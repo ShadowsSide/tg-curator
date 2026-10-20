@@ -1,0 +1,220 @@
+# tg-submit-bot
+
+[![docker](https://github.com/ShadowsSide/tg-submit-bot/actions/workflows/docker.yml/badge.svg)](https://github.com/ShadowsSide/tg-submit-bot/actions/workflows/docker.yml)
+[![license](https://img.shields.io/github/license/ShadowsSide/tg-submit-bot)](LICENSE)
+![python](https://img.shields.io/badge/python-3.12-blue)
+![platform](https://img.shields.io/badge/platform-linux%2Famd64%20%7C%20linux%2Farm64-lightgrey)
+
+[简体中文](README.md) | **English**
+
+A Telegram channel submission bot: users send posts to the bot in a private chat, admins review them in a review group, and approved posts are published to the channel.
+
+Built with Python 3.12 + [aiogram 3](https://github.com/aiogram/aiogram) + SQLite, deployed with a single Docker Compose command. It uses long polling, so **you don't need a public IP or HTTPS**.
+
+> The bot's own messages and buttons are in Chinese. All texts live in the source code (mainly `bot/handlers/`, `bot/core.py` and `bot/render.py`), and the signature lines can be changed in `.env`.
+
+## Features
+
+**Submitting**
+- Text, photos, videos, GIFs, files, audio and voice messages. Albums of several photos or videos are merged into one submission
+- Submitters choose to post **signed** (with their name) or **anonymously**. Either way, admins can always see who sent it
+- **Formatting is kept exactly as sent**: links, bold, quotes, spoiler text, code, date/time and emoji all come through to the channel unchanged
+- Submitters can **edit their post** until it has been reviewed, either with Telegram's built-in "Edit" or with `/edit`
+
+**Reviewing**
+- Each submission gets a preview in the review group (exactly what the channel will show), followed by a control message with colored buttons
+- Publish now · Schedule · Reject · Ban submitter
+- Publishing options: 🙈 **spoiler** (blur the media) and 🔕 **silent** (subscribers get a notification without sound)
+- `/edit` to change a post, `/no reason` to reject, `/ban reason` to ban. Banning also rejects every open submission from that user
+- Safe against double actions: if two admins press "Publish" at the same time, the post is still published only once
+
+**Scheduling and stats**
+- Schedule with quick buttons or a custom time (`20:30`, `10-20 09:00`, `+2h`, …). Schedules are stored in the database and survive restarts
+- A review summary is posted to the review group at a set interval and refreshed after each review action. It looks like this (accepted / rejected / pending, approval rate, review rate):
+  ```
+  接受 3 拒绝 1 待审核 4
+  通过率: 75.00% 审核率: 50.00%
+  #审核统计 [更新于 16:03:10]
+  ```
+- Contributor activity ranking and per-user stats; submitters can see their own stats with `/me`
+
+**Deployment**
+- Multi-arch images for `linux/amd64` and `linux/arm64`: works on regular VPSes, ARM servers and Raspberry Pi
+- Proxy support (`http://`, `socks5://`) and support for a self-hosted Bot API server
+
+## How it works
+
+```
+User sends content ─► chooses signed / anonymous ─► Review group: preview + control message
+                                                             │
+        ┌───────────────┬──────────────────┬─────────────────┼──────────────────┐
+  spoiler / silent   ✏️ Edit          ✅ Publish now      ⏰ Schedule      ❌ Reject / 🚫 Ban
+                                             │                 │                  │
+                                             ▼                 ▼                  ▼
+                                   Channel + notify user   Publish on time   Notify user (with reason)
+```
+
+## Quick start
+
+### 1. Set up Telegram
+
+1. Create a bot with [@BotFather](https://t.me/BotFather) and copy its token. Leave privacy mode on (the default)
+2. Make the bot an admin of your **channel** with permission to post messages
+3. Create a **review group** and add the bot as a regular member. Anyone in the review group can review posts, so only add your admins
+4. Find the channel ID and review group ID (both are numbers starting with `-100`). You can use a bot such as [@RawDataBot](https://t.me/RawDataBot), or send a message in the group and open `https://api.telegram.org/bot<token>/getUpdates`. For the channel you can also use its `@username`
+
+### 2. Deploy
+
+```bash
+git clone https://github.com/ShadowsSide/tg-submit-bot.git
+cd tg-submit-bot
+cp .env.example .env        # fill in BOT_TOKEN, CHANNEL_ID and REVIEW_CHAT_ID
+docker compose up -d --build
+docker compose logs -f
+```
+
+To use the prebuilt image instead of building on your server, add this to `.env`:
+
+```bash
+IMAGE=ghcr.io/shadowsside/tg-submit-bot:latest
+```
+
+and run:
+
+```bash
+docker compose pull && docker compose up -d --no-build
+```
+
+Image tags: `latest` is the newest build of the main branch, `vX.Y.Z` are releases, and `sha-xxxxxxx` points to a specific build, which is handy for rolling back.
+
+### 3. Updating and backups
+
+```bash
+git pull && docker compose up -d --build                         # update (build yourself)
+docker compose pull && docker compose up -d --no-build           # update (prebuilt image)
+docker compose cp bot:/app/data/bot.db ./backup-$(date +%F).db   # back up the database
+```
+
+The database lives in the `bot-data` Docker volume. Its schema is migrated automatically when you upgrade.
+
+## Configuration
+
+Everything is configured in `.env`. See [`.env.example`](.env.example) for a full example.
+
+| Variable | Default | Description |
+|---|---|---|
+| `BOT_TOKEN` | — | **Required.** The bot token |
+| `CHANNEL_ID` | — | **Required.** Channel to publish to: `@username` or `-100…` |
+| `REVIEW_CHAT_ID` | — | **Required.** Review group ID |
+| `TZ` | `Asia/Shanghai` | Time zone for scheduling and for what counts as "today" in stats |
+| `SIGN_TEMPLATE` | `投稿人：{name}` | Signature for signed posts; `{name}` becomes a link to the submitter |
+| `ANON_SIGNATURE` | `匿名投稿` | Signature for anonymous posts; leave empty for none |
+| `MAX_PENDING_PER_USER` | `5` | Maximum open submissions per user at a time |
+| `ALBUM_DELAY` | `1.5` | Seconds to wait while collecting the parts of an album |
+| `SCHEDULE_PRESETS` | `09:00,12:00,18:00,21:00` | Quick time buttons in the schedule panel |
+| `DEFAULT_SILENT` | `false` | Whether new submissions are published silently by default |
+| `REMINDER_INTERVAL_MINUTES` | `60` | Interval of the review summary, aligned to the clock; `0` turns it off |
+| `REMINDER_ONLY_WHEN_PENDING` | `true` | Only post the summary when something is waiting for review |
+| `REMINDER_QUIET_HOURS` | — | Quiet hours with no summaries, e.g. `0-8` |
+| `STATS_SCOPE` | `today` | `today`: accepted/rejected counts cover today only; `all`: all time |
+| `PROXY` | — | Proxy, e.g. `socks5://host:port` |
+| `TELEGRAM_API_URL` | — | Self-hosted Bot API server, which lifts the official 20 MB / 50 MB file limits |
+| `IMAGE` | `tg-submit-bot:latest` | Set this when using a prebuilt image |
+
+> Inside Docker, `127.0.0.1` means the container itself. To use a proxy running on the host, use the host's IP address or `host.docker.internal` (Docker Desktop).
+
+## Usage
+
+### Submitters (private chat with the bot)
+
+| Action | Description |
+|---|---|
+| Send any content | Starts a submission, then choose signed or anonymous |
+| Edit the original message with Telegram's "Edit" | Changes the submission until it has been reviewed: text, formatting, or even the image |
+| `/edit new content` | Reply to your submission. If you have only one pending submission, you don't need to reply; with several, use `/edit #id new content` |
+| `/edit` | Shows the current content with formatting, so you can copy and change it |
+| `/me` | Your submission stats |
+
+### Admins (review group)
+
+Buttons on the control message: **✅ Publish now**, **⏰ Schedule**, **❌ Reject**, **🚫 Ban submitter**, plus the **🙈 Spoiler** and **🔕 Silent** toggles.
+
+Use the commands below by **replying** to a submission's preview or control message, or by giving the submission ID:
+
+| Command | Description |
+|---|---|
+| `/edit new content` | Changes the text or caption, keeping its formatting, and posts a new preview. The original is kept |
+| `/edit` | Shows the current content with formatting |
+| `/no [reason]` | Rejects the submission; the reason is sent to the submitter |
+| `/ban [reason]` | Bans the submitter and rejects all their open submissions |
+| `/unban <user ID>` | Lifts a ban |
+| `/stats` | Posts the latest review summary |
+| `/queue` | Lists scheduled posts |
+| `/active [days]` | Contributor activity ranking (default: 30 days) |
+| `/user <user ID>` | Shows one contributor's stats |
+
+Without replying: `/no 12 reason`, `/edit #12 new content`, `/ban <user ID or #submission ID> reason`.
+
+## FAQ
+
+**Custom (premium) emoji turn into regular emoji in the channel. Why?**
+Telegram only lets bots with a username bought on Fragment send custom emoji to channels. When the channel refuses them, the bot automatically resends the post with the matching regular emoji. All other formatting is unaffected.
+
+**The log says `Conflict: terminated by other getUpdates request`.**
+Two processes are using the same token. Make sure only one instance is running, and use a separate bot for testing.
+
+**A post failed to publish. What now?**
+The control message shows the reason and a 🔁 Retry button. A common cause is that the caption plus the signature exceeds Telegram's length limit (1024 characters for media captions, 4096 for text). Shorten it with `/edit`, then retry.
+
+**A user sent several GIFs and got several submissions. Why?**
+Telegram doesn't allow GIFs in albums, so each GIF becomes its own submission.
+
+## Development
+
+Requires Python 3.10 or newer.
+
+```bash
+python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
+cp .env.example .env && mkdir -p data
+set -a; source .env; set +a
+DB_PATH=./data/bot.db .venv/bin/python -m bot
+```
+
+The tests need no token and no network access:
+
+```bash
+.venv/bin/python tests/test_entities.py   # unit tests: formatting offsets (UTF-16)
+.venv/bin/python tests/live_test.py       # end-to-end: runs the real bot against a mock Bot API server (~1 minute)
+```
+
+### Project layout
+
+```
+bot/
+  __main__.py     entry point
+  config.py       environment variables
+  db.py           SQLite schema, migrations and queries
+  core.py         submitting, reviewing, publishing, editing, scheduling, stats
+  render.py       sending content (single / album, signature, spoiler, silent) and message texts
+  entities.py     message formatting (UTF-16 offsets, appending the signature)
+  keyboards.py    colored inline buttons
+  album.py        album collection
+  timeutil.py     time parsing
+  handlers/
+    user.py       private chat: submitting, editing, /me
+    review.py     review group: buttons and commands
+tests/            unit and end-to-end tests
+scripts/          multi-arch image build script
+```
+
+### Publishing images (for your own fork)
+
+On every push to `main` or `v*` tag, GitHub Actions builds amd64 + arm64 images and publishes them to `ghcr.io/<owner>/tg-submit-bot`.
+
+To publish to Docker Hub as well, add the variable `DOCKERHUB_USERNAME` and the secret `DOCKERHUB_TOKEN` (a Docker Hub access token with Read & Write permission) under **Settings → Secrets and variables → Actions** in your repository.
+
+You can also build and push locally: `scripts/build-multiarch.sh <image:tag>`.
+
+## License
+
+[MIT](LICENSE)

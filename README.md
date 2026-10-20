@@ -5,6 +5,8 @@
 ![python](https://img.shields.io/badge/python-3.12-blue)
 ![platform](https://img.shields.io/badge/platform-linux%2Famd64%20%7C%20linux%2Farm64-lightgrey)
 
+**简体中文** | [English](README.en.md)
+
 一个 Telegram 频道投稿机器人：用户私聊投稿，管理员在审核群里审核，通过后发布到频道。
 
 基于 Python 3.12 + [aiogram 3](https://github.com/aiogram/aiogram) + SQLite，使用 Docker Compose 一键部署。采用长轮询方式运行，**不需要公网 IP，也不需要 HTTPS**。

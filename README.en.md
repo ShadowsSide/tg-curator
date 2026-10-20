@@ -38,6 +38,10 @@ Built with Python 3.12 + [aiogram 3](https://github.com/aiogram/aiogram) + SQLit
   ```
 - Contributor activity ranking and per-user stats; submitters can see their own stats with `/me`
 
+**Topic mode** (optional, switched on separately for each side)
+- **Review group**: every new submission gets its own topic holding the preview, the control message and the discussion. Inside a topic you can send `/no`, `/edit` and the other commands directly, without replying. The topic name follows the status (⏳ pending → ⏰ scheduled → ✅ published / ❌ rejected), and the topic is closed once the review is done
+- **Submitter's private chat**: every submission gets its own topic, so its content, edits and review notifications stay together and separate from other submissions
+
 **English and Chinese**
 - Submitters see the language of their Telegram app (Chinese clients get Chinese, everyone else English); the review group, channel signatures and the review summary use the `LANGUAGE` setting
 - The command menu is shown in the client's language too
@@ -112,6 +116,8 @@ Everything is configured in `.env`. See [`.env.example`](.env.example) for a ful
 | `REVIEW_CHAT_ID` | — | **Required.** Review group ID |
 | `LANGUAGE` | `zh` | Language of the review group, channel signatures and review summary: `zh` / `en` |
 | `USER_LANGUAGE` | `auto` | Language submitters see: `auto` follows their Telegram app, or fix it to `zh` / `en` |
+| `REVIEW_TOPICS` | `false` | Topic mode in the review group: the group needs topics enabled, and the bot must be an admin allowed to manage topics |
+| `USER_TOPICS` | `false` | Topic mode in private chats: enable topic mode for the bot in @BotFather first |
 | `TZ` | `Asia/Shanghai` | Time zone for scheduling and for what counts as "today" in stats |
 | `SIGN_TEMPLATE` | depends on `LANGUAGE`: `Submitted by {name}` / `投稿人：{name}` | Signature for signed posts; `{name}` becomes a link to the submitter |
 | `ANON_SIGNATURE` | depends on `LANGUAGE`: `Anonymous submission` / `匿名投稿` | Signature for anonymous posts; set it to empty for none |
@@ -126,6 +132,8 @@ Everything is configured in `.env`. See [`.env.example`](.env.example) for a ful
 | `PROXY` | — | Proxy, e.g. `socks5://host:port` |
 | `TELEGRAM_API_URL` | — | Self-hosted Bot API server, which lifts the official 20 MB / 50 MB file limits |
 | `IMAGE` | `tg-submit-bot:latest` | Set this when using a prebuilt image |
+
+> If topic mode can't be used (the review group has no topics, topic mode isn't enabled in BotFather, or a permission is missing), the bot falls back to normal mode and logs why.
 
 > Inside Docker, `127.0.0.1` means the container itself. To use a proxy running on the host, use the host's IP address or `host.docker.internal` (Docker Desktop).
 
@@ -159,7 +167,7 @@ Use the commands below by **replying** to a submission's preview or control mess
 | `/active [days]` | Contributor activity ranking (default: 30 days) |
 | `/user <user ID>` | Shows one contributor's stats |
 
-Without replying: `/no 12 reason`, `/edit #12 new content`, `/ban <user ID or #submission ID> reason`.
+With review-group topics on, just send these commands inside the submission's topic — no reply needed. Without replying: `/no 12 reason`, `/edit #12 new content`, `/ban <user ID or #submission ID> reason`.
 
 ## FAQ
 
@@ -192,6 +200,7 @@ The tests need no token and no network access:
 .venv/bin/python tests/test_entities.py   # unit tests: formatting offsets (UTF-16)
 .venv/bin/python tests/test_i18n.py       # unit tests: every text exists in both languages
 .venv/bin/python tests/live_test.py       # end-to-end: runs the real bot against a mock Bot API server (~1 minute)
+.venv/bin/python tests/live_topics_test.py  # end-to-end: topic mode (~10 seconds)
 ```
 
 ### Project layout

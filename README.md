@@ -36,6 +36,10 @@
   ```
 - 投稿人活跃度排行、单个投稿人统计；投稿人可以用 `/me` 查看自己的统计
 
+**话题模式**（可选，两边分别开启）
+- **审核群**：每条新投稿自动建一个话题，预览、控制消息和讨论都在里面；在话题里直接发 `/no`、`/edit` 等命令，不用回复消息。话题名称会随状态变化（⏳ 待审核 → ⏰ 已定时 → ✅ 已发布 / ❌ 已拒绝），审核完成后话题自动关闭
+- **投稿人私聊**：每条投稿一个话题，投稿内容、修改和审核结果通知都在同一个话题里，多条投稿互不干扰
+
 **中英文界面**
 - 投稿人看到的语言跟随其 Telegram 客户端（中文客户端显示中文，其他显示英文）；审核群、频道落款和统计提醒使用 `LANGUAGE` 配置的语言
 - 命令菜单也按客户端语言显示
@@ -110,6 +114,8 @@ docker compose cp bot:/app/data/bot.db ./backup-$(date +%F).db   # 备份数据�
 | `REVIEW_CHAT_ID` | — | **必填**。审核群 ID |
 | `LANGUAGE` | `zh` | 审核群、频道落款、统计提醒的语言：`zh` / `en` |
 | `USER_LANGUAGE` | `auto` | 投稿人看到的语言：`auto` 跟随其客户端，或固定为 `zh` / `en` |
+| `REVIEW_TOPICS` | `false` | 审核群话题模式：审核群需开启话题，机器人需是管理员并有“管理话题”权限 |
+| `USER_TOPICS` | `false` | 私聊话题模式：需先在 @BotFather 里为机器人开启话题模式 |
 | `TZ` | `Asia/Shanghai` | 时区，影响定时发布和“今天”的统计范围 |
 | `SIGN_TEMPLATE` | 随 `LANGUAGE`：`投稿人：{name}` / `Submitted by {name}` | 署名落款，`{name}` 会替换成投稿人链接 |
 | `ANON_SIGNATURE` | 随 `LANGUAGE`：`匿名投稿` / `Anonymous submission` | 匿名落款，设为空则不加落款 |
@@ -124,6 +130,8 @@ docker compose cp bot:/app/data/bot.db ./backup-$(date +%F).db   # 备份数据�
 | `PROXY` | — | 代理，例如 `socks5://host:port` |
 | `TELEGRAM_API_URL` | — | 自建 Bot API 服务器地址，可以突破官方 API 的 20MB/50MB 文件限制 |
 | `IMAGE` | `tg-submit-bot:latest` | 使用预构建镜像时填写 |
+
+> 话题模式的条件不满足时（审核群没开话题、BotFather 里没开话题模式、缺少权限），机器人会自动改用普通模式，并在日志里提示。
 
 > 在 Docker 里运行时，`127.0.0.1` 指的是容器自己。要使用宿主机上的代理，请填宿主机 IP，或者 `host.docker.internal`（Docker Desktop）。
 
@@ -157,7 +165,7 @@ docker compose cp bot:/app/data/bot.db ./backup-$(date +%F).db   # 备份数据�
 | `/active [天数]` | 投稿人活跃度排行（默认 30 天） |
 | `/user <用户ID>` | 查看某位投稿人 |
 
-不回复消息时的写法：`/no 12 理由`、`/edit #12 新内容`、`/ban <用户ID 或 #投稿编号> 理由`。
+开启审核群话题模式后，在投稿自己的话题里直接发这些命令即可，不用回复。不回复消息时的写法：`/no 12 理由`、`/edit #12 新内容`、`/ban <用户ID 或 #投稿编号> 理由`。
 
 ## 常见问题
 
@@ -190,6 +198,7 @@ DB_PATH=./data/bot.db .venv/bin/python -m bot
 .venv/bin/python tests/test_entities.py   # 单元测试：格式偏移（UTF-16）计算
 .venv/bin/python tests/test_i18n.py       # 单元测试：中英文文案齐全、占位符一致
 .venv/bin/python tests/live_test.py       # 端到端测试：启动模拟的 Bot API 服务器，运行真实的机器人进程（约 1 分钟）
+.venv/bin/python tests/live_topics_test.py  # 端到端测试：话题模式（约 10 秒）
 ```
 
 ### 项目结构

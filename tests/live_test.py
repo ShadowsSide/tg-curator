@@ -35,9 +35,16 @@ def chat(cid):
     return {"id": cid, "type": "private" if cid > 0 else ("channel" if cid == CHANNEL else "supergroup")}
 
 
-def make_msg(chat_id):
+MOCK = {"review_is_forum": False, "bot_topics": False}
+next_topic = [7000]
+
+
+def make_msg(chat_id, thread_id=None):
     mid[0] += 1
-    return {"message_id": mid[0], "date": now(), "chat": chat(int(chat_id))}
+    msg = {"message_id": mid[0], "date": now(), "chat": chat(int(chat_id))}
+    if thread_id:
+        msg.update(message_thread_id=int(thread_id), is_topic_message=True)
+    return msg
 
 
 async def handle(request: web.Request):
@@ -73,17 +80,27 @@ async def handle(request: web.Request):
         return web.json_response({"ok": False, "error_code": 400,
                                   "description": "Bad Request: custom emoji can't be used in this chat"}, status=400)
 
+    thread = params.get("message_thread_id")
     if m == "getme":
-        result = {"id": 1, "is_bot": True, "first_name": "TestBot", "username": "test_bot"}
+        result = {"id": 1, "is_bot": True, "first_name": "TestBot", "username": "test_bot",
+                  "has_topics_enabled": MOCK["bot_topics"]}
     elif m == "getchat":
-        result = {**chat(CHANNEL), "title": "Test Channel", "username": "testchan", "accent_color_id": 0,
-                  "max_reaction_count": 11,
-                  "accepted_gift_types": {k: False for k in ("unlimited_gifts", "limited_gifts", "unique_gifts",
-                                                             "premium_subscription", "gifts_from_channels")}}
+        info = {"accent_color_id": 0, "max_reaction_count": 11,
+                "accepted_gift_types": {k: False for k in ("unlimited_gifts", "limited_gifts", "unique_gifts",
+                                                           "premium_subscription", "gifts_from_channels")}}
+        if str(params.get("chat_id")) == str(REVIEW):
+            result = {**chat(REVIEW), "title": "Review", "is_forum": MOCK["review_is_forum"], **info}
+        else:
+            result = {**chat(CHANNEL), "title": "Test Channel", "username": "testchan", **info}
+    elif m == "createforumtopic":
+        next_topic[0] += 1
+        result = {"message_thread_id": next_topic[0], "name": params["name"], "icon_color": int(params.get("icon_color", 0))}
+    elif m == "copymessages":
+        result = [{"message_id": make_msg(params["chat_id"], thread)["message_id"]} for _ in params["message_ids"]]
     elif m == "sendmediagroup":
-        result = [make_msg(params["chat_id"]) for _ in params["media"]]
+        result = [make_msg(params["chat_id"], thread) for _ in params["media"]]
     elif m.startswith("send"):
-        result = make_msg(params["chat_id"])
+        result = make_msg(params["chat_id"], thread)
     else:
         result = True
     log.append({"method": method, "params": params, "result": result, "t": time.time()})
@@ -386,7 +403,8 @@ async def scenario():
     check("reminder loop posted stats on its own", e, e and e["params"]["text"].replace("\n", " | "))
 
 
-async def main():
+async def main(scenario_fn=None, extra_env=None):
+    scenario_fn = scenario_fn or scenario
     app = web.Application()
     app.router.add_route("*", "/bot{token}/{method}", handle)
     runner = web.AppRunner(app)
@@ -398,7 +416,7 @@ async def main():
     env = {**os.environ, "BOT_TOKEN": "123:TEST", "CHANNEL_ID": str(CHANNEL), "REVIEW_CHAT_ID": str(REVIEW),
            "TELEGRAM_API_URL": f"http://127.0.0.1:{port}", "DB_PATH": os.path.join(tempfile.mkdtemp(), "bot.db"),
            "ALBUM_DELAY": "0.5", "REMINDER_INTERVAL_MINUTES": "1", "REMINDER_ONLY_WHEN_PENDING": "false",
-           "REMINDER_QUIET_HOURS": "", "TZ": "Asia/Shanghai", "PYTHONUNBUFFERED": "1"}
+           "REMINDER_QUIET_HOURS": "", "TZ": "Asia/Shanghai", "PYTHONUNBUFFERED": "1", **(extra_env or {})}
     proc = await asyncio.create_subprocess_exec(sys.executable, "-m", "bot", cwd=PROJECT, env=env,
                                                 stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.STDOUT)
     bot_log = []
@@ -409,7 +427,7 @@ async def main():
 
     pump_task = asyncio.create_task(pump())
     try:
-        await scenario()
+        await scenario_fn()
     except Exception as e:  # 场景中断时仍然输出机器人日志，方便排查
         import traceback
         traceback.print_exc()
@@ -431,4 +449,5 @@ async def main():
     sys.exit(0 if all(ok for _, ok in results) else 1)
 
 
-asyncio.run(main())
+if __name__ == "__main__":
+    asyncio.run(main())

@@ -12,7 +12,7 @@ from aiogram.types import CallbackQuery, ForceReply, Message
 
 from .. import entities as ent
 from ..config import Settings
-from ..core import NO_PREVIEW, Core, mention
+from ..core import NO_PREVIEW, Core, explicit_reply, mention, topic_of
 from ..i18n import join_ids, t
 from ..keyboards import ReviewCB
 from ..render import dump_link_preview, user_link
@@ -46,9 +46,13 @@ def _split_ref(args: str) -> tuple[str | None, int | None, str | None]:
 
 
 async def _replied_sid(m: Message, core: Core) -> int | None:
-    if not m.reply_to_message:
-        return None
-    return await core.db.sid_by_review_message(m.reply_to_message.message_id)
+    """命令针对的投稿：回复了投稿消息就用它；话题模式下，在投稿的话题里直接发命令也行。"""
+    reply = explicit_reply(m)
+    if reply:
+        return await core.db.sid_by_review_message(reply.message_id)
+    if topic_of(m):
+        return await core.db.sid_by_review_topic(topic_of(m))
+    return None
 
 
 def build_router(settings: Settings) -> Router:
@@ -145,7 +149,7 @@ def build_router(settings: Settings) -> Router:
         sid = await _replied_sid(m, core)
         if sid is not None:
             reason = _clean_reason(args)
-        elif m.reply_to_message:
+        elif explicit_reply(m):
             await m.reply(t(core.lang, "reply_to_submission"))
             return
         else:
@@ -167,7 +171,7 @@ def build_router(settings: Settings) -> Router:
         body, entities = ent.strip_command(m.text or m.caption or "", ent.dump(m.entities or m.caption_entities))
         sid = await _replied_sid(m, core)
         if sid is None:
-            if m.reply_to_message:
+            if explicit_reply(m):
                 await m.reply(t(core.lang, "reply_to_submission"))
                 return
             ref = re.match(r"#?(\d+)[ \t]*\n?", body)
@@ -191,7 +195,7 @@ def build_router(settings: Settings) -> Router:
         sid = await _replied_sid(m, core)
         if sid is not None:
             user_id, reason = (await core.db.get(sid)).user_id, _clean_reason(args)
-        elif m.reply_to_message:
+        elif explicit_reply(m):
             await m.reply(t(core.lang, "reply_to_submission"))
             return
         else:

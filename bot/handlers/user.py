@@ -8,7 +8,7 @@ from aiogram.filters import Command, CommandStart
 from aiogram.types import CallbackQuery, Message
 
 from .. import entities as ent
-from ..core import Core
+from ..core import Core, explicit_reply, topic_of
 from ..db import SUBMITTER_EDITABLE
 from ..i18n import join_ids, t
 from ..keyboards import UserCB
@@ -37,12 +37,16 @@ def build_router() -> Router:
         body, entities = ent.strip_command(m.text or m.caption or "", ent.dump(m.entities or m.caption_entities))
         mine = await core.db.editable_by_submitter(uid)
 
-        if m.reply_to_message:
-            found = await core.db.find_by_user_message(uid, m.reply_to_message.message_id)
+        reply = explicit_reply(m)
+        topic_sid = await core.db.sid_by_user_topic(uid, topic_of(m)) if topic_of(m) else None
+        if reply:
+            found = await core.db.find_by_user_message(uid, reply.message_id)
             if not found:
                 await m.reply(t(lang, "u_edit_reply_own"))
                 return
             sid = found[0]
+        elif topic_sid:  # 私聊话题模式：在投稿自己的话题里直接 /edit
+            sid = topic_sid
         else:
             # “#12 新内容”一定是编号；纯数字只有在确实是自己可修改的投稿编号时才当作编号，
             # 避免把“/edit 2024年总结”里的 2024 误认成投稿编号

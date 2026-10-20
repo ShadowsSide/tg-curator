@@ -46,6 +46,7 @@ T: dict[str, dict[str, str]] = {
     "status_changed": {"zh": "状态已变化，请刷新", "en": "The status has changed, please refresh"},
     "default_sign": {"zh": "投稿人：{name}", "en": "Submitted by {name}"},
     "default_anon": {"zh": "匿名投稿", "en": "Anonymous submission"},
+    "topic_anon": {"zh": "匿名", "en": "anonymous"},
 
     # ---------- 内容类型 ----------
     "type_text": {"zh": "文字", "en": "text"},

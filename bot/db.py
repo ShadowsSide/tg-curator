@@ -56,6 +56,9 @@ CREATE TABLE IF NOT EXISTS submissions (
     original_items TEXT,
     edited_by      TEXT,
     edited_at      INTEGER,
+    review_topic_id INTEGER,
+    user_topic_id  INTEGER,
+    topic_status   TEXT,
     error          TEXT
 );
 
@@ -85,6 +88,9 @@ MIGRATIONS = [
     ("submissions", "edited_by", "ALTER TABLE submissions ADD COLUMN edited_by TEXT"),
     ("submissions", "edited_at", "ALTER TABLE submissions ADD COLUMN edited_at INTEGER"),
     ("users", "lang", "ALTER TABLE users ADD COLUMN lang TEXT"),
+    ("submissions", "review_topic_id", "ALTER TABLE submissions ADD COLUMN review_topic_id INTEGER"),
+    ("submissions", "user_topic_id", "ALTER TABLE submissions ADD COLUMN user_topic_id INTEGER"),
+    ("submissions", "topic_status", "ALTER TABLE submissions ADD COLUMN topic_status TEXT"),
 ]
 
 OPEN_STATES = ("pending", "scheduled", "failed")  # 已提交、尚未发布或拒绝
@@ -131,6 +137,9 @@ class Submission:
     original_items: list[dict[str, Any]] | None  # 第一次 /edit 前的原稿
     edited_by: str | None
     edited_at: int | None
+    review_topic_id: int | None  # 话题模式：审核群里这条投稿的话题
+    user_topic_id: int | None  # 话题模式：投稿人私聊里这条投稿的话题
+    topic_status: str | None  # 话题名称上次同步时的状态，避免重复改名
     error: str | None
 
     @property
@@ -268,6 +277,16 @@ class DB:
             (user_id, message_id),
         )
         return (row[0], None) if row else None
+
+    async def sid_by_review_topic(self, thread_id: int) -> int | None:
+        row = await self._one("SELECT id FROM submissions WHERE review_topic_id=? ORDER BY id DESC LIMIT 1", (thread_id,))
+        return row[0] if row else None
+
+    async def sid_by_user_topic(self, user_id: int, thread_id: int) -> int | None:
+        row = await self._one(
+            "SELECT id FROM submissions WHERE user_id=? AND user_topic_id=? ORDER BY id DESC LIMIT 1", (user_id, thread_id)
+        )
+        return row[0] if row else None
 
     async def editable_by_submitter(self, user_id: int) -> list[Submission]:
         marks = ", ".join("?" * len(SUBMITTER_EDITABLE))

@@ -50,6 +50,8 @@ class Settings:
     api_url: str
     language: str  # 审核群、频道落款、统计提醒的语言
     user_language: str  # 投稿人看到的语言：auto（跟随客户端）/ zh / en
+    review_topics: bool  # 审核群话题模式：每条投稿一个话题
+    user_topics: bool  # 私聊话题模式：每条投稿在投稿人私聊里一个话题
 
     def in_quiet_hours(self, hour: int) -> bool:
         if not self.quiet_hours:
@@ -94,4 +96,6 @@ def load_settings() -> Settings:
         api_url=_env("TELEGRAM_API_URL"),
         language=language,
         user_language=_lang(_env("USER_LANGUAGE", "auto"), ("auto", *LANGS), "USER_LANGUAGE"),
+        review_topics=_bool(_env("REVIEW_TOPICS", "false")),
+        user_topics=_bool(_env("USER_TOPICS", "false")),
     )

@@ -53,7 +53,8 @@ def _sub(status="pending", **kw):
         reviewer_id=1, reviewer_name="Admin", scheduled_at=int(datetime.now(TZ).timestamp()) + 3600,
         published_at=int(datetime.now(TZ).timestamp()), user_msg_id=None, review_msg_id=None, channel_msg_id=5,
         reject_reason="spam", original_items=None, edited_by="submitter Bob",
-        edited_at=int(datetime.now(TZ).timestamp()), error="Bad Request",
+        edited_at=int(datetime.now(TZ).timestamp()), review_topic_id=None, user_topic_id=None, topic_status=None,
+        error="Bad Request",
     )
     base.update(kw)
     return Submission(**base)

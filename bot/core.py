@@ -26,6 +26,11 @@ from .timeutil import fmt_ts, now_ts, start_of_today, utc_offset
 
 log = logging.getLogger(__name__)
 
+# 话题名称前的状态图标
+STATUS_ICON = {"draft": "📝", "pending": "⏳", "scheduled": "⏰", "published": "✅",
+               "rejected": "❌", "failed": "⚠️", "cancelled": "🚫"}
+TOPIC_COLOR = 7322096  # 蓝色（Telegram 只允许几种固定颜色）
+
 SCHEDULER_TICK = 15  # 秒
 DRAFT_TTL = 24 * 3600
 STATS_MSG_KEY = "stats_msg_id"
@@ -44,6 +49,8 @@ class Core:
         self.db = db
         self.s = settings
         self.lang = settings.language
+        self.review_topics = settings.review_topics
+        self.user_topics = settings.user_topics
         self.albums = AlbumCollector(settings.album_delay, self.receive)
         self.channel_post_base: str | None = None
         self._stats_lock = asyncio.Lock()
@@ -58,6 +65,18 @@ class Core:
         else:
             self.channel_post_base = f"https://t.me/c/{str(chat.id).removeprefix('-100')}/"
         await self.db.reset_stuck_publishing()
+
+        # 话题模式的前提条件不满足时，降级为普通模式并在日志里说明，而不是启动失败
+        if self.review_topics:
+            review = await self.bot.get_chat(self.s.review_chat_id)
+            if not review.is_forum:
+                log.warning("REVIEW_TOPICS=true，但审核群没有开启话题功能，已改用普通模式")
+                self.review_topics = False
+        if self.user_topics:
+            me = await self.bot.get_me()
+            if not me.has_topics_enabled:
+                log.warning("USER_TOPICS=true，但机器人没有在 @BotFather 开启话题模式，已改用普通模式")
+                self.user_topics = False
 
     def start_background(self) -> None:
         self._tasks = [
@@ -102,15 +121,18 @@ class Core:
     async def notify(self, sub: Submission, key: str, **kw) -> None:
         """用投稿人自己的语言通知他，回复在他的投稿提示消息下面。"""
         lang = await self.user_lang(sub.user_id)
-        await self.notify_user(sub.user_id, t(lang, key, **kw), reply_to=sub.user_msg_id)
+        await self.notify_user(sub.user_id, t(lang, key, **kw), reply_to=sub.user_msg_id, thread_id=sub.user_topic_id)
 
-    async def notify_user(self, user_id: int, text: str, reply_to: int | None = None) -> None:
+    async def notify_user(self, user_id: int, text: str, reply_to: int | None = None,
+                          thread_id: int | None = None) -> None:
         try:
-            await self.bot.send_message(user_id, text, reply_parameters=_reply_to(reply_to))
+            await self.bot.send_message(user_id, text, reply_parameters=_reply_to(reply_to),
+                                        message_thread_id=thread_id)
         except TelegramAPIError as e:  # 用户把机器人拉黑、从没启动过机器人等
             log.info("通知用户 %s 失败：%s", user_id, e)
 
     async def refresh_control(self, sid: int) -> None:
+        await self.sync_topics(sid)
         sub = await self.db.get(sid)
         if not sub or not sub.review_msg_id:
             return
@@ -136,6 +158,54 @@ class Core:
             message_id=sub.review_msg_id,
             reply_markup=schedule_kb(sid, self.s.schedule_presets, self.s.tz, self.lang),
         )
+
+    # ---------- 话题模式 ----------
+
+    def _review_topic_name(self, sub: Submission, user) -> str:
+        who = (user.full_name if user and user.full_name else str(sub.user_id))
+        if sub.anonymous:
+            who += f" ({t(self.lang, 'topic_anon')})"
+        return f"{STATUS_ICON.get(sub.status, '')} #{sub.id} · {who} · {describe(sub.items, self.lang)}"[:128]
+
+    def _user_topic_name(self, sub: Submission, lang: str) -> str:
+        text = next((it["text"] for it in sub.items if it.get("text")), "")
+        snippet = " ".join(text.split())[:30] or describe(sub.items, lang)
+        return f"{STATUS_ICON.get(sub.status, '')} #{sub.id} · {snippet}"[:128]
+
+    async def _create_topic(self, chat_id: int, name: str) -> int | None:
+        try:
+            topic = await self.bot.create_forum_topic(chat_id, name, icon_color=TOPIC_COLOR)
+            return topic.message_thread_id
+        except TelegramAPIError as e:  # 没有管理话题权限等：退回普通模式
+            log.warning("创建话题失败（%s），这条投稿改用普通模式", e)
+            return None
+
+    async def sync_topics(self, sid: int, review_is_fresh: bool = False) -> None:
+        """状态变化后更新话题名称（前面的状态图标）；审核群里已发布/已拒绝的话题顺便关闭。
+        review_is_fresh：审核话题刚按当前状态创建，不用再改名（每次改名都会在话题里留一条服务消息）。"""
+        sub = await self.db.get(sid)
+        if not sub or sub.status == sub.topic_status or sub.status == "publishing":
+            return
+        if not sub.review_topic_id and not sub.user_topic_id:
+            return
+        if sub.review_topic_id and not review_is_fresh:
+            user = await self.db.get_user(sub.user_id)
+            await self._try(self.bot.edit_forum_topic(
+                self.s.review_chat_id, sub.review_topic_id, name=self._review_topic_name(sub, user)))
+            if sub.status in ("published", "rejected"):
+                await self._try(self.bot.close_forum_topic(self.s.review_chat_id, sub.review_topic_id))
+        if sub.user_topic_id:
+            lang = await self.user_lang(sub.user_id)
+            await self._try(self.bot.edit_forum_topic(
+                sub.user_id, sub.user_topic_id, name=self._user_topic_name(sub, lang)))
+        await self.db.update(sid, topic_status=sub.status)
+
+    @staticmethod
+    async def _try(call) -> None:
+        try:
+            await call
+        except TelegramAPIError as e:
+            log.info("话题操作失败：%s", e)
 
     # ---------- 用户侧 ----------
 
@@ -165,10 +235,29 @@ class Core:
         # 用户自己给媒体加了剧透时，默认保留剧透
         spoiler = any(i.get("spoiler") for i in items)
         sid = await self.db.create_draft(user.id, items, silent=self.s.default_silent, spoiler=spoiler)
-        prompt = await first.reply(
-            t(lang, "choose_mode", desc=describe(items, lang)), reply_markup=user_choice_kb(sid, lang)
-        )
-        await self.db.update(sid, user_msg_id=prompt.message_id)
+        text, kb = t(lang, "choose_mode", desc=describe(items, lang)), user_choice_kb(sid, lang)
+
+        topic_id = await self._user_topic_for(sid, messages, lang) if self.user_topics else None
+        if topic_id and topic_id != first.message_thread_id:
+            # 新建的话题：把投稿内容复制进去（格式、相册分组都保持不变），提示消息回复在副本下面
+            copies = await self.bot.copy_messages(
+                user.id, user.id, [m.message_id for m in messages], message_thread_id=topic_id)
+            prompt = await self.bot.send_message(
+                user.id, text, reply_markup=kb, message_thread_id=topic_id,
+                reply_parameters=_reply_to(copies[0].message_id if copies else None))
+        else:
+            prompt = await first.reply(text, reply_markup=kb)
+        await self.db.update(sid, user_msg_id=prompt.message_id, user_topic_id=topic_id, topic_status="draft")
+
+    async def _user_topic_for(self, sid: int, messages: list[Message], lang: str) -> int | None:
+        """私聊话题模式：投稿人在自己新建、还没被占用的话题里发的，就用这个话题；否则新建一个。"""
+        first = messages[0]
+        thread = first.message_thread_id if first.is_topic_message else None
+        sub = await self.db.get(sid)
+        if thread and not await self.db.sid_by_user_topic(first.from_user.id, thread):
+            await self._try(self.bot.edit_forum_topic(first.from_user.id, thread, name=self._user_topic_name(sub, lang)))
+            return thread
+        return await self._create_topic(first.from_user.id, self._user_topic_name(sub, lang))
 
     async def submit(self, sid: int, user_id: int, anonymous: bool, lang: str) -> str | None:
         sub = await self.db.get(sid)
@@ -177,6 +266,7 @@ class Core:
         if not await self.db.transition(sid, ("draft",), "pending", anonymous=int(anonymous), submitted_at=now_ts()):
             return t(lang, "already_handled")
         await self._send_to_review(sid)
+        await self.sync_topics(sid, review_is_fresh=True)
         await self.refresh_stats()
         return None
 
@@ -186,14 +276,20 @@ class Core:
             return t(lang, "invalid_sub")
         if not await self.db.transition(sid, ("draft",), "cancelled"):
             return t(lang, "cannot_cancel")
+        await self.sync_topics(sid)
         return None
 
     async def _send_to_review(self, sid: int) -> None:
         sub = await self.db.get(sid)
         user = await self.db.get_user(sub.user_id)
+        # 话题模式：每条投稿在审核群里单独一个话题
+        topic_id = None
+        if self.review_topics:
+            topic_id = await self._create_topic(self.s.review_chat_id, self._review_topic_name(sub, user))
         # 预览就是频道里最终的样子（含落款），方便审核
         preview = await send_items(
-            self.bot, self.s.review_chat_id, sub.items, sig=await self._signature(sub), spoiler=False
+            self.bot, self.s.review_chat_id, sub.items, sig=await self._signature(sub), spoiler=False,
+            thread_id=topic_id,
         )
         ctrl = await self.bot.send_message(
             self.s.review_chat_id,
@@ -201,8 +297,9 @@ class Core:
             reply_markup=control_kb(sub, self.lang),
             reply_parameters=_reply_to(preview[0].message_id),
             link_preview_options=NO_PREVIEW,
+            message_thread_id=topic_id,
         )
-        await self.db.update(sid, review_msg_id=ctrl.message_id)
+        await self.db.update(sid, review_msg_id=ctrl.message_id, review_topic_id=topic_id)
         await self.db.link_review_messages(sid, [m.message_id for m in preview] + [ctrl.message_id])
 
     # ---------- 审核侧 ----------
@@ -274,7 +371,7 @@ class Core:
         if sub.status != "draft":  # 草稿还没进审核群，不用发预览
             preview = await send_items(
                 self.bot, self.s.review_chat_id, sub.items, sig=await self._signature(sub),
-                spoiler=False, reply_to=sub.review_msg_id,
+                spoiler=False, reply_to=sub.review_msg_id, thread_id=sub.review_topic_id,
             )
             await self.db.link_review_messages(sub.id, [m.message_id for m in preview])
             await self.refresh_control(sub.id)
@@ -390,7 +487,7 @@ class Core:
             return t(self.lang, "status_changed")
         lang = await self.user_lang(sub.user_id)
         await self.notify_user(sub.user_id, t(lang, "notify_rejected", sid=sid) + _reason_line(lang, reason),
-                               reply_to=sub.user_msg_id)
+                               reply_to=sub.user_msg_id, thread_id=sub.user_topic_id)
         await self.refresh_control(sid)
         await self.refresh_stats()
         return None
@@ -527,6 +624,7 @@ class Core:
                             )
                         except TelegramAPIError:
                             pass
+                    await self.sync_topics(sub.id)
             except Exception:
                 log.exception("调度循环出错")
             await asyncio.sleep(SCHEDULER_TICK)
@@ -552,6 +650,21 @@ class Core:
 
 def _reason_line(lang: str, reason: str | None) -> str:
     return t(lang, "reason_line", reason=html.escape(reason)) if reason else ""
+
+
+def explicit_reply(m: Message) -> Message | None:
+    """用户真正“回复”的那条消息。
+    话题里的每条消息都会隐式地回复话题的第一条消息（创建话题的服务消息），那不算回复。"""
+    r = m.reply_to_message
+    if r is None:
+        return None
+    if r.forum_topic_created or (m.is_topic_message and r.message_id == m.message_thread_id):
+        return None
+    return r
+
+
+def topic_of(m: Message) -> int | None:
+    return m.message_thread_id if m.is_topic_message else None
 
 
 def mention(user: TgUser) -> str:

@@ -3,3 +3,5 @@ data/
 __pycache__/
 *.pyc
 .venv/
+# 仅本地查看的文档，不提交
+*.local.md

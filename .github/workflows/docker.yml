@@ -1,4 +1,7 @@
-# 推送到 main 或打 v* 标签时，构建 amd64 + arm64 镜像并发布到 GHCR
+# 推送到 main 或打 v* 标签时，构建 amd64 + arm64 镜像并发布：
+#   - GHCR（始终）：ghcr.io/<owner>/tg-submit-bot
+#   - Docker Hub（可选）：在仓库 Settings → Secrets and variables → Actions 中
+#       Variables 添加 DOCKERHUB_USERNAME，Secrets 添加 DOCKERHUB_TOKEN 后自动启用
 name: docker
 
 on:
@@ -11,6 +14,9 @@ permissions:
   contents: read
   packages: write
 
+env:
+  DOCKERHUB_USERNAME: ${{ vars.DOCKERHUB_USERNAME }}
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -18,19 +24,32 @@ jobs:
       - uses: actions/checkout@v4
       - uses: docker/setup-qemu-action@v3
       - uses: docker/setup-buildx-action@v3
-      - uses: docker/login-action@v3
+
+      - name: Login to GHCR
+        uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Login to Docker Hub
+        if: env.DOCKERHUB_USERNAME != ''
+        uses: docker/login-action@v3
+        with:
+          username: ${{ env.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
       - id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ghcr.io/${{ github.repository_owner }}/tg-submit-bot
+          images: |
+            ghcr.io/${{ github.repository_owner }}/tg-submit-bot
+            name=docker.io/${{ env.DOCKERHUB_USERNAME }}/tg-submit-bot,enable=${{ env.DOCKERHUB_USERNAME != '' }}
           tags: |
             type=raw,value=latest,enable={{is_default_branch}}
             type=ref,event=tag
             type=sha
+
       - uses: docker/build-push-action@v6
         with:
           context: .

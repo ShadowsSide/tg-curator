@@ -107,7 +107,19 @@ DB_PATH=./data/bot.db .venv/bin/python -m bot
    docker compose pull && docker compose up -d --no-build
    ```
 
-3. **GitHub Actions**：仓库推送到 GitHub 后，`.github/workflows/docker.yml` 会在每次推送到 main 或打 `v*` 标签时，自动构建 amd64 + arm64 镜像并发布到 `ghcr.io/<owner>/tg-submit-bot`。拉取方式同第 2 种
+3. **GitHub Actions**：仓库推送到 GitHub 后，`.github/workflows/docker.yml` 会在每次推送到 main 或打 `v*` 标签时，自动构建 amd64 + arm64 镜像并发布到 `ghcr.io/<owner>/tg-submit-bot`；配置了 Docker Hub 时，也会同时发布到 Docker Hub（见下）。拉取方式同第 2 种
+
+   镜像标签：`latest` 对应 main 分支的最新版本；打 `v1.0.0` 这类标签时，会额外生成同名标签；每次构建还会生成 `sha-xxxxxxx`，方便回滚到某个版本。
+
+### 同时发布到 Docker Hub（可选）
+
+1. 登录 Docker Hub，在 **Account settings → Personal access tokens** 里新建一个令牌，权限选 **Read & Write**，复制下来。令牌只显示一次
+2. 打开 GitHub 仓库的 **Settings → Secrets and variables → Actions**：
+   - **Variables** 标签页 → New repository variable：名称 `DOCKERHUB_USERNAME`，值填你的 Docker Hub 用户名，全部用小写
+   - **Secrets** 标签页 → New repository secret：名称 `DOCKERHUB_TOKEN`，值填刚才的令牌
+3. 到 **Actions → docker → Run workflow** 手动运行一次，或者等下次推送代码。镜像会出现在 `docker.io/<用户名>/tg-submit-bot`。如果 Docker Hub 上还没有这个仓库，第一次推送时会自动创建，可见性取决于你 Docker Hub 账号的默认设置
+
+不配置这两项时，工作流只发布到 GHCR，不会报错。服务器上使用 Docker Hub 镜像：在 `.env` 里设置 `IMAGE=<用户名>/tg-submit-bot:latest`，然后执行 `docker compose pull && docker compose up -d --no-build`。
 
 ## 审核群命令
 

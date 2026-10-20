@@ -16,32 +16,20 @@ from .config import Settings, load_settings
 from .core import Core
 from .db import DB
 from .handlers import review, user
+from .i18n import LANGS, PRIVATE_COMMANDS, REVIEW_COMMANDS
 
 
-async def set_commands(bot: Bot, review_chat_id: int) -> None:
-    await bot.set_my_commands(
-        [
-            BotCommand(command="start", description="开始投稿"),
-            BotCommand(command="edit", description="修改投稿（回复你的投稿）新内容"),
-            BotCommand(command="me", description="我的投稿统计"),
-            BotCommand(command="help", description="使用说明"),
-        ],
-        scope=BotCommandScopeAllPrivateChats(),
-    )
-    await bot.set_my_commands(
-        [
-            BotCommand(command="stats", description="审核统计"),
-            BotCommand(command="queue", description="定时发布队列"),
-            BotCommand(command="active", description="投稿人活跃度"),
-            BotCommand(command="edit", description="修改稿件（回复投稿）新内容"),
-            BotCommand(command="no", description="拒绝投稿（回复投稿）[理由]"),
-            BotCommand(command="ban", description="封禁投稿人并拒绝其来稿 [理由]"),
-            BotCommand(command="unban", description="解除封禁"),
-            BotCommand(command="user", description="查看投稿人"),
-            BotCommand(command="help", description="命令说明"),
-        ],
-        scope=BotCommandScopeChat(chat_id=review_chat_id),
-    )
+async def set_commands(bot: Bot, review_chat_id: int, default_lang: str) -> None:
+    """命令菜单按语言注册：Telegram 会根据用户客户端的语言显示对应版本，其他语言显示默认版本。"""
+    def cmds(table: dict, lang: str) -> list[BotCommand]:
+        return [BotCommand(command=c, description=d) for c, d in table[lang]]
+
+    private, review = BotCommandScopeAllPrivateChats(), BotCommandScopeChat(chat_id=review_chat_id)
+    await bot.set_my_commands(cmds(PRIVATE_COMMANDS, default_lang), scope=private)
+    await bot.set_my_commands(cmds(REVIEW_COMMANDS, default_lang), scope=review)
+    for lang in LANGS:
+        await bot.set_my_commands(cmds(PRIVATE_COMMANDS, lang), scope=private, language_code=lang)
+        await bot.set_my_commands(cmds(REVIEW_COMMANDS, default_lang), scope=review, language_code=lang)
 
 
 def make_session(settings: Settings) -> AiohttpSession:
@@ -68,7 +56,7 @@ async def main() -> None:
     )
     core = Core(bot, db, settings)
     await core.init()
-    await set_commands(bot, settings.review_chat_id)
+    await set_commands(bot, settings.review_chat_id, settings.language)
 
     dp = Dispatcher(storage=MemoryStorage())
     dp["core"] = core

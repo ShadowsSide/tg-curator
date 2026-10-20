@@ -23,20 +23,10 @@ from aiogram.types import (
 
 from . import entities as ent
 from .db import Submission, User
+from .i18n import on_off, t
 from .timeutil import fmt_ts
 
 log = logging.getLogger(__name__)
-
-TYPE_NAMES = {
-    "text": ("段", "文字"),
-    "photo": ("张", "图片"),
-    "video": ("个", "视频"),
-    "animation": ("个", "GIF"),
-    "document": ("个", "文件"),
-    "audio": ("个", "音频"),
-    "voice": ("条", "语音"),
-}
-
 
 def dump_link_preview(lp: LinkPreviewOptions | None) -> dict[str, Any] | None:
     """用户消息里的链接预览设置（关闭预览、大图、显示在上方等）。
@@ -83,11 +73,11 @@ def caption_index(items: list[dict[str, Any]]) -> int:
     return next((i for i, it in enumerate(items) if it.get("text")), 0)
 
 
-def describe(items: list[dict[str, Any]]) -> str:
+def describe(items: list[dict[str, Any]], lang: str) -> str:
     counts = Counter(i["type"] for i in items)
     if list(counts) == ["text"]:
-        return "文字"
-    return "、".join(f"{n} {TYPE_NAMES[t][0]}{TYPE_NAMES[t][1]}" for t, n in counts.items())
+        return t(lang, "type_text")
+    return t(lang, "list_sep").join(t(lang, f"type_{kind}", n=n) for kind, n in counts.items())
 
 
 def user_link(user: User | None, user_id: int) -> str:
@@ -195,49 +185,46 @@ async def _send(bot: Bot, chat_id: int | str, items: list[dict[str, Any]], sig: 
     return await bot.send_media_group(chat_id, media, **common)
 
 
-def control_text(sub: Submission, user: User | None, tz: ZoneInfo, post_url: str | None) -> str:
+def control_text(sub: Submission, user: User | None, tz: ZoneInfo, post_url: str | None, lang: str) -> str:
     """审核群里每条投稿下方的“控制消息”。"""
     lines = [
-        f"📮 <b>投稿 #{sub.id}</b>",
-        f"投稿人：{user_link(user, sub.user_id)}  <code>{sub.user_id}</code>"
-        + ("  🚫已封禁" if user and user.banned else ""),
-        f"方式：{'🕶 匿名' if sub.anonymous else '👤 署名'}",
-        f"内容：{describe(sub.items)}",
+        t(lang, "ctrl_title", sid=sub.id),
+        t(lang, "ctrl_from", link=user_link(user, sub.user_id), uid=sub.user_id)
+        + (t(lang, "ctrl_banned_tag") if user and user.banned else ""),
+        t(lang, "ctrl_mode_anon" if sub.anonymous else "ctrl_mode_signed"),
+        t(lang, "ctrl_content", desc=describe(sub.items, lang)),
     ]
     if sub.edited_at:
-        lines.append(f"✏️ 已修改（{html.escape(sub.edited_by or '')}，{fmt_ts(sub.edited_at, tz)}）")
+        lines.append(t(lang, "ctrl_edited", by=html.escape(sub.edited_by or ""), when=fmt_ts(sub.edited_at, tz, lang)))
     if sub.spoilerable:
-        lines.append(f"剧透遮罩：{'🙈 开' if sub.spoiler else '关'}")
-    lines.append(f"静音发送：{'🔕 开' if sub.silent else '关'}")
+        lines.append(t(lang, "ctrl_spoiler", state=("🙈 " if sub.spoiler else "") + on_off(lang, sub.spoiler)))
+    lines.append(t(lang, "ctrl_silent", state=("🔕 " if sub.silent else "") + on_off(lang, sub.silent)))
 
-    reviewer = html.escape(sub.reviewer_name or "")
+    by = html.escape(sub.reviewer_name or "")
     status = sub.status
     if status == "pending":
-        lines.append("状态：⏳ 待审核")
+        lines.append(t(lang, "status_pending"))
     elif status == "scheduled":
-        lines.append(f"状态：⏰ 定时发布 <b>{fmt_ts(sub.scheduled_at, tz)}</b>（{reviewer}）")
+        lines.append(t(lang, "status_scheduled", when=fmt_ts(sub.scheduled_at, tz, lang), by=by))
     elif status == "publishing":
-        lines.append("状态：🚀 发布中…")
+        lines.append(t(lang, "status_publishing"))
     elif status == "published":
-        link = f'  <a href="{post_url}">查看</a>' if post_url else ""
-        lines.append(f"状态：✅ 已发布 {fmt_ts(sub.published_at, tz)}（{reviewer}）{link}")
+        link = f'  <a href="{post_url}">{t(lang, "view")}</a>' if post_url else ""
+        lines.append(t(lang, "status_published", when=fmt_ts(sub.published_at, tz, lang), by=by, link=link))
     elif status == "rejected":
-        lines.append(f"状态：❌ 已拒绝（{reviewer}）")
+        lines.append(t(lang, "status_rejected", by=by))
         if sub.reject_reason:
-            lines.append(f"理由：{html.escape(sub.reject_reason)}")
+            lines.append(t(lang, "reason_plain", reason=html.escape(sub.reject_reason)))
     elif status == "failed":
-        lines.append(f"状态：⚠️ 发布失败：{html.escape(sub.error or '')}")
+        lines.append(t(lang, "status_failed", error=html.escape(sub.error or "")))
     else:
-        lines.append(f"状态：{status}")
+        lines.append(t(lang, "status_other", status=status))
     return "\n".join(lines)
 
 
-def stats_text(accepted: int, rejected: int, pending: int, now: datetime) -> str:
+def stats_text(accepted: int, rejected: int, pending: int, now: datetime, lang: str) -> str:
     reviewed = accepted + rejected
     pass_rate = accepted / reviewed * 100 if reviewed else 0.0
     review_rate = reviewed / (reviewed + pending) * 100 if reviewed + pending else 0.0
-    return (
-        f"接受 {accepted} 拒绝 {rejected} 待审核 {pending}\n"
-        f"通过率: {pass_rate:.2f}% 审核率: {review_rate:.2f}%\n"
-        f"#审核统计 [更新于 {now:%H:%M:%S}]"
-    )
+    return t(lang, "stats", accepted=accepted, rejected=rejected, pending=pending,
+             pass_rate=pass_rate, review_rate=review_rate, time=f"{now:%H:%M:%S}")

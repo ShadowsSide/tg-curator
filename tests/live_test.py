@@ -102,7 +102,8 @@ BOB = 43
 def pm(text=None, who=USER, **extra):
     name = "Alice" if who == USER else "Bob"
     d = {"message_id": 10 + uid[0], "date": now(), "chat": chat(who),
-         "from": {"id": who, "is_bot": False, "first_name": name, "username": name.lower()}}
+         "from": {"id": who, "is_bot": False, "first_name": name, "username": name.lower(),
+                  "language_code": "zh-hans" if who == USER else "en"}}
     if text is not None:
         d["text"] = text
         if text.startswith("/"):
@@ -164,8 +165,9 @@ def styles(e):
 
 
 async def scenario():
-    e = await wait_for(lambda e: e["method"] == "setMyCommands", 15, since=0)
-    check("bot started: getMe/getChat/setMyCommands", e)
+    e = await wait_for(lambda e: e["method"] == "setMyCommands" and e["params"].get("language_code") == "en", 15, since=0)
+    check("bot started; command menus registered per language", e and any(
+        c.get("command") == "start" and c.get("description") == "Start submitting" for c in e["params"]["commands"]))
 
     # 1. 文字投稿 → 选匿名
     n = len(log); pm("Hello <b>world</b>", entities=[{"type": "bold", "offset": 0, "length": 5}])
@@ -213,7 +215,12 @@ async def scenario():
     # 4. 再来两条投稿：一条 /no 带理由，一条用于 /ban 自动拒绝
     async def submit(text, sid, who=USER):
         n = len(log); pm(text, who=who)
-        await wait_for(lambda e: is_send(e, "sendMessage", who, "请选择投稿方式"), since=n)
+        prompt_marker = "请选择投稿方式" if who == USER else "How would you like to submit it"
+        e = await wait_for(lambda e: is_send(e, "sendMessage", who, prompt_marker), since=n)
+        if who == BOB:
+            check("English client → English prompt and buttons",
+                  e and styles(e).get("👤 Signed") == "primary" and styles(e).get("🕶 Anonymous") == "primary",
+                  e and styles(e))
         n = len(log); cb(f"u:sign:{sid}", who, who)
         return await wait_for(lambda e: is_send(e, "sendMessage", REVIEW, f"投稿 #{sid}"), since=n)
 
@@ -223,12 +230,14 @@ async def scenario():
     e = await wait_for(lambda e: is_send(e, "sendMessage", USER, "理由：内容重复"), since=n)
     check("/no with reason → user notified", e)
     n = len(log); gm("/ban 发广告", reply_to=ctrl4["result"]["message_id"])
-    e = await wait_for(lambda e: is_send(e, "sendMessage", BOB, "你已被禁止投稿"), since=n)
-    check("/ban → Bob notified, his pending #4 auto-rejected", e and "#4" in e["params"]["text"],
+    e = await wait_for(lambda e: is_send(e, "sendMessage", BOB, "You are not allowed to submit"), since=n)
+    check("/ban → Bob notified in English, his pending #4 auto-rejected", e and "#4" in e["params"]["text"],
           e and e["params"]["text"].replace("\n", " | "))
+    ban_reply = await wait_for(lambda e: is_send(e, "sendMessage", REVIEW, "已封禁"), since=n)
+    check("review group stays Chinese for the same ban", ban_reply and "已自动拒绝" in ban_reply["params"]["text"])
     n = len(log); pm("still here", who=BOB)
-    e = await wait_for(lambda e: is_send(e, "sendMessage", BOB, "理由：发广告"), since=n)
-    check("banned user blocked with reason", e)
+    e = await wait_for(lambda e: is_send(e, "sendMessage", BOB, "Reason: 发广告"), since=n)
+    check("banned user blocked with reason (English)", e)
 
     # 5. 格式保真：超链接 / 粗体 / 引用 / 日期时间 / 自定义 emoji / emoji 代理对 / 链接预览设置
     def u16(t):

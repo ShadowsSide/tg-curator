@@ -36,6 +36,10 @@
   ```
 - 投稿人活跃度排行、单个投稿人统计；投稿人可以用 `/me` 查看自己的统计
 
+**中英文界面**
+- 投稿人看到的语言跟随其 Telegram 客户端（中文客户端显示中文，其他显示英文）；审核群、频道落款和统计提醒使用 `LANGUAGE` 配置的语言
+- 命令菜单也按客户端语言显示
+
 **部署**
 - 提供 `linux/amd64` 和 `linux/arm64` 多架构镜像，VPS、ARM 服务器、树莓派都能用
 - 支持代理（`http://`、`socks5://`）和自建 Bot API 服务器
@@ -104,9 +108,11 @@ docker compose cp bot:/app/data/bot.db ./backup-$(date +%F).db   # 备份数据�
 | `BOT_TOKEN` | — | **必填**。机器人 token |
 | `CHANNEL_ID` | — | **必填**。发布频道，填 `@username` 或 `-100…` |
 | `REVIEW_CHAT_ID` | — | **必填**。审核群 ID |
+| `LANGUAGE` | `zh` | 审核群、频道落款、统计提醒的语言：`zh` / `en` |
+| `USER_LANGUAGE` | `auto` | 投稿人看到的语言：`auto` 跟随其客户端，或固定为 `zh` / `en` |
 | `TZ` | `Asia/Shanghai` | 时区，影响定时发布和“今天”的统计范围 |
-| `SIGN_TEMPLATE` | `投稿人：{name}` | 署名落款，`{name}` 会替换成投稿人链接 |
-| `ANON_SIGNATURE` | `匿名投稿` | 匿名落款，留空则不加落款 |
+| `SIGN_TEMPLATE` | 随 `LANGUAGE`：`投稿人：{name}` / `Submitted by {name}` | 署名落款，`{name}` 会替换成投稿人链接 |
+| `ANON_SIGNATURE` | 随 `LANGUAGE`：`匿名投稿` / `Anonymous submission` | 匿名落款，设为空则不加落款 |
 | `MAX_PENDING_PER_USER` | `5` | 每人同时最多保留几条未处理投稿 |
 | `ALBUM_DELAY` | `1.5` | 收集相册时等待的秒数 |
 | `SCHEDULE_PRESETS` | `09:00,12:00,18:00,21:00` | 定时面板里的快捷时间点 |
@@ -182,6 +188,7 @@ DB_PATH=./data/bot.db .venv/bin/python -m bot
 
 ```bash
 .venv/bin/python tests/test_entities.py   # 单元测试：格式偏移（UTF-16）计算
+.venv/bin/python tests/test_i18n.py       # 单元测试：中英文文案齐全、占位符一致
 .venv/bin/python tests/live_test.py       # 端到端测试：启动模拟的 Bot API 服务器，运行真实的机器人进程（约 1 分钟）
 ```
 
@@ -195,6 +202,7 @@ bot/
   core.py         业务逻辑：投稿、审核、发布、修改、定时、统计
   render.py       发送内容（单条 / 相册、落款、剧透、静音）与文案
   entities.py     消息格式处理（UTF-16 偏移、拼接落款）
+  i18n.py         中英文界面文案
   keyboards.py    彩色内联按钮
   album.py        相册收集
   timeutil.py     时间解析

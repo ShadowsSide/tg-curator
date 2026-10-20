@@ -8,6 +8,7 @@ from aiogram.filters.callback_data import CallbackData
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
 from .db import Submission
+from .i18n import on_off, t
 from .timeutil import next_occurrence
 
 # 按钮颜色（Bot API 的 InlineKeyboardButton.style）：
@@ -38,52 +39,53 @@ def _toggle(on: bool) -> ButtonStyle | None:
     return BLUE if on else None
 
 
-def user_choice_kb(sid: int) -> InlineKeyboardMarkup:
+def user_choice_kb(sid: int, lang: str) -> InlineKeyboardMarkup:
     def b(text: str, a: str, style: ButtonStyle | None = None) -> InlineKeyboardButton:
         return InlineKeyboardButton(text=text, callback_data=UserCB(a=a, sid=sid).pack(), style=style)
 
     return InlineKeyboardMarkup(
         inline_keyboard=[
-            [b("👤 署名投稿", "sign", BLUE), b("🕶 匿名投稿", "anon", BLUE)],
-            [b("取消", "cancel")],
+            [b(t(lang, "btn_sign"), "sign", BLUE), b(t(lang, "btn_anon"), "anon", BLUE)],
+            [b(t(lang, "btn_cancel"), "cancel")],
         ]
     )
 
 
-def control_kb(sub: Submission) -> InlineKeyboardMarkup | None:
+def control_kb(sub: Submission, lang: str) -> InlineKeyboardMarkup | None:
     sid = sub.id
     rows: list[list[InlineKeyboardButton]] = []
     if sub.status in ("pending", "scheduled", "failed"):
-        options = [
-            _rb(f"{'🔕' if sub.silent else '🔔'} 静音：{'开' if sub.silent else '关'}", "silent", sid,
-                style=_toggle(sub.silent))
-        ]
+        silent = t(lang, "btn_silent", icon="🔕" if sub.silent else "🔔", state=on_off(lang, sub.silent))
+        options = [_rb(silent, "silent", sid, style=_toggle(sub.silent))]
         if sub.spoilerable:
-            options.insert(0, _rb(f"🙈 剧透：{'开' if sub.spoiler else '关'}", "spoiler", sid,
-                                  style=_toggle(sub.spoiler)))
+            spoiler = t(lang, "btn_spoiler", state=on_off(lang, sub.spoiler))
+            options.insert(0, _rb(spoiler, "spoiler", sid, style=_toggle(sub.spoiler)))
         rows.append(options)
+    reject = _rb(t(lang, "btn_reject"), "reject", sid, style=RED)
     if sub.status == "pending":
-        rows.append([_rb("✅ 立即发布", "pub", sid, style=GREEN), _rb("⏰ 定时发布", "sched", sid, style=BLUE)])
-        rows.append([_rb("❌ 拒绝", "reject", sid, style=RED), _rb("🚫 封禁投稿人", "ban", sid, style=RED)])
+        rows.append([_rb(t(lang, "btn_publish"), "pub", sid, style=GREEN),
+                     _rb(t(lang, "btn_schedule"), "sched", sid, style=BLUE)])
+        rows.append([reject, _rb(t(lang, "btn_ban"), "ban", sid, style=RED)])
     elif sub.status == "scheduled":
-        rows.append([_rb("🚀 立即发布", "pub", sid, style=GREEN), _rb("⏰ 改时间", "sched", sid, style=BLUE)])
-        rows.append([_rb("↩️ 取消定时", "unsched", sid), _rb("❌ 拒绝", "reject", sid, style=RED)])
+        rows.append([_rb(t(lang, "btn_publish_now"), "pub", sid, style=GREEN),
+                     _rb(t(lang, "btn_reschedule"), "sched", sid, style=BLUE)])
+        rows.append([_rb(t(lang, "btn_unschedule"), "unsched", sid), reject])
     elif sub.status == "failed":
-        rows.append([_rb("🔁 重试发布", "retry", sid, style=GREEN), _rb("❌ 拒绝", "reject", sid, style=RED)])
+        rows.append([_rb(t(lang, "btn_retry"), "retry", sid, style=GREEN), reject])
     return InlineKeyboardMarkup(inline_keyboard=rows) if rows else None
 
 
-def schedule_kb(sid: int, presets: tuple[str, ...], tz: ZoneInfo) -> InlineKeyboardMarkup:
+def schedule_kb(sid: int, presets: tuple[str, ...], tz: ZoneInfo, lang: str) -> InlineKeyboardMarkup:
     now = datetime.now(tz)
     buttons = [
-        _rb("+1 小时", "preset", sid, int((now + timedelta(hours=1)).timestamp()), style=BLUE),
-        _rb("+3 小时", "preset", sid, int((now + timedelta(hours=3)).timestamp()), style=BLUE),
+        _rb(t(lang, "btn_plus_hours", n=h), "preset", sid, int((now + timedelta(hours=h)).timestamp()), style=BLUE)
+        for h in (1, 3)
     ]
     for hhmm in presets:
         dt = next_occurrence(hhmm, tz, now)
-        day = "今天" if dt.date() == now.date() else "明天"
+        day = t(lang, "today" if dt.date() == now.date() else "tomorrow")
         buttons.append(_rb(f"{day} {dt:%H:%M}", "preset", sid, int(dt.timestamp()), style=BLUE))
 
     rows = [buttons[i : i + 3] for i in range(0, len(buttons), 3)]
-    rows.append([_rb("✏️ 自定义时间", "custom", sid), _rb("« 返回", "back", sid)])
+    rows.append([_rb(t(lang, "btn_custom_time"), "custom", sid), _rb(t(lang, "btn_back"), "back", sid)])
     return InlineKeyboardMarkup(inline_keyboard=rows)

@@ -28,6 +28,7 @@ CREATE TABLE IF NOT EXISTS users (
     ban_reason TEXT,
     banned_at  INTEGER,
     banned_by  TEXT,
+    lang       TEXT,
     first_seen INTEGER NOT NULL,
     last_seen  INTEGER NOT NULL
 );
@@ -83,6 +84,7 @@ MIGRATIONS = [
     ("submissions", "original_items", "ALTER TABLE submissions ADD COLUMN original_items TEXT"),
     ("submissions", "edited_by", "ALTER TABLE submissions ADD COLUMN edited_by TEXT"),
     ("submissions", "edited_at", "ALTER TABLE submissions ADD COLUMN edited_at INTEGER"),
+    ("users", "lang", "ALTER TABLE users ADD COLUMN lang TEXT"),
 ]
 
 OPEN_STATES = ("pending", "scheduled", "failed")  # 已提交、尚未发布或拒绝
@@ -100,6 +102,7 @@ class User:
     ban_reason: str | None
     banned_at: int | None
     banned_by: str | None
+    lang: str | None
     first_seen: int
     last_seen: int
 
@@ -179,14 +182,15 @@ class DB:
 
     # ---------- users ----------
 
-    async def touch_user(self, user_id: int, username: str | None, full_name: str) -> None:
+    async def touch_user(self, user_id: int, username: str | None, full_name: str, lang: str | None = None) -> None:
         ts = now_ts()
         await self._exec(
-            """INSERT INTO users(user_id, username, full_name, first_seen, last_seen)
-               VALUES(?, ?, ?, ?, ?)
+            """INSERT INTO users(user_id, username, full_name, lang, first_seen, last_seen)
+               VALUES(?, ?, ?, ?, ?, ?)
                ON CONFLICT(user_id) DO UPDATE SET
-                 username=excluded.username, full_name=excluded.full_name, last_seen=excluded.last_seen""",
-            (user_id, username, full_name, ts, ts),
+                 username=excluded.username, full_name=excluded.full_name,
+                 lang=COALESCE(excluded.lang, users.lang), last_seen=excluded.last_seen""",
+            (user_id, username, full_name, lang, ts, ts),
         )
 
     async def get_user(self, user_id: int) -> User | None:

@@ -10,19 +10,9 @@ from aiogram.types import CallbackQuery, Message
 from .. import entities as ent
 from ..core import Core
 from ..db import SUBMITTER_EDITABLE
+from ..i18n import join_ids, t
 from ..keyboards import UserCB
 from ..render import dump_link_preview, extract_item
-
-WELCOME = (
-    "👋 欢迎投稿！\n\n"
-    "直接把要投稿的内容发给我即可：文字、图片、视频、GIF、文件，或一次发多张图（相册）。\n"
-    "发送后选择 <b>署名</b> 或 <b>匿名</b>，审核通过后会发布到频道，结果会通知你。\n\n"
-    "<b>修改投稿</b>（审核结果出来之前都可以改）：\n"
-    "· 直接用 Telegram 的“编辑”修改你发出的那条消息，机器人会自动同步（换图也可以）\n"
-    "· 或者回复你的投稿，发送 <code>/edit 新内容</code>；只发 /edit 会把当前内容发给你，方便复制修改\n\n"
-    "/me 查看我的投稿统计"
-)
-
 
 def build_router() -> Router:
     router = Router(name="user")
@@ -34,22 +24,23 @@ def build_router() -> Router:
     @router.message(Command("help"))
     async def start(m: Message, core: Core) -> None:
         await core.touch(m.from_user)
-        await m.answer(WELCOME)
+        await m.answer(t(core.lang_of(m.from_user), "welcome"))
 
     @router.message(Command("me"))
     async def me(m: Message, core: Core) -> None:
-        await m.answer(await core.user_text(m.from_user.id, for_admin=False))
+        await m.answer(await core.user_text(m.from_user.id, for_admin=False, lang=core.lang_of(m.from_user)))
 
     @router.message(Command("edit"))
     async def edit_cmd(m: Message, core: Core) -> None:
         uid = m.from_user.id
+        lang = core.lang_of(m.from_user)
         body, entities = ent.strip_command(m.text or m.caption or "", ent.dump(m.entities or m.caption_entities))
         mine = await core.db.editable_by_submitter(uid)
 
         if m.reply_to_message:
             found = await core.db.find_by_user_message(uid, m.reply_to_message.message_id)
             if not found:
-                await m.reply("请回复你自己发出的投稿内容，或机器人关于这条投稿的提示消息。")
+                await m.reply(t(lang, "u_edit_reply_own"))
                 return
             sid = found[0]
         else:
@@ -62,25 +53,24 @@ def build_router() -> Router:
             elif len(mine) == 1:
                 sid = mine[0].id
             elif not mine:
-                await m.reply("你目前没有可以修改的投稿（审核结果出来之前的投稿才能修改）。")
+                await m.reply(t(lang, "u_edit_none"))
                 return
             else:
-                ids = "、".join(f"#{s.id}" for s in mine)
-                await m.reply(f"你有多条待审核的投稿：{ids}。\n请回复要修改的那条，或发送 <code>/edit #编号 新内容</code>。")
+                await m.reply(t(lang, "u_edit_many", ids=join_ids(lang, (s.id for s in mine))))
                 return
 
         sub = await core.db.get(sid)
         if not sub or sub.user_id != uid:
-            await m.reply(f"没有找到你的投稿 #{sid}。")
+            await m.reply(t(lang, "u_edit_not_found", sid=sid))
             return
         if not body.strip():
-            err = await core.show_text(sid, m.chat.id, reply_to=m.message_id)
-            await m.reply(err or "↑ 这是当前内容。复制、修改后，回复你的投稿发送 <code>/edit 新内容</code>。")
+            err = await core.show_text(sid, m.chat.id, reply_to=m.message_id, lang=lang)
+            await m.reply(err or t(lang, "u_edit_echo_hint"))
             return
 
-        err = await core.edit(sid, f"投稿人 {m.from_user.full_name}", body, entities,
-                              dump_link_preview(m.link_preview_options), allowed=SUBMITTER_EDITABLE)
-        await m.reply(err or _edited_text(sid, sub.status))
+        err = await core.edit(sid, _editor(core, m), body, entities, dump_link_preview(m.link_preview_options),
+                              allowed=SUBMITTER_EDITABLE, lang=lang)
+        await m.reply(err or _edited_text(lang, sid, sub.status))
 
     @router.edited_message()
     async def native_edit(m: Message, core: Core) -> None:
@@ -93,8 +83,9 @@ def build_router() -> Router:
         if new_item is None:
             return
         sub = await core.db.get(sid)
-        err = await core.replace_item(sid, index, new_item, f"投稿人 {m.from_user.full_name}", SUBMITTER_EDITABLE)
-        await m.reply(err or _edited_text(sid, sub.status))
+        lang = core.lang_of(m.from_user)
+        err = await core.replace_item(sid, index, new_item, _editor(core, m), SUBMITTER_EDITABLE, lang)
+        await m.reply(err or _edited_text(lang, sid, sub.status))
 
     @router.message(F.media_group_id)
     async def album_part(m: Message, core: Core) -> None:
@@ -103,34 +94,37 @@ def build_router() -> Router:
     @router.message()
     async def single(m: Message, core: Core) -> None:
         if m.text and m.text.startswith("/"):
-            await m.answer("未知命令。直接发送内容即可投稿，/help 查看说明。")
+            await m.answer(t(core.lang_of(m.from_user), "unknown_cmd"))
             return
         await core.receive([m])
 
     @router.callback_query(UserCB.filter())
     async def choice(cq: CallbackQuery, callback_data: UserCB, core: Core) -> None:
         sid = callback_data.sid
+        lang = core.lang_of(cq.from_user)
         if callback_data.a == "cancel":
-            err = await core.cancel_draft(sid, cq.from_user.id)
+            err = await core.cancel_draft(sid, cq.from_user.id, lang)
             if not err:
-                await cq.message.edit_text("已取消。")
-            await cq.answer(err or "已取消")
+                await cq.message.edit_text(t(lang, "cancelled"))
+            await cq.answer(err or t(lang, "cancelled"))
             return
 
         anonymous = callback_data.a == "anon"
-        err = await core.submit(sid, cq.from_user.id, anonymous)
+        err = await core.submit(sid, cq.from_user.id, anonymous, lang)
         if err:
             await cq.answer(err, show_alert=True)
             return
-        await cq.message.edit_text(
-            f"✅ 已{'匿名' if anonymous else '署名'}提交，投稿编号 <b>#{sid}</b>。\n审核结果会通知你，请耐心等待。"
-        )
-        await cq.answer("已提交")
+        mode = t(lang, "mode_anon" if anonymous else "mode_signed")
+        await cq.message.edit_text(t(lang, "submitted", mode=mode, sid=sid))
+        await cq.answer(t(lang, "submitted_toast"))
 
     return router
 
 
-def _edited_text(sid: int, status: str) -> str:
-    if status == "draft":
-        return "✏️ 已更新。确认无误后请在上面选择署名或匿名提交。"
-    return f"✏️ 投稿 #{sid} 已更新，审核时将使用修改后的内容。"
+def _edited_text(lang: str, sid: int, status: str) -> str:
+    return t(lang, "edited_draft") if status == "draft" else t(lang, "edited_pending", sid=sid)
+
+
+def _editor(core: Core, m: Message) -> str:
+    """控制消息上“已修改（谁）”的显示，用审核群的语言。"""
+    return t(core.lang, "submitter_label", name=m.from_user.full_name)

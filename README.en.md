@@ -11,7 +11,7 @@ A Telegram channel submission bot: users send posts to the bot in a private chat
 
 Built with Python 3.12 + [aiogram 3](https://github.com/aiogram/aiogram) + SQLite, deployed with a single Docker Compose command. It uses long polling, so **you don't need a public IP or HTTPS**.
 
-> The bot's own messages and buttons are in Chinese. All texts live in the source code (mainly `bot/handlers/`, `bot/core.py` and `bot/render.py`), and the signature lines can be changed in `.env`.
+> The bot speaks **English and Chinese**. Submitters see the language of their Telegram app (Chinese for Chinese clients, English otherwise); the review group, channel signatures and the review summary use `LANGUAGE`. For an English setup, set `LANGUAGE=en` in `.env`.
 
 ## Features
 
@@ -30,13 +30,17 @@ Built with Python 3.12 + [aiogram 3](https://github.com/aiogram/aiogram) + SQLit
 
 **Scheduling and stats**
 - Schedule with quick buttons or a custom time (`20:30`, `10-20 09:00`, `+2h`, …). Schedules are stored in the database and survive restarts
-- A review summary is posted to the review group at a set interval and refreshed after each review action. It looks like this (accepted / rejected / pending, approval rate, review rate):
+- A review summary is posted to the review group at a set interval and refreshed after each review action:
   ```
-  接受 3 拒绝 1 待审核 4
-  通过率: 75.00% 审核率: 50.00%
-  #审核统计 [更新于 16:03:10]
+  Accepted 3 Rejected 1 Pending 4
+  Approval rate: 75.00% Review rate: 50.00%
+  #review_stats [updated 16:03:10]
   ```
 - Contributor activity ranking and per-user stats; submitters can see their own stats with `/me`
+
+**English and Chinese**
+- Submitters see the language of their Telegram app (Chinese clients get Chinese, everyone else English); the review group, channel signatures and the review summary use the `LANGUAGE` setting
+- The command menu is shown in the client's language too
 
 **Deployment**
 - Multi-arch images for `linux/amd64` and `linux/arm64`: works on regular VPSes, ARM servers and Raspberry Pi
@@ -68,7 +72,7 @@ User sends content ─► chooses signed / anonymous ─► Review group: previe
 ```bash
 git clone https://github.com/ShadowsSide/tg-submit-bot.git
 cd tg-submit-bot
-cp .env.example .env        # fill in BOT_TOKEN, CHANNEL_ID and REVIEW_CHAT_ID
+cp .env.example .env        # fill in BOT_TOKEN, CHANNEL_ID and REVIEW_CHAT_ID; set LANGUAGE=en for English
 docker compose up -d --build
 docker compose logs -f
 ```
@@ -106,9 +110,11 @@ Everything is configured in `.env`. See [`.env.example`](.env.example) for a ful
 | `BOT_TOKEN` | — | **Required.** The bot token |
 | `CHANNEL_ID` | — | **Required.** Channel to publish to: `@username` or `-100…` |
 | `REVIEW_CHAT_ID` | — | **Required.** Review group ID |
+| `LANGUAGE` | `zh` | Language of the review group, channel signatures and review summary: `zh` / `en` |
+| `USER_LANGUAGE` | `auto` | Language submitters see: `auto` follows their Telegram app, or fix it to `zh` / `en` |
 | `TZ` | `Asia/Shanghai` | Time zone for scheduling and for what counts as "today" in stats |
-| `SIGN_TEMPLATE` | `投稿人：{name}` | Signature for signed posts; `{name}` becomes a link to the submitter |
-| `ANON_SIGNATURE` | `匿名投稿` | Signature for anonymous posts; leave empty for none |
+| `SIGN_TEMPLATE` | depends on `LANGUAGE`: `Submitted by {name}` / `投稿人：{name}` | Signature for signed posts; `{name}` becomes a link to the submitter |
+| `ANON_SIGNATURE` | depends on `LANGUAGE`: `Anonymous submission` / `匿名投稿` | Signature for anonymous posts; set it to empty for none |
 | `MAX_PENDING_PER_USER` | `5` | Maximum open submissions per user at a time |
 | `ALBUM_DELAY` | `1.5` | Seconds to wait while collecting the parts of an album |
 | `SCHEDULE_PRESETS` | `09:00,12:00,18:00,21:00` | Quick time buttons in the schedule panel |
@@ -184,6 +190,7 @@ The tests need no token and no network access:
 
 ```bash
 .venv/bin/python tests/test_entities.py   # unit tests: formatting offsets (UTF-16)
+.venv/bin/python tests/test_i18n.py       # unit tests: every text exists in both languages
 .venv/bin/python tests/live_test.py       # end-to-end: runs the real bot against a mock Bot API server (~1 minute)
 ```
 
@@ -197,6 +204,7 @@ bot/
   core.py         submitting, reviewing, publishing, editing, scheduling, stats
   render.py       sending content (single / album, signature, spoiler, silent) and message texts
   entities.py     message formatting (UTF-16 offsets, appending the signature)
+  i18n.py         English and Chinese UI texts
   keyboards.py    colored inline buttons
   album.py        album collection
   timeutil.py     time parsing

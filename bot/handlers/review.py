@@ -13,26 +13,10 @@ from aiogram.types import CallbackQuery, ForceReply, Message
 from .. import entities as ent
 from ..config import Settings
 from ..core import NO_PREVIEW, Core, mention
+from ..i18n import join_ids, t
 from ..keyboards import ReviewCB
 from ..render import dump_link_preview, user_link
-from ..timeutil import fmt_ts, parse_time
-
-HELP = (
-    "🛠 <b>审核群命令</b>\n"
-    "/stats 发送最新审核统计\n"
-    "/queue 定时发布队列\n"
-    "/active [天数] 投稿人活跃度排行（默认 30 天）\n"
-    "/user &lt;用户ID&gt; 查看某位投稿人\n\n"
-    "<b>拒绝 / 封禁</b>（回复投稿的预览或控制消息，理由可省略）\n"
-    "/no [理由] 拒绝该投稿，理由会发给投稿人\n"
-    "/ban [理由] 封禁投稿人，并自动拒绝其所有未处理来稿\n"
-    "不回复时：/no &lt;投稿编号&gt; [理由] · /ban &lt;用户ID 或 #投稿编号&gt; [理由]\n"
-    "/unban &lt;用户ID&gt; 解除封禁\n\n"
-    "<b>修改稿件</b>（回复投稿使用，格式会原样保留）\n"
-    "/edit 新内容 —— 替换文字投稿的正文 / 媒体投稿的说明文字\n"
-    "/edit —— 不带内容：把当前文字（含格式）发出来，方便复制后修改\n"
-    "不回复时：/edit &lt;投稿编号&gt; 新内容"
-)
+from ..timeutil import parse_time
 
 MAX_REASON = 500
 
@@ -78,18 +62,19 @@ def build_router(settings: Settings) -> Router:
     async def on_button(cq: CallbackQuery, callback_data: ReviewCB, core: Core, state: FSMContext) -> None:
         sid, action = callback_data.sid, callback_data.a
         who = cq.from_user
+        lang = core.lang
 
         if action == "spoiler":
             await cq.answer(await core.toggle_spoiler(sid))
         elif action == "silent":
             await cq.answer(await core.toggle_silent(sid))
         elif action == "pub":
-            await cq.answer("发布中…")
+            await cq.answer(t(lang, "toast_publishing"))
             err = await core.publish(sid, reviewer=who)
             if err:
                 await cq.message.answer(f"#{sid} {err}")
         elif action == "retry":
-            await cq.answer("重试中…")
+            await cq.answer(t(lang, "toast_retrying"))
             err = await core.publish(sid, reviewer=who, from_states=("failed",))
             if err:
                 await cq.message.answer(f"#{sid} {err}")
@@ -101,13 +86,10 @@ def build_router(settings: Settings) -> Router:
             await cq.answer()
         elif action == "preset":
             err = await core.schedule(sid, callback_data.v, who)
-            await cq.answer(err or f"已定时：{fmt_ts(callback_data.v, settings.tz)}", show_alert=bool(err))
+            await cq.answer(err or t(lang, "toast_scheduled", when=core.fmt(callback_data.v)), show_alert=bool(err))
         elif action == "custom":
             prompt = await cq.message.answer(
-                f"{mention(who)} 请<b>回复本消息</b>输入投稿 #{sid} 的发布时间：\n"
-                "<code>20:30</code> · <code>10-20 09:00</code> · <code>2026-10-20 09:00</code>"
-                " · <code>+90m</code> · <code>+2h</code>\n"
-                "回复「取消」放弃。",
+                t(lang, "custom_time_prompt", who=mention(who), sid=sid),
                 reply_markup=ForceReply(selective=True, input_field_placeholder="20:30"),
             )
             await state.set_state(ScheduleInput.waiting)
@@ -115,25 +97,25 @@ def build_router(settings: Settings) -> Router:
             await cq.answer()
         elif action == "unsched":
             err = await core.unschedule(sid)
-            await cq.answer(err or "已取消定时，回到待审核")
+            await cq.answer(err or t(lang, "toast_unscheduled"))
         elif action == "reject":
             err = await core.reject(sid, who)
-            await cq.answer(err or "已拒绝（需要附理由请用 /no 回复）", show_alert=bool(err))
+            await cq.answer(err or t(lang, "toast_rejected"), show_alert=bool(err))
         elif action == "ban":
             sub = await core.db.get(sid)
             if not sub:
-                await cq.answer("投稿不存在", show_alert=True)
+                await cq.answer(t(lang, "sub_not_found", sid=sid), show_alert=True)
                 return
             rejected = await core.ban_user(sub.user_id, who)
-            await cq.answer(f"已封禁，并拒绝 {len(rejected)} 条未处理来稿")
+            await cq.answer(t(lang, "toast_banned", n=len(rejected)))
         else:
             await cq.answer()
 
     # ---------- 命令 ----------
 
     @router.message(Command("help"))
-    async def help_(m: Message) -> None:
-        await m.answer(HELP)
+    async def help_(m: Message, core: Core) -> None:
+        await m.answer(t(core.lang, "review_help"))
 
     @router.message(Command("stats"))
     async def stats(m: Message, core: Core) -> None:
@@ -153,7 +135,7 @@ def build_router(settings: Settings) -> Router:
     async def user(m: Message, command: CommandObject, core: Core) -> None:
         uid = _user_id_arg(command)
         if uid is None:
-            await m.answer("用法：/user &lt;用户ID&gt;（控制消息里投稿人名字后面的数字）")
+            await m.answer(t(core.lang, "usage_user"))
             return
         await m.answer(await core.user_text(uid, for_admin=True), link_preview_options=NO_PREVIEW)
 
@@ -164,19 +146,20 @@ def build_router(settings: Settings) -> Router:
         if sid is not None:
             reason = _clean_reason(args)
         elif m.reply_to_message:
-            await m.reply("请回复投稿的预览或控制消息。")
+            await m.reply(t(core.lang, "reply_to_submission"))
             return
         else:
             kind, sid, reason = _split_ref(args)
             if sid is None:
-                await m.reply("用法：回复投稿后发 /no [理由]，或 /no &lt;投稿编号&gt; [理由]")
+                await m.reply(t(core.lang, "usage_no"))
                 return
 
         err = await core.reject(sid, m.from_user, reason)
         if err:
             await m.reply(err)
             return
-        await m.reply(f"❌ 已拒绝投稿 #{sid}" + (f"\n理由：{html.escape(reason)}" if reason else ""))
+        await m.reply(t(core.lang, "rejected_reply", sid=sid)
+                      + (t(core.lang, "reason_line", reason=html.escape(reason)) if reason else ""))
 
     @router.message(Command("edit"))
     async def edit_cmd(m: Message, core: Core) -> None:
@@ -185,22 +168,22 @@ def build_router(settings: Settings) -> Router:
         sid = await _replied_sid(m, core)
         if sid is None:
             if m.reply_to_message:
-                await m.reply("请回复投稿的预览或控制消息。")
+                await m.reply(t(core.lang, "reply_to_submission"))
                 return
             ref = re.match(r"#?(\d+)[ \t]*\n?", body)
             if not ref:
-                await m.reply("用法：回复投稿后发 /edit 新内容，或 /edit &lt;投稿编号&gt; 新内容")
+                await m.reply(t(core.lang, "usage_edit"))
                 return
             sid = int(ref.group(1))
             body, entities = ent.cut_prefix(body, entities, ref.end())
 
         if not body.strip():
             err = await core.show_text(sid, m.chat.id, reply_to=m.message_id)
-            await m.reply(err or "↑ 这是当前内容。复制、修改后，回复这条投稿发送 <code>/edit 新内容</code>。")
+            await m.reply(err or t(core.lang, "admin_echo_hint"))
             return
 
         err = await core.edit(sid, m.from_user.full_name, body, entities, dump_link_preview(m.link_preview_options))
-        await m.reply(err or f"✏️ 投稿 #{sid} 已修改，新的预览已发出，发布时将使用修改后的内容。")
+        await m.reply(err or t(core.lang, "admin_edited", sid=sid))
 
     @router.message(Command("ban"))
     async def ban_cmd(m: Message, command: CommandObject, core: Core) -> None:
@@ -209,17 +192,17 @@ def build_router(settings: Settings) -> Router:
         if sid is not None:
             user_id, reason = (await core.db.get(sid)).user_id, _clean_reason(args)
         elif m.reply_to_message:
-            await m.reply("请回复投稿的预览或控制消息。")
+            await m.reply(t(core.lang, "reply_to_submission"))
             return
         else:
             kind, ref, reason = _split_ref(args)
             if ref is None:
-                await m.reply("用法：回复投稿后发 /ban [理由]，或 /ban &lt;用户ID 或 #投稿编号&gt; [理由]")
+                await m.reply(t(core.lang, "usage_ban"))
                 return
             if kind == "sid":
                 sub = await core.db.get(ref)
                 if not sub:
-                    await m.reply(f"投稿 #{ref} 不存在")
+                    await m.reply(t(core.lang, "sub_not_found", sid=ref))
                     return
                 user_id = sub.user_id
             else:
@@ -227,11 +210,11 @@ def build_router(settings: Settings) -> Router:
 
         rejected = await core.ban_user(user_id, m.from_user, reason)
         user = await core.db.get_user(user_id)
-        text = f"🚫 已封禁 {user_link(user, user_id)} <code>{user_id}</code>"
+        text = t(core.lang, "banned_reply", link=user_link(user, user_id), uid=user_id)
         if reason:
-            text += f"\n理由：{html.escape(reason)}"
+            text += t(core.lang, "reason_line", reason=html.escape(reason))
         if rejected:
-            text += f"\n已自动拒绝其 {len(rejected)} 条未处理来稿：{'、'.join(f'#{i}' for i in rejected)}"
+            text += t(core.lang, "banned_reply_rejected", n=len(rejected), ids=join_ids(core.lang, rejected))
         await m.reply(text, link_preview_options=NO_PREVIEW)
 
     @router.message(Command("unban"))
@@ -241,12 +224,12 @@ def build_router(settings: Settings) -> Router:
             sid = await _replied_sid(m, core)
             uid = (await core.db.get(sid)).user_id if sid is not None else None
         if uid is None:
-            await m.reply("用法：/unban &lt;用户ID&gt;，或回复该用户的投稿")
+            await m.reply(t(core.lang, "usage_unban"))
             return
         if not await core.unban_user(uid):
-            await m.reply(f"用户 <code>{uid}</code> 没有被封禁。")
+            await m.reply(t(core.lang, "not_banned", uid=uid))
             return
-        await m.reply(f"✅ 已解除封禁 <code>{uid}</code>。")
+        await m.reply(t(core.lang, "unbanned_reply", uid=uid))
 
     # ---------- 自定义定时：等待管理员回复时间 ----------
 
@@ -259,25 +242,25 @@ def build_router(settings: Settings) -> Router:
         if not m.reply_to_message or m.reply_to_message.message_id != prompt_id:
             return
 
-        if m.text.strip() in ("取消", "cancel"):
+        if m.text.strip().lower() in ("取消", "cancel"):
             await state.clear()
-            await m.reply("已取消自定义定时。")
+            await m.reply(t(core.lang, "custom_time_cancelled"))
             return
 
         ts = parse_time(m.text, settings.tz)
         if ts is None:
-            await m.reply("看不懂这个时间 🤔 例如 <code>20:30</code>、<code>10-20 09:00</code>、<code>+2h</code>")
+            await m.reply(t(core.lang, "custom_time_bad"))
             return
 
         err = await core.schedule(sid, ts, m.from_user)
         if err:
             await m.reply(err)
-            if err != "这个时间已经过去了":
+            if err != t(core.lang, "time_past"):  # 时间已过：保留状态，让管理员重新输入
                 await state.clear()
             return
 
         await state.clear()
-        await m.reply(f"⏰ 投稿 #{sid} 将于 <b>{fmt_ts(ts, settings.tz)}</b> 发布。")
+        await m.reply(t(core.lang, "custom_time_done", sid=sid, when=core.fmt(ts)))
         try:
             await m.bot.delete_message(m.chat.id, prompt_id)
         except TelegramAPIError:

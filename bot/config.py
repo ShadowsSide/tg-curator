@@ -4,6 +4,8 @@ import os
 from dataclasses import dataclass
 from zoneinfo import ZoneInfo
 
+from .i18n import LANGS, t
+
 
 def _env(name: str, default: str = "", *, required: bool = False) -> str:
     value = os.getenv(name, default).strip()
@@ -46,6 +48,8 @@ class Settings:
     default_silent: bool
     proxy: str
     api_url: str
+    language: str  # 审核群、频道落款、统计提醒的语言
+    user_language: str  # 投稿人看到的语言：auto（跟随客户端）/ zh / en
 
     def in_quiet_hours(self, hour: int) -> bool:
         if not self.quiet_hours:
@@ -56,7 +60,18 @@ class Settings:
         return hour >= start or hour < end
 
 
+def _lang(value: str, allowed: tuple[str, ...], name: str) -> str:
+    value = value.lower()
+    if value not in allowed:
+        raise RuntimeError(f"{name} 只能是 {' / '.join(allowed)}，当前是 {value!r}")
+    return value
+
+
 def load_settings() -> Settings:
+    language = _lang(_env("LANGUAGE", "zh"), LANGS, "LANGUAGE")
+    # 落款没配置时用对应语言的默认值；配置成空字符串表示不要落款
+    sign = os.environ.get("SIGN_TEMPLATE")
+    anon = os.environ.get("ANON_SIGNATURE")
     return Settings(
         bot_token=_env("BOT_TOKEN", required=True),
         channel_id=_chat_id(_env("CHANNEL_ID", required=True)),
@@ -65,8 +80,8 @@ def load_settings() -> Settings:
         db_path=_env("DB_PATH", "/app/data/bot.db"),
         album_delay=float(_env("ALBUM_DELAY", "1.5")),
         max_pending_per_user=int(_env("MAX_PENDING_PER_USER", "5")),
-        sign_template=_env("SIGN_TEMPLATE", "投稿人：{name}"),
-        anon_signature=_env("ANON_SIGNATURE", "匿名投稿"),
+        sign_template=sign.strip() if sign is not None else t(language, "default_sign"),
+        anon_signature=anon.strip() if anon is not None else t(language, "default_anon"),
         schedule_presets=tuple(
             p.strip() for p in _env("SCHEDULE_PRESETS", "09:00,12:00,18:00,21:00").split(",") if p.strip()
         ),
@@ -77,4 +92,6 @@ def load_settings() -> Settings:
         default_silent=_bool(_env("DEFAULT_SILENT", "false")),
         proxy=_env("PROXY"),
         api_url=_env("TELEGRAM_API_URL"),
+        language=language,
+        user_language=_lang(_env("USER_LANGUAGE", "auto"), ("auto", *LANGS), "USER_LANGUAGE"),
     )

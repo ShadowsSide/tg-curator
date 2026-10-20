@@ -10,12 +10,12 @@ def now_ts() -> int:
     return int(time.time())
 
 
-def fmt_ts(ts: int | None, tz: ZoneInfo) -> str:
+def fmt_ts(ts: int | None, tz: ZoneInfo, lang: str = "zh") -> str:
     if not ts:
         return "-"
     dt = datetime.fromtimestamp(ts, tz)
     if dt.date() == datetime.now(tz).date():
-        return dt.strftime("今天 %H:%M")
+        return f"{'今天' if lang == 'zh' else 'today'} {dt:%H:%M}"
     return dt.strftime("%m-%d %H:%M")
 
 

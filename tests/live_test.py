@@ -414,15 +414,27 @@ async def scenario():
     pv = await wait_for(lambda e: is_send(e, "sendMessage", REVIEW, "v3 新版本"), since=n)
     check("/edit replying to bot prompt", ok and pv)
 
-    # 7d. 不回复、只有一条可改的投稿：直接改那一条（命令不接受投稿编号，“2024”就是正文）
-    n = len(log); pm("/edit 2024年总结")
-    pv = await wait_for(lambda e: is_send(e, "sendMessage", REVIEW, "2024年总结"), since=n)
-    check("/edit without reply uses the only editable submission; numbers are just text", pv)
+    def reply_to(message_id, by_bot):
+        sender = {"id": 1, "is_bot": True, "first_name": "TestBot"} if by_bot else \
+            {"id": USER, "is_bot": False, "first_name": "Alice"}
+        return {"message_id": message_id, "date": now(), "chat": chat(USER), "from": sender}
 
-    # 7e. /edit 只看内容
+    # 7d. 不回复 → 不生效，提示必须回复（即使只有一条可改的投稿）
+    n = len(log); pm("/edit 不回复就想改")
+    e = await wait_for(lambda e: is_send(e, "sendMessage", USER, "请<b>回复</b>"), since=n)
+    changed = await wait_for(lambda e: is_send(e, "sendMessage", REVIEW, "不回复就想改"), timeout=0.5, since=n)
+    check("submitter /edit without reply → not applied, asked to reply", e and not changed)
     n = len(log); pm("/edit")
+    e = await wait_for(lambda e: is_send(e, "sendMessage", USER, "请<b>回复</b>"), since=n)
+    check("submitter /edit alone without reply → asked to reply", e)
+
+    # 7e. 回复自己发的原消息 /edit → 生效；回复后只发 /edit → 返回当前内容
+    n = len(log); pm("/edit 2024年总结", reply_to_message=reply_to(src, by_bot=False))
+    pv = await wait_for(lambda e: is_send(e, "sendMessage", REVIEW, "2024年总结"), since=n)
+    check("/edit replying to own original message works; numbers are just text", pv)
+    n = len(log); pm("/edit", reply_to_message=reply_to(src, by_bot=False))
     e = await wait_for(lambda e: is_send(e, "sendMessage", USER, "2024年总结") and "投稿人" not in e["params"]["text"], since=n)
-    check("/edit alone echoes current content to submitter", e)
+    check("replying with just /edit echoes current content", e)
 
     # 7f. 发布后再改 → 拒绝
     n = len(log); cb("r:pub:7:0", REVIEW, ADMIN)
@@ -431,9 +443,9 @@ async def scenario():
     e = await wait_for(lambda e: is_send(e, "sendMessage", USER, "已经发布，不能修改"), since=n)
     check("edit after publish refused", e and not await wait_for(
         lambda e: is_send(e, "sendMessage", REVIEW, "偷偷改"), timeout=0.5, since=n))
-    n = len(log); pm("/edit 也不行")
-    e = await wait_for(lambda e: is_send(e, "sendMessage", USER, "没有可以修改的投稿"), since=n)
-    check("/edit with nothing editable → explained", e)
+    n = len(log); pm("/edit 也不行", reply_to_message=reply_to(prompt7["result"]["message_id"], by_bot=True))
+    e = await wait_for(lambda e: is_send(e, "sendMessage", USER, "已经发布，不能修改"), since=n)
+    check("/edit by reply after publish → refused with reason", e)
 
     # 8. 等后台任务：定时发布（调度器每 15 秒检查）+ 每分钟统计提醒
     print("… waiting for scheduler + reminder loops (up to ~100s)", flush=True)

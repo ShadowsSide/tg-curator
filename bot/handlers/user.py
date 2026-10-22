@@ -6,7 +6,7 @@ from aiogram.filters import Command, CommandStart
 from aiogram.types import CallbackQuery, Message
 
 from .. import entities as ent
-from ..core import Core, explicit_reply, topic_of
+from ..core import Core, explicit_reply
 from ..db import SUBMITTER_EDITABLE
 from ..i18n import t
 from ..keyboards import UserCB
@@ -33,26 +33,17 @@ def build_router() -> Router:
         uid = m.from_user.id
         lang = core.lang_of(m.from_user)
         body, entities = ent.strip_command(m.text or m.caption or "", ent.dump(m.entities or m.caption_entities))
-        mine = await core.db.editable_by_submitter(uid)
 
+        # 必须回复要修改的那条投稿（投稿内容本身，或机器人关于它的提示消息）才生效
         reply = explicit_reply(m)
-        topic_sid = await core.db.sid_by_user_topic(uid, topic_of(m)) if topic_of(m) else None
-        if reply:
-            found = await core.db.find_by_user_message(uid, reply.message_id)
-            if not found:
-                await m.reply(t(lang, "u_edit_reply_own"))
-                return
-            sid = found[0]
-        elif topic_sid:  # 私聊话题模式：在投稿自己的话题里直接 /edit
-            sid = topic_sid
-        elif len(mine) == 1:  # 只有一条可改的投稿：不用回复也知道改哪条
-            sid = mine[0].id
-        elif not mine:
-            await m.reply(t(lang, "u_edit_none"))
+        if not reply:
+            await m.reply(t(lang, "u_edit_reply_needed"))
             return
-        else:
-            await m.reply(t(lang, "u_edit_many"))
+        found = await core.db.find_by_user_message(uid, reply.message_id)
+        if not found:
+            await m.reply(t(lang, "u_edit_reply_own"))
             return
+        sid = found[0]
 
         sub = await core.db.get(sid)
         if not sub or sub.user_id != uid:

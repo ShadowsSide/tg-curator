@@ -64,7 +64,7 @@ T: dict[str, dict[str, str]] = {
             "发送后选择 <b>署名</b> 或 <b>匿名</b>，审核通过后会发布到频道，结果会通知你。\n\n"
             "<b>修改投稿</b>（审核结果出来之前都可以改）：\n"
             "· 直接用 Telegram 的“编辑”修改你发出的那条消息，机器人会自动同步（换图也可以）\n"
-            "· 或者回复你的投稿，发送 <code>/edit 新内容</code>；只发 /edit 会把当前内容发给你，方便复制修改\n\n"
+            "· 或者<b>回复</b>你的投稿，发送 <code>/edit 新内容</code>；回复时只发 /edit 会把当前内容发给你，方便复制修改\n\n"
             "/me 查看我的投稿统计"
         ),
         "en": (
@@ -74,8 +74,8 @@ T: dict[str, dict[str, str]] = {
             "and you'll be notified.\n\n"
             "<b>Editing</b> (possible until the review is done):\n"
             "· Use Telegram's “Edit” on the message you sent; the bot syncs it automatically (you can even swap the image)\n"
-            "· Or reply to your submission with <code>/edit new content</code>; /edit alone sends you the current "
-            "content so you can copy and change it\n\n"
+            "· Or <b>reply</b> to your submission with <code>/edit new content</code>; replying with just /edit sends "
+            "you the current content so you can copy and change it\n\n"
             "/me shows your submission stats"
         ),
     },
@@ -131,13 +131,10 @@ T: dict[str, dict[str, str]] = {
         "zh": "请回复你自己发出的投稿内容，或机器人关于这条投稿的提示消息。",
         "en": "Please reply to a submission you sent, or to the bot's message about it.",
     },
-    "u_edit_none": {
-        "zh": "你目前没有可以修改的投稿（审核结果出来之前的投稿才能修改）。",
-        "en": "You have no submissions you can edit (only submissions that haven't been reviewed yet can be edited).",
-    },
-    "u_edit_many": {
-        "zh": '你有多条待审核的投稿，请回复要修改的那一条，再发送 <code>/edit 新内容</code>。',
-        "en": 'You have several submissions waiting for review. Reply to the one you want to change with <code>/edit new content</code>.',
+    "u_edit_reply_needed": {
+        "zh": "请<b>回复</b>你要修改的那条投稿（或机器人关于它的提示消息），再发送 <code>/edit 新内容</code>。",
+        "en": "Please <b>reply</b> to the submission you want to change (or the bot's message about it) with "
+              "<code>/edit new content</code>.",
     },
     "u_edit_not_found": {
         "zh": '没有找到这条投稿。',

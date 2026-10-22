@@ -288,14 +288,6 @@ class DB:
         )
         return row[0] if row else None
 
-    async def editable_by_submitter(self, user_id: int) -> list[Submission]:
-        marks = ", ".join("?" * len(SUBMITTER_EDITABLE))
-        rows = await self._all(
-            f"SELECT * FROM submissions WHERE user_id=? AND status IN ({marks}) ORDER BY id",
-            (user_id, *SUBMITTER_EDITABLE),
-        )
-        return [Submission.from_row(r) for r in rows]
-
     async def transition(self, sid: int, from_states: Iterable[str], to_state: str, **fields: Any) -> bool:
         """原子地把状态从 from_states 之一改成 to_state；状态不符时返回 False（防并发重复操作）。"""
         from_states = tuple(from_states)

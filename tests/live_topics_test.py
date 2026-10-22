@@ -97,11 +97,18 @@ async def scenario():
     check("anonymous submission marked in review topic name", rtopic2 and "（匿名）" not in rtopic2["params"]["name"]
           and "(匿名)" in rtopic2["params"]["name"], rtopic2 and rtopic2["params"]["name"])
 
-    # ---------- 5. 投稿人在自己的话题里直接 /edit；管理员在审核话题里直接 /edit ----------
-    n = len(log); topic_msg(USER, own, "/edit 投稿人改过的内容", USER)
+    # ---------- 5. 投稿人：话题里也必须回复才生效；管理员在审核话题里可直接 /edit ----------
+    n = len(log); topic_msg(USER, own, "/edit 没回复", USER)
+    e = await wait_for(lambda e: is_send(e, "sendMessage", USER, "请<b>回复</b>"), since=n)
+    changed = await wait_for(lambda e: is_send(e, "sendMessage", REVIEW, "没回复"), timeout=0.5, since=n)
+    check("submitter /edit inside their topic without reply → not applied, asked to reply", e and not changed)
+    n = len(log)
+    topic_msg(USER, own, "/edit 投稿人改过的内容", USER, reply_to_message={
+        "message_id": p2["result"]["message_id"], "date": now(), "chat": lt.chat(USER),
+        "from": {"id": 1, "is_bot": True, "first_name": "TestBot"}})
     ok = await wait_for(lambda e: is_send(e, "sendMessage", USER, "投稿已更新"), since=n)
     pv = await wait_for(lambda e: is_send(e, "sendMessage", REVIEW, "投稿人改过的内容"), since=n)
-    check("submitter /edit inside their topic (no reply) → new preview in the review topic",
+    check("submitter /edit replying inside their topic → new preview in the review topic",
           ok and pv and int(pv["params"]["message_thread_id"]) == t_r2)
     n = len(log); topic_msg(REVIEW, t_r2, "/edit 管理员定稿", ADMIN)
     pv = await wait_for(lambda e: is_send(e, "sendMessage", REVIEW, "管理员定稿"), since=n)

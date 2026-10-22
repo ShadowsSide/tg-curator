@@ -19,7 +19,7 @@ Built with Python 3.12 + [aiogram 3](https://github.com/aiogram/aiogram) + SQLit
 - Text, photos, videos, GIFs, files, audio and voice messages. Albums of several photos or videos are merged into one submission
 - Submitters choose to post **signed** (with their name) or **anonymously**. Either way, admins can always see who sent it
 - **Formatting is kept exactly as sent**: links, bold, quotes, spoiler text, code, date/time and emoji all come through to the channel unchanged
-- Submitters can **edit their post** until it has been reviewed, either with Telegram's built-in "Edit" or with `/edit`
+- Submitters can **edit their post** until it has been reviewed, either with Telegram's built-in "Edit" or by **replying** to it with `/edit`
 
 **Reviewing**
 - Each submission gets a preview in the review group (exactly what the channel will show), followed by a control message with colored buttons
@@ -147,8 +147,8 @@ Everything is configured in `.env`. See [`.env.example`](.env.example) for a ful
 |---|---|
 | Send any content | Starts a submission, then choose signed or anonymous |
 | Edit the original message with Telegram's "Edit" | Changes the submission until it has been reviewed: text, formatting, or even the image |
-| `/edit new content` | Reply to your submission. If you have only one pending submission, you don't need to reply |
-| `/edit` | Shows the current content with formatting, so you can copy and change it |
+| `/edit new content` | Only works as a **reply** to your submission (or the bot's message about it); without a reply nothing is changed |
+| `/edit` (as a reply) | Shows the current content with formatting, so you can copy and change it |
 | `/me` | Your submission stats |
 
 ### Admins (review group)

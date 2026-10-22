@@ -275,6 +275,10 @@ T: dict[str, dict[str, str]] = {
         "en": "Banned; {n} open submission(s) rejected",
     },
     "publish_failed": {"zh": "发布失败：{error}", "en": "Failed to publish: {error}"},
+    "publish_postponed": {
+        "zh": "⏳ Telegram 正在限流，已自动改为 <b>{when}</b> 发布",
+        "en": "⏳ Telegram is rate-limiting the bot; publishing was moved to <b>{when}</b>",
+    },
     "time_past": {"zh": "这个时间已经过去了", "en": "That time has already passed"},
     "reject_published": {
         "zh": '这条投稿已发布，无法拒绝',

@@ -188,6 +188,9 @@ Telegram 只允许购买了 Fragment 用户名的机器人往频道发自定义 
 **发布失败了怎么办？**
 控制消息会显示失败原因，并提供 🔁 重试 按钮。常见原因是说明文字加上落款后超过了 Telegram 的长度限制（媒体说明 1024 字，文字 4096 字），可以先用 `/edit` 缩短后再重试。
 
+**被 Telegram 限流了会怎样？**
+机器人会按 Telegram 要求的时间自动等待并重试，不需要人工处理。如果要求等待的时间太长（超过 30 秒），正在发布的投稿会自动改为稍后定时发布，不会标记为失败。统计消息在几秒内的多次变化会合并成一次更新。
+
 **用户发了多个 GIF，为什么变成了多条投稿？**
 Telegram 不允许把 GIF 放进相册，所以每个 GIF 会单独成为一条投稿。
 
@@ -210,6 +213,7 @@ DB_PATH=./data/bot.db .venv/bin/python -m bot
 .venv/bin/python tests/live_test.py       # 端到端测试：启动模拟的 Bot API 服务器，运行真实的机器人进程（约 1 分钟）
 .venv/bin/python tests/live_topics_test.py  # 端到端测试：话题模式（约 10 秒）
 .venv/bin/python tests/live_msg_test.py     # 端到端测试：/msg 沟通的边界情况（约 10 秒）
+.venv/bin/python tests/live_flood_test.py   # 端到端测试：被限流时的自动重试与改期（约 20 秒）
 ```
 
 ### 项目结构

@@ -190,6 +190,9 @@ Two processes are using the same token. Make sure only one instance is running, 
 **A post failed to publish. What now?**
 The control message shows the reason and a 🔁 Retry button. A common cause is that the caption plus the signature exceeds Telegram's length limit (1024 characters for media captions, 4096 for text). Shorten it with `/edit`, then retry.
 
+**What happens when Telegram rate-limits the bot?**
+The bot waits as long as Telegram asks and retries automatically. If the wait would be too long (over 30 seconds), a post being published is automatically rescheduled for later instead of being marked failed. Several changes to the review summary within a few seconds are merged into one update.
+
 **A user sent several GIFs and got several submissions. Why?**
 Telegram doesn't allow GIFs in albums, so each GIF becomes its own submission.
 
@@ -212,6 +215,7 @@ The tests need no token and no network access:
 .venv/bin/python tests/live_test.py       # end-to-end: runs the real bot against a mock Bot API server (~1 minute)
 .venv/bin/python tests/live_topics_test.py  # end-to-end: topic mode (~10 seconds)
 .venv/bin/python tests/live_msg_test.py     # end-to-end: /msg edge cases (~10 seconds)
+.venv/bin/python tests/live_flood_test.py   # end-to-end: retries and rescheduling under rate limits (~20 seconds)
 ```
 
 ### Project layout

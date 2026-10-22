@@ -10,7 +10,7 @@ import logging
 from datetime import datetime
 
 from aiogram import Bot
-from aiogram.exceptions import TelegramAPIError, TelegramBadRequest
+from aiogram.exceptions import TelegramAPIError, TelegramBadRequest, TelegramRetryAfter
 from aiogram.types import LinkPreviewOptions, Message, ReplyParameters, User as TgUser
 
 from .album import AlbumCollector
@@ -35,6 +35,8 @@ TOPIC_COLOR = 7322096  # 蓝色（Telegram 只允许几种固定颜色）
 SCHEDULER_TICK = 15  # 秒
 DRAFT_TTL = 24 * 3600
 STATS_MSG_KEY = "stats_msg_id"
+STATS_DEBOUNCE = 3  # 秒：统计消息在这段时间内的多次更新合并成一次编辑（减少审核群里的请求，避免限流）
+POSTPONE_MARGIN = 5  # 秒：发布被限流时，在 Telegram 要求的等待时间之后再多留一点余量
 NO_PREVIEW = LinkPreviewOptions(is_disabled=True)
 
 
@@ -57,6 +59,8 @@ class Core:
         self.channel_chat_id: int | None = None
         self.channel_linked_chat_id: int | None = None  # 发布频道的关联群组（评论区）
         self._stats_lock = asyncio.Lock()
+        self._stats_dirty = False
+        self._stats_task: asyncio.Task | None = None
         self._tasks: list[asyncio.Task] = []
 
     # ---------- lifecycle ----------
@@ -90,6 +94,8 @@ class Core:
         ]
 
     async def stop_background(self) -> None:
+        if self._stats_task:
+            self._tasks.append(self._stats_task)
         for task in self._tasks:
             task.cancel()
         await asyncio.gather(*self._tasks, return_exceptions=True)
@@ -436,6 +442,14 @@ class Core:
                 self.bot, self.s.channel_id, sub.items, sig=await self._signature(sub),
                 spoiler=sub.spoiler, silent=sub.silent,
             )
+        except TelegramRetryAfter as e:
+            # 等待时间太长、请求层的自动重试没能解决：频道里什么都还没发出去，改为稍后自动发布，而不是“发布失败”
+            ts = now_ts() + e.retry_after + POSTPONE_MARGIN
+            log.warning("发布 #%s 被限流 %s 秒，改为 %s 自动发布", sid, e.retry_after, ts)
+            await self.db.update(sid, status="scheduled", scheduled_at=ts, error=None)
+            await self.refresh_control(sid)
+            await self.refresh_stats()
+            return t(self.lang, "publish_postponed", when=self.fmt(ts))
         except TelegramAPIError as e:
             log.exception("发布 #%s 失败", sid)
             await self.db.update(sid, status="failed", error=str(e)[:300])
@@ -619,7 +633,23 @@ class Core:
                     pass
 
     async def refresh_stats(self) -> None:
-        """审核状态变化时就地更新当前那条统计消息（“更新于”时间随之刷新）。"""
+        """审核状态变化时更新统计消息。不立即编辑：STATS_DEBOUNCE 秒内的多次变化合并成一次编辑。"""
+        self._stats_dirty = True
+        if self._stats_task is None or self._stats_task.done():
+            self._stats_task = asyncio.create_task(self._stats_worker(), name="stats-refresh")
+
+    async def _stats_worker(self) -> None:
+        # 等待期间又有变化会重新置位 dirty，循环再刷新一次，保证最后的状态一定会显示出来
+        while self._stats_dirty:
+            self._stats_dirty = False
+            await asyncio.sleep(STATS_DEBOUNCE)
+            try:
+                await self._refresh_stats_now()
+            except Exception:
+                log.exception("刷新统计消息出错")
+
+    async def _refresh_stats_now(self) -> None:
+        """就地更新当前那条统计消息（“更新于”时间随之刷新）。"""
         async with self._stats_lock:
             mid = await self.db.kv_get(STATS_MSG_KEY)
             if not mid:

@@ -38,7 +38,9 @@ def chat(cid):
     return {"id": cid, "type": "private" if cid > 0 else ("channel" if cid == CHANNEL else "supergroup")}
 
 
-MOCK = {"review_is_forum": False, "bot_topics": False}
+MOCK = {"review_is_forum": False, "bot_topics": False,
+        # 限流注入："方法名:chat_id" → 依次返回的 retry_after 秒数列表，每次调用消耗一个
+        "flood": {}}
 next_topic = [7000]
 
 
@@ -65,6 +67,13 @@ async def handle(request: web.Request):
         params = await request.json()
 
     m = method.lower()
+    flood = MOCK["flood"].get(f"{method}:{params.get('chat_id')}")
+    if flood:
+        retry_after = flood.pop(0)
+        log.append({"method": method, "params": params, "result": None, "error": True, "flood": retry_after,
+                    "t": time.time()})
+        return web.json_response({"ok": False, "error_code": 429, "parameters": {"retry_after": retry_after},
+                                  "description": f"Too Many Requests: retry after {retry_after}"}, status=429)
     if m == "getupdates":
         offset = int(params.get("offset") or 0)
         timeout = min(float(params.get("timeout") or 0), 2)

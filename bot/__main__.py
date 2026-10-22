@@ -18,6 +18,7 @@ from .db import DB
 from .guard import ChatGuard
 from .handlers import review, user
 from .i18n import LANGS, PRIVATE_COMMANDS, REVIEW_COMMANDS
+from .ratelimit import RetryAfterMiddleware
 
 
 async def set_commands(bot: Bot, review_chat_id: int, default_lang: str) -> None:
@@ -55,6 +56,7 @@ async def main() -> None:
         session=make_session(settings),
         default=DefaultBotProperties(parse_mode=ParseMode.HTML),
     )
+    bot.session.middleware(RetryAfterMiddleware())  # 被限流时自动等待重试
     core = Core(bot, db, settings)
     await core.init()
     await set_commands(bot, settings.review_chat_id, settings.language)

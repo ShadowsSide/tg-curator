@@ -10,7 +10,7 @@ sys.path.insert(0, str(ROOT))
 from bot.errors import Notice, notice  # noqa: E402
 from bot.i18n import LANGS, T  # noqa: E402
 
-CORE = ROOT / "bot" / "core.py"
+CORE = ROOT / "bot" / "core"  # 包：base.py、review.py……
 
 
 def _functions(tree):
@@ -19,9 +19,11 @@ def _functions(tree):
 
 def test_notice_methods_never_return_translated_text():
     """返回值标注为 Notice 的方法里，不允许出现 return t(...)（那是把翻译又放回了业务层）。"""
-    tree = ast.parse(CORE.read_text())
+    trees = [ast.parse(f.read_text()) for f in sorted(CORE.glob("*.py"))] if CORE.is_dir() \
+        else [ast.parse(CORE.read_text())]
+    fns = [fn for tree in trees for fn in _functions(tree)]
     offenders = []
-    for fn in _functions(tree):
+    for fn in fns:
         if fn.returns is None or "Notice" not in ast.unparse(fn.returns):
             continue
         for node in ast.walk(fn):
@@ -29,7 +31,7 @@ def test_notice_methods_never_return_translated_text():
                     and isinstance(node.value.func, ast.Name) and node.value.func.id == "t":
                 offenders.append(f"{fn.name}:{node.lineno}")
     assert not offenders, offenders
-    assert sum(1 for fn in _functions(tree) if fn.returns is not None and "Notice" in ast.unparse(fn.returns)) >= 15
+    assert sum(1 for fn in fns if fn.returns is not None and "Notice" in ast.unparse(fn.returns)) >= 15
 
 
 def test_every_notice_key_exists_in_both_languages():

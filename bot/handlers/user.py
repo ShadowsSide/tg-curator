@@ -39,13 +39,13 @@ def build_router() -> Router:
         if not reply:
             await m.reply(t(lang, "u_edit_reply_needed"))
             return
-        found = await core.db.find_by_user_message(uid, reply.message_id)
+        found = await core.find_user_message(uid, reply.message_id)
         if not found:
             await m.reply(t(lang, "u_edit_reply_own"))
             return
         sid = found[0]
 
-        sub = await core.db.get(sid)
+        sub = await core.get_submission(sid)
         if not sub or sub.user_id != uid:
             await m.reply(t(lang, "u_edit_not_found"))
             return
@@ -64,7 +64,7 @@ def build_router() -> Router:
         lang = core.lang_of(m.from_user)
         body, entities = ent.strip_command(m.text or m.caption or "", ent.dump(m.entities or m.caption_entities))
         reply = explicit_reply(m)
-        found = await core.db.find_by_user_message(m.from_user.id, reply.message_id) if reply else None
+        found = await core.find_user_message(m.from_user.id, reply.message_id) if reply else None
         if not found:
             await m.reply(t(lang, "msg_usage_user"))
             return
@@ -78,14 +78,14 @@ def build_router() -> Router:
     @router.edited_message()
     async def native_edit(m: Message, core: Core) -> None:
         """投稿人用 Telegram 自带的“编辑”改了投稿的原消息。"""
-        found = await core.db.find_by_user_message(m.from_user.id, m.message_id)
+        found = await core.find_user_message(m.from_user.id, m.message_id)
         if not found or found[1] is None:
             return  # 不是投稿内容（比如普通聊天、命令），忽略
         sid, index = found
         new_item = extract_item(m)
         if new_item is None:
             return
-        sub = await core.db.get(sid)
+        sub = await core.get_submission(sid)
         lang = core.lang_of(m.from_user)
         err = await core.replace_item(sid, index, new_item, _editor(core, m), SUBMITTER_EDITABLE)
         await m.reply(err.text(lang) if err else _edited_text(lang, sid, sub.status))
@@ -101,7 +101,7 @@ def build_router() -> Router:
             return
         # 直接回复了审核员的消息但没写 /msg：提醒用 /msg，而不是当成一条新投稿
         reply = explicit_reply(m)
-        if reply and await core.db.sid_by_relay_message(m.from_user.id, reply.message_id):
+        if reply and await core.sid_for_relay_message(m.from_user.id, reply.message_id):
             await m.reply(t(core.lang_of(m.from_user), "msg_hint_user"))
             return
         await core.receive([m])

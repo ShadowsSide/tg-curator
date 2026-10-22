@@ -214,6 +214,7 @@ The tests need no token and no network access:
 .venv/bin/python tests/test_entities.py   # unit tests: formatting offsets (UTF-16)
 .venv/bin/python tests/test_i18n.py       # unit tests: every text exists in both languages
 .venv/bin/python tests/test_errors.py     # unit tests: business logic returns notice codes, translated only when shown
+.venv/bin/python tests/test_structure.py  # unit tests: handlers don't touch the database; core modules don't redefine methods
 .venv/bin/python tests/live_test.py       # end-to-end: runs the real bot against a mock Bot API server (~1 minute)
 .venv/bin/python tests/live_topics_test.py  # end-to-end: topic mode (~10 seconds)
 .venv/bin/python tests/live_msg_test.py     # end-to-end: /msg edge cases (~10 seconds)
@@ -228,7 +229,15 @@ bot/
   __main__.py     entry point
   config.py       environment variables
   db.py           SQLite schema, migrations and queries
-  core.py         submitting, reviewing, publishing, editing, scheduling, stats
+  core/           business logic, combined into one Core; handlers only go through it
+    base.py         setup, language, notifications, control messages, lookups for handlers
+    submissions.py  receiving, drafts, sending for review
+    editing.py      editing (/edit and Telegram's built-in edit)
+    review.py       publish, schedule, reject, ban, spoiler / silent toggles
+    messaging.py    /msg messaging
+    topics.py       topic mode
+    stats.py        review summary, activity, scheduled queue
+    scheduler.py    background jobs: scheduled publishing, draft cleanup, summary reminders
   render.py       sending content (single / album, signature, spoiler, silent) and message texts
   entities.py     message formatting (UTF-16 offsets, appending the signature)
   i18n.py         English and Chinese UI texts

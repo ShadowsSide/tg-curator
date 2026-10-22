@@ -47,9 +47,9 @@ async def _replied_sid(m: Message, core: Core) -> int | None:
     """命令针对的投稿：回复了投稿消息就用它；话题模式下，在投稿的话题里直接发命令也行。"""
     reply = explicit_reply(m)
     if reply:
-        return await core.db.sid_by_review_message(reply.message_id)
+        return await core.sid_for_review_message(reply.message_id)
     if topic_of(m):
-        return await core.db.sid_by_review_topic(topic_of(m))
+        return await core.sid_for_review_topic(topic_of(m))
     return None
 
 
@@ -110,7 +110,7 @@ def build_router(settings: Settings) -> Router:
             err = await core.reject(sid, who)
             await cq.answer(err.text(lang) if err else t(lang, "toast_rejected"), show_alert=bool(err))
         elif action == "ban":
-            sub = await core.db.get(sid)
+            sub = await core.get_submission(sid)
             if not sub:
                 await cq.answer(t(lang, "sub_not_found", sid=sid), show_alert=True)
                 return
@@ -200,7 +200,7 @@ def build_router(settings: Settings) -> Router:
         args = command.args or ""
         sid = await _replied_sid(m, core)
         if sid is not None:
-            user_id, reason = (await core.db.get(sid)).user_id, _clean_reason(args)
+            user_id, reason = (await core.get_submission(sid)).user_id, _clean_reason(args)
         elif explicit_reply(m):
             await m.reply(t(core.lang, "reply_to_submission"))
             return
@@ -211,7 +211,7 @@ def build_router(settings: Settings) -> Router:
                 return
 
         rejected = await core.ban_user(user_id, m.from_user, reason)
-        user = await core.db.get_user(user_id)
+        user = await core.get_user(user_id)
         text = t(core.lang, "banned_reply", link=user_link(user, user_id), uid=user_id)
         if reason:
             text += t(core.lang, "reason_line", reason=html.escape(reason))
@@ -224,7 +224,7 @@ def build_router(settings: Settings) -> Router:
         uid = _user_id_arg(command)
         if uid is None:
             sid = await _replied_sid(m, core)
-            uid = (await core.db.get(sid)).user_id if sid is not None else None
+            uid = (await core.get_submission(sid)).user_id if sid is not None else None
         if uid is None:
             await m.reply(t(core.lang, "usage_unban"))
             return
@@ -272,7 +272,7 @@ def build_router(settings: Settings) -> Router:
     async def plain_reply(m: Message, core: Core) -> None:
         """直接回复了投稿人转来的消息但没写 /msg：提醒一下，免得以为对方收到了。"""
         reply = explicit_reply(m)
-        if reply and await core.db.is_review_relay_message(reply.message_id):
+        if reply and await core.is_review_relay_message(reply.message_id):
             await m.reply(t(core.lang, "msg_hint_admin"))
 
     return router

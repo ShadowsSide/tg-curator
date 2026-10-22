@@ -212,6 +212,7 @@ DB_PATH=./data/bot.db .venv/bin/python -m bot
 .venv/bin/python tests/test_entities.py   # 单元测试：格式偏移（UTF-16）计算
 .venv/bin/python tests/test_i18n.py       # 单元测试：中英文文案齐全、占位符一致
 .venv/bin/python tests/test_errors.py     # 单元测试：业务层只返回提示代码，翻译在显示时进行
+.venv/bin/python tests/test_structure.py  # 单元测试：处理函数不直接访问数据库，core 各模块不重复定义方法
 .venv/bin/python tests/live_test.py       # 端到端测试：启动模拟的 Bot API 服务器，运行真实的机器人进程（约 1 分钟）
 .venv/bin/python tests/live_topics_test.py  # 端到端测试：话题模式（约 10 秒）
 .venv/bin/python tests/live_msg_test.py     # 端到端测试：/msg 沟通的边界情况（约 10 秒）
@@ -226,7 +227,15 @@ bot/
   __main__.py     启动入口
   config.py       环境变量
   db.py           SQLite 表结构、迁移与查询
-  core.py         业务逻辑：投稿、审核、发布、修改、定时、统计
+  core/           业务逻辑，组合成一个 Core；处理函数只通过它访问业务和数据
+    base.py         初始化、语言、通知、控制消息、给处理函数用的查询
+    submissions.py  收稿、草稿、提交审核
+    editing.py      修改稿件（/edit、Telegram 自带编辑）
+    review.py       发布、定时、拒绝、封禁、剧透 / 静音开关
+    messaging.py    /msg 沟通
+    topics.py       话题模式
+    stats.py        审核统计、活跃度、定时队列
+    scheduler.py    后台任务：定时发布、清理草稿、统计提醒
   render.py       发送内容（单条 / 相册、落款、剧透、静音）与文案
   entities.py     消息格式处理（UTF-16 偏移、拼接落款）
   i18n.py         中英文界面文案

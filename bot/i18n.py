@@ -30,10 +30,6 @@ def on_off(lang: str, on: bool) -> str:
     return t(lang, "on" if on else "off")
 
 
-def join_ids(lang: str, ids) -> str:
-    return t(lang, "list_sep").join(f"#{i}" for i in ids)
-
-
 T: dict[str, dict[str, str]] = {
     # ---------- 通用 ----------
     "on": {"zh": "开", "en": "on"},
@@ -42,7 +38,10 @@ T: dict[str, dict[str, str]] = {
     "today": {"zh": "今天", "en": "Today"},
     "tomorrow": {"zh": "明天", "en": "Tomorrow"},
     "reason_line": {"zh": "\n理由：{reason}", "en": "\nReason: {reason}"},
-    "sub_not_found": {"zh": "投稿 #{sid} 不存在", "en": "Submission #{sid} does not exist"},
+    "sub_not_found": {
+        "zh": '这条投稿不存在',
+        "en": "This submission doesn't exist",
+    },
     "status_changed": {"zh": "状态已变化，请刷新", "en": "The status has changed, please refresh"},
     "default_sign": {"zh": "投稿人：{name}", "en": "Submitted by {name}"},
     "default_anon": {"zh": "匿名投稿", "en": "Anonymous submission"},
@@ -112,8 +111,8 @@ T: dict[str, dict[str, str]] = {
     "mode_anon": {"zh": "匿名", "en": "anonymously"},
     "mode_signed": {"zh": "署名", "en": "with your name"},
     "submitted": {
-        "zh": "✅ 已{mode}提交，投稿编号 <b>#{sid}</b>。\n审核结果会通知你，请耐心等待。",
-        "en": "✅ Submitted {mode}. Your submission number is <b>#{sid}</b>.\nWe'll let you know the review result.",
+        "zh": '✅ 已{mode}提交。\n审核结果会通知你，请耐心等待。',
+        "en": "✅ Submitted {mode}.\nWe'll let you know the review result.",
     },
     "submitted_toast": {"zh": "已提交", "en": "Submitted"},
     "draft_expired": {
@@ -125,8 +124,8 @@ T: dict[str, dict[str, str]] = {
         "en": "✏️ Updated. When you're happy with it, choose signed or anonymous above to submit.",
     },
     "edited_pending": {
-        "zh": "✏️ 投稿 #{sid} 已更新，审核时将使用修改后的内容。",
-        "en": "✏️ Submission #{sid} was updated. The review will use the new version.",
+        "zh": '✏️ 投稿已更新，审核时将使用修改后的内容。',
+        "en": '✏️ Updated. The review will use the new version.',
     },
     "u_edit_reply_own": {
         "zh": "请回复你自己发出的投稿内容，或机器人关于这条投稿的提示消息。",
@@ -137,11 +136,13 @@ T: dict[str, dict[str, str]] = {
         "en": "You have no submissions you can edit (only submissions that haven't been reviewed yet can be edited).",
     },
     "u_edit_many": {
-        "zh": "你有多条待审核的投稿：{ids}。\n请回复要修改的那条，或发送 <code>/edit #编号 新内容</code>。",
-        "en": "You have several submissions waiting for review: {ids}.\n"
-              "Reply to the one you want to change, or send <code>/edit #number new content</code>.",
+        "zh": '你有多条待审核的投稿，请回复要修改的那一条，再发送 <code>/edit 新内容</code>。',
+        "en": 'You have several submissions waiting for review. Reply to the one you want to change with <code>/edit new content</code>.',
     },
-    "u_edit_not_found": {"zh": "没有找到你的投稿 #{sid}。", "en": "Couldn't find your submission #{sid}."},
+    "u_edit_not_found": {
+        "zh": '没有找到这条投稿。',
+        "en": "Couldn't find that submission.",
+    },
     "u_edit_echo_hint": {
         "zh": "↑ 这是当前内容。复制、修改后，回复你的投稿发送 <code>/edit 新内容</code>。",
         "en": "↑ This is the current content. Copy and change it, then reply to your submission with "
@@ -152,20 +153,20 @@ T: dict[str, dict[str, str]] = {
     # ---------- 通知投稿人 ----------
     "view_post": {"zh": "查看帖子", "en": "View post"},
     "notify_published": {
-        "zh": "🎉 你的投稿 #{sid} 已发布到频道！{link}",
-        "en": "🎉 Your submission #{sid} has been published to the channel!{link}",
+        "zh": '🎉 你的投稿已发布到频道！{link}',
+        "en": '🎉 Your submission has been published to the channel!{link}',
     },
     "notify_scheduled": {
-        "zh": "✅ 你的投稿 #{sid} 已通过审核，将于 {when} 发布。",
-        "en": "✅ Your submission #{sid} was approved and will be published {when}.",
+        "zh": '✅ 你的投稿已通过审核，将于 {when} 发布。',
+        "en": '✅ Your submission was approved and will be published {when}.',
     },
     "notify_rejected": {
-        "zh": "😢 你的投稿 #{sid} 未通过审核。",
-        "en": "😢 Your submission #{sid} was not approved.",
+        "zh": '😢 你的投稿未通过审核。',
+        "en": '😢 Your submission was not approved.',
     },
     "notify_banned_rejected": {
-        "zh": "\n你待处理的 {n} 条投稿（{ids}）已一并拒绝。",
-        "en": "\nYour {n} pending submission(s) ({ids}) were rejected as well.",
+        "zh": '\n你待处理的 {n} 条投稿已一并拒绝。',
+        "en": '\nYour {n} pending submission(s) were rejected as well.',
     },
     "notify_unbanned": {
         "zh": "✅ 你的投稿权限已恢复，欢迎继续投稿。",
@@ -174,32 +175,32 @@ T: dict[str, dict[str, str]] = {
 
     # ---------- 修改稿件（两边共用的错误） ----------
     "not_editable_scheduled": {
-        "zh": "投稿 #{sid} 已通过审核、等待发布，不能修改",
-        "en": "Submission #{sid} has been approved and is waiting to be published, so it can't be edited",
+        "zh": '这条投稿已通过审核、等待发布，不能修改',
+        "en": "This submission has been approved and is waiting to be published, so it can't be edited",
     },
     "not_editable_publishing": {
-        "zh": "投稿 #{sid} 正在发布，不能修改",
-        "en": "Submission #{sid} is being published right now, so it can't be edited",
+        "zh": '这条投稿正在发布，不能修改',
+        "en": "This submission is being published right now, so it can't be edited",
     },
     "not_editable_published": {
-        "zh": "投稿 #{sid} 已经发布，不能修改",
-        "en": "Submission #{sid} has already been published, so it can't be edited",
+        "zh": '这条投稿已经发布，不能修改',
+        "en": "This submission has already been published, so it can't be edited",
     },
     "not_editable_rejected": {
-        "zh": "投稿 #{sid} 已被拒绝，不能修改",
-        "en": "Submission #{sid} was rejected, so it can't be edited",
+        "zh": '这条投稿已被拒绝，不能修改',
+        "en": "This submission was rejected, so it can't be edited",
     },
     "not_editable_cancelled": {
-        "zh": "投稿 #{sid} 已取消，不能修改",
-        "en": "Submission #{sid} was cancelled, so it can't be edited",
+        "zh": '这条投稿已取消，不能修改',
+        "en": "This submission was cancelled, so it can't be edited",
     },
     "not_editable_failed": {
-        "zh": "投稿 #{sid} 发布失败、等待管理员处理，不能修改",
-        "en": "Submission #{sid} failed to publish and is waiting for an admin, so it can't be edited",
+        "zh": '这条投稿发布失败、等待管理员处理，不能修改',
+        "en": "This submission failed to publish and is waiting for an admin, so it can't be edited",
     },
     "not_editable_other": {
-        "zh": "投稿 #{sid} 当前状态不能修改",
-        "en": "Submission #{sid} can't be edited in its current state",
+        "zh": '这条投稿当前状态不能修改',
+        "en": "This submission can't be edited in its current state",
     },
     "text_empty": {"zh": "文字投稿的内容不能为空", "en": "A text submission can't be empty"},
     "too_long": {
@@ -215,12 +216,15 @@ T: dict[str, dict[str, str]] = {
         "en": "A text submission can't become a media submission (or the other way round). Please submit again",
     },
     "no_text_to_show": {
-        "zh": "投稿 #{sid} 没有文字，直接发送 /edit 新的说明文字 即可添加",
-        "en": "Submission #{sid} has no text. Send /edit followed by a caption to add one",
+        "zh": '这条投稿没有文字，直接发送 /edit 新的说明文字 即可添加',
+        "en": 'This submission has no text. Send /edit followed by a caption to add one',
     },
 
     # ---------- 审核：控制消息 ----------
-    "ctrl_title": {"zh": "📮 <b>投稿 #{sid}</b>", "en": "📮 <b>Submission #{sid}</b>"},
+    "ctrl_title": {
+        "zh": '📮 <b>新投稿</b>',
+        "en": '📮 <b>New submission</b>',
+    },
     "ctrl_from": {"zh": "投稿人：{link}  <code>{uid}</code>", "en": "From: {link}  <code>{uid}</code>"},
     "ctrl_banned_tag": {"zh": "  🚫已封禁", "en": "  🚫banned"},
     "ctrl_mode_anon": {"zh": "方式：🕶 匿名", "en": "Mode: 🕶 anonymous"},
@@ -272,20 +276,28 @@ T: dict[str, dict[str, str]] = {
     },
     "publish_failed": {"zh": "发布失败：{error}", "en": "Failed to publish: {error}"},
     "time_past": {"zh": "这个时间已经过去了", "en": "That time has already passed"},
-    "reject_published": {"zh": "投稿 #{sid} 已发布，无法拒绝", "en": "Submission #{sid} is already published and can't be rejected"},
-    "reject_rejected": {"zh": "投稿 #{sid} 已经被拒绝过了", "en": "Submission #{sid} was already rejected"},
-    "reject_publishing": {"zh": "投稿 #{sid} 正在发布中", "en": "Submission #{sid} is being published right now"},
-    "reject_other": {"zh": "投稿 #{sid} 当前状态无法拒绝", "en": "Submission #{sid} can't be rejected in its current state"},
+    "reject_published": {
+        "zh": '这条投稿已发布，无法拒绝',
+        "en": "This submission is already published and can't be rejected",
+    },
+    "reject_rejected": {
+        "zh": '这条投稿已经被拒绝过了',
+        "en": 'This submission was already rejected',
+    },
+    "reject_publishing": {
+        "zh": '这条投稿正在发布中',
+        "en": 'This submission is being published right now',
+    },
+    "reject_other": {
+        "zh": '这条投稿当前状态无法拒绝',
+        "en": "This submission can't be rejected in its current state",
+    },
     "ban_default_reason": {"zh": "投稿人已被封禁", "en": "The submitter was banned"},
 
     # ---------- 审核：自定义时间 ----------
     "custom_time_prompt": {
-        "zh": "{who} 请<b>回复本消息</b>输入投稿 #{sid} 的发布时间：\n"
-              "<code>20:30</code> · <code>10-20 09:00</code> · <code>2026-10-20 09:00</code>"
-              " · <code>+90m</code> · <code>+2h</code>\n回复「取消」放弃。",
-        "en": "{who} please <b>reply to this message</b> with a publish time for submission #{sid}:\n"
-              "<code>20:30</code> · <code>10-20 09:00</code> · <code>2026-10-20 09:00</code>"
-              " · <code>+90m</code> · <code>+2h</code>\nReply “cancel” to give up.",
+        "zh": '{who} 请<b>回复本消息</b>输入发布时间：\n<code>20:30</code> · <code>10-20 09:00</code> · <code>2026-10-20 09:00</code> · <code>+90m</code> · <code>+2h</code>\n回复「取消」放弃。',
+        "en": '{who} please <b>reply to this message</b> with a publish time:\n<code>20:30</code> · <code>10-20 09:00</code> · <code>2026-10-20 09:00</code> · <code>+90m</code> · <code>+2h</code>\nReply “cancel” to give up.',
     },
     "custom_time_cancelled": {"zh": "已取消自定义定时。", "en": "Custom scheduling cancelled."},
     "custom_time_bad": {
@@ -293,44 +305,14 @@ T: dict[str, dict[str, str]] = {
         "en": "I can't read that time 🤔 Try <code>20:30</code>, <code>10-20 09:00</code> or <code>+2h</code>",
     },
     "custom_time_done": {
-        "zh": "⏰ 投稿 #{sid} 将于 <b>{when}</b> 发布。",
-        "en": "⏰ Submission #{sid} will be published <b>{when}</b>.",
+        "zh": '⏰ 将于 <b>{when}</b> 发布。',
+        "en": '⏰ Will be published <b>{when}</b>.',
     },
 
     # ---------- 审核：命令 ----------
     "review_help": {
-        "zh": (
-            "🛠 <b>审核群命令</b>\n"
-            "/stats 发送最新审核统计\n"
-            "/queue 定时发布队列\n"
-            "/active [天数] 投稿人活跃度排行（默认 30 天）\n"
-            "/user &lt;用户ID&gt; 查看某位投稿人\n\n"
-            "<b>拒绝 / 封禁</b>（回复投稿的预览或控制消息，理由可省略）\n"
-            "/no [理由] 拒绝该投稿，理由会发给投稿人\n"
-            "/ban [理由] 封禁投稿人，并自动拒绝其所有未处理来稿\n"
-            "不回复时：/no &lt;投稿编号&gt; [理由] · /ban &lt;用户ID 或 #投稿编号&gt; [理由]\n"
-            "/unban &lt;用户ID&gt; 解除封禁\n\n"
-            "<b>修改稿件</b>（回复投稿使用，格式会原样保留）\n"
-            "/edit 新内容 —— 替换文字投稿的正文 / 媒体投稿的说明文字\n"
-            "/edit —— 不带内容：把当前文字（含格式）发出来，方便复制后修改\n"
-            "不回复时：/edit &lt;投稿编号&gt; 新内容"
-        ),
-        "en": (
-            "🛠 <b>Review group commands</b>\n"
-            "/stats post the latest review summary\n"
-            "/queue scheduled posts\n"
-            "/active [days] contributor ranking (default 30 days)\n"
-            "/user &lt;user ID&gt; show one contributor\n\n"
-            "<b>Reject / ban</b> (reply to a submission's preview or control message; the reason is optional)\n"
-            "/no [reason] reject it; the reason is sent to the submitter\n"
-            "/ban [reason] ban the submitter and reject all their open submissions\n"
-            "Without replying: /no &lt;submission ID&gt; [reason] · /ban &lt;user ID or #submission ID&gt; [reason]\n"
-            "/unban &lt;user ID&gt; lift a ban\n\n"
-            "<b>Edit</b> (reply to a submission; formatting is kept)\n"
-            "/edit new content — replace the text, or the caption of a media submission\n"
-            "/edit — on its own: show the current text with formatting so you can copy it\n"
-            "Without replying: /edit &lt;submission ID&gt; new content"
-        ),
+        "zh": '🛠 <b>审核群命令</b>\n/stats 发送最新审核统计\n/queue 定时发布队列\n/active [天数] 投稿人活跃度排行（默认 30 天）\n/user &lt;用户ID&gt; 查看某位投稿人\n\n<b>处理投稿</b>（回复投稿的预览或控制消息使用；开启话题模式时，在投稿的话题里直接发送即可）\n/edit 新内容 —— 替换正文或说明文字，格式原样保留\n/edit —— 不带内容：把当前文字（含格式）发出来，方便复制后修改\n/no [理由] —— 拒绝，理由会发给投稿人\n/ban [理由] —— 封禁投稿人，并自动拒绝其所有未处理来稿\n\n<b>按用户处理</b>\n/ban &lt;用户ID&gt; [理由] · /unban &lt;用户ID&gt;',
+        "en": "🛠 <b>Review group commands</b>\n/stats post the latest review summary\n/queue scheduled posts\n/active [days] contributor ranking (default 30 days)\n/user &lt;user ID&gt; show one contributor\n\n<b>Handling a submission</b> (reply to its preview or control message; with topic mode on, just send it inside the submission's topic)\n/edit new content — replace the text or caption, keeping formatting\n/edit — on its own: show the current text with formatting so you can copy it\n/no [reason] — reject; the reason is sent to the submitter\n/ban [reason] — ban the submitter and reject all their open submissions\n\n<b>By user</b>\n/ban &lt;user ID&gt; [reason] · /unban &lt;user ID&gt;",
     },
     "reply_to_submission": {
         "zh": "请回复投稿的预览或控制消息。",
@@ -341,35 +323,38 @@ T: dict[str, dict[str, str]] = {
         "en": "Usage: /user &lt;user ID&gt; (the number after the submitter's name in the control message)",
     },
     "usage_no": {
-        "zh": "用法：回复投稿后发 /no [理由]，或 /no &lt;投稿编号&gt; [理由]",
-        "en": "Usage: reply to a submission with /no [reason], or /no &lt;submission ID&gt; [reason]",
+        "zh": '用法：回复投稿的预览或控制消息，发送 /no [理由]',
+        "en": "Usage: reply to a submission's preview or control message with /no [reason]",
     },
     "usage_edit": {
-        "zh": "用法：回复投稿后发 /edit 新内容，或 /edit &lt;投稿编号&gt; 新内容",
-        "en": "Usage: reply to a submission with /edit new content, or /edit &lt;submission ID&gt; new content",
+        "zh": '用法：回复投稿的预览或控制消息，发送 /edit 新内容',
+        "en": "Usage: reply to a submission's preview or control message with /edit new content",
     },
     "usage_ban": {
-        "zh": "用法：回复投稿后发 /ban [理由]，或 /ban &lt;用户ID 或 #投稿编号&gt; [理由]",
-        "en": "Usage: reply to a submission with /ban [reason], or /ban &lt;user ID or #submission ID&gt; [reason]",
+        "zh": '用法：回复投稿发送 /ban [理由]，或 /ban &lt;用户ID&gt; [理由]',
+        "en": 'Usage: reply to a submission with /ban [reason], or /ban &lt;user ID&gt; [reason]',
     },
     "usage_unban": {
         "zh": "用法：/unban &lt;用户ID&gt;，或回复该用户的投稿",
         "en": "Usage: /unban &lt;user ID&gt;, or reply to one of their submissions",
     },
-    "rejected_reply": {"zh": "❌ 已拒绝投稿 #{sid}", "en": "❌ Rejected submission #{sid}"},
+    "rejected_reply": {
+        "zh": '❌ 已拒绝',
+        "en": '❌ Rejected',
+    },
     "admin_echo_hint": {
         "zh": "↑ 这是当前内容。复制、修改后，回复这条投稿发送 <code>/edit 新内容</code>。",
         "en": "↑ This is the current content. Copy and change it, then reply to the submission with "
               "<code>/edit new content</code>.",
     },
     "admin_edited": {
-        "zh": "✏️ 投稿 #{sid} 已修改，新的预览已发出，发布时将使用修改后的内容。",
-        "en": "✏️ Submission #{sid} was edited. A new preview has been posted, and the new version will be published.",
+        "zh": '✏️ 已修改，新的预览已发出，发布时将使用修改后的内容。',
+        "en": '✏️ Edited. A new preview has been posted, and the new version will be published.',
     },
     "banned_reply": {"zh": "🚫 已封禁 {link} <code>{uid}</code>", "en": "🚫 Banned {link} <code>{uid}</code>"},
     "banned_reply_rejected": {
-        "zh": "\n已自动拒绝其 {n} 条未处理来稿：{ids}",
-        "en": "\nAlso rejected their {n} open submission(s): {ids}",
+        "zh": '\n已自动拒绝其 {n} 条未处理来稿',
+        "en": '\nAlso rejected their {n} open submission(s)',
     },
     "not_banned": {"zh": "用户 <code>{uid}</code> 没有被封禁。", "en": "User <code>{uid}</code> is not banned."},
     "unbanned_reply": {"zh": "✅ 已解除封禁 <code>{uid}</code>。", "en": "✅ Unbanned <code>{uid}</code>."},
@@ -405,6 +390,7 @@ T: dict[str, dict[str, str]] = {
               "Approval rate {rate} · anonymous {anonymous}\n"
               "First {first} · last {last}",
     },
+    "queue_view": {"zh": '查看', "en": 'view'},
     "queue_empty": {"zh": "没有待发布的定时投稿。", "en": "No scheduled posts."},
     "queue_head": {"zh": "⏰ <b>定时发布队列</b>", "en": "⏰ <b>Scheduled posts</b>"},
 }

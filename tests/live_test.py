@@ -8,6 +8,7 @@
 """
 import asyncio
 import json
+import re
 import os
 import sys
 import tempfile
@@ -18,6 +19,7 @@ from aiohttp import web
 PROJECT = sys.argv[1] if len(sys.argv) > 1 else os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 USER, REVIEW, CHANNEL, ADMIN = 42, -1001, -1002, 7
 LINKED = -8000  # 发布频道的关联群组（评论区）
+CTRL = "新投稿"  # 控制消息标题（不再显示投稿编号；测试按顺序取紧接着的那一条）
 T0 = time.time()
 
 updates: list[dict] = []
@@ -228,7 +230,7 @@ async def scenario():
     e = await wait_for(lambda e: is_send(e, "sendMessage", USER, "请选择投稿方式"), since=n)
     check("text submission prompt with colored buttons", e and styles(e).get("👤 署名投稿") == "primary", styles(e) if e else "")
     n = len(log); cb("u:anon:1", USER, USER)
-    ctrl1 = await wait_for(lambda e: is_send(e, "sendMessage", REVIEW, "投稿 #1"), since=n)
+    ctrl1 = await wait_for(lambda e: is_send(e, "sendMessage", REVIEW, CTRL), since=n)
     s = styles(ctrl1) if ctrl1 else {}
     check("control msg colors", s.get("✅ 立即发布") == "success" and s.get("❌ 拒绝") == "danger"
           and s.get("⏰ 定时发布") == "primary" and s.get("🔔 静音：关") is None, s)
@@ -243,7 +245,7 @@ async def scenario():
     n = len(log); cb("u:sign:2", USER, USER)
     e = await wait_for(lambda e: is_send(e, "sendMediaGroup", REVIEW), since=n)
     check("album preview in review group", e and len(e["params"]["media"]) == 2)
-    ctrl2 = await wait_for(lambda e: is_send(e, "sendMessage", REVIEW, "投稿 #2"), since=n)
+    ctrl2 = await wait_for(lambda e: is_send(e, "sendMessage", REVIEW, CTRL), since=n)
     n = len(log); cb("r:spoiler:2:0", REVIEW, ADMIN); cb("r:silent:2:0", REVIEW, ADMIN)
     e = await wait_for(lambda e: e["method"] == "editMessageText" and "静音发送：🔕 开" in e["params"].get("text", "")
                        and "剧透遮罩：🙈 开" in e["params"].get("text", ""), since=n)
@@ -276,7 +278,7 @@ async def scenario():
                   e and styles(e).get("👤 Signed") == "primary" and styles(e).get("🕶 Anonymous") == "primary",
                   e and styles(e))
         n = len(log); cb(f"u:sign:{sid}", who, who)
-        return await wait_for(lambda e: is_send(e, "sendMessage", REVIEW, f"投稿 #{sid}"), since=n)
+        return await wait_for(lambda e: is_send(e, "sendMessage", REVIEW, CTRL), since=n)
 
     ctrl3 = await submit("post three", 3)
     ctrl4 = await submit("post four", 4, who=BOB)
@@ -285,7 +287,7 @@ async def scenario():
     check("/no with reason → user notified", e)
     n = len(log); gm("/ban 发广告", reply_to=ctrl4["result"]["message_id"])
     e = await wait_for(lambda e: is_send(e, "sendMessage", BOB, "You are not allowed to submit"), since=n)
-    check("/ban → Bob notified in English, his pending #4 auto-rejected", e and "#4" in e["params"]["text"],
+    check("/ban → Bob notified in English, his 1 pending submission auto-rejected", e and "1 pending" in e["params"]["text"],
           e and e["params"]["text"].replace("\n", " | "))
     ban_reply = await wait_for(lambda e: is_send(e, "sendMessage", REVIEW, "已封禁"), since=n)
     check("review group stays Chinese for the same ban", ban_reply and "已自动拒绝" in ban_reply["params"]["text"])
@@ -336,7 +338,7 @@ async def scenario():
        photo=[{"file_id": "pX", "file_unique_id": "uX", "width": 1, "height": 1}])
     await wait_for(lambda e: is_send(e, "sendMessage", USER, "请选择投稿方式"), since=n)
     n = len(log); cb("u:anon:6", USER, USER)
-    ctrl6 = await wait_for(lambda e: is_send(e, "sendMessage", REVIEW, "投稿 #6"), since=n)
+    ctrl6 = await wait_for(lambda e: is_send(e, "sendMessage", REVIEW, CTRL), since=n)
     check("user's own media spoiler kept as default", ctrl6 and "剧透遮罩：🙈 开" in ctrl6["params"]["text"])
 
     edit_cmd = "/edit 🎉 新的说明，详见官网"
@@ -373,10 +375,13 @@ async def scenario():
           and str(p6.get("show_caption_above_media")).lower() == "true" and str(p6.get("has_spoiler")).lower() == "true",
           p6)
 
+    n = len(log); gm("/no 3 想按编号拒绝")
+    e = await wait_for(lambda e: is_send(e, "sendMessage", REVIEW, "用法"), since=n)
+    check("/no with a number but no reply → usage, number not used as a submission ID", e)
     n = len(log); gm("/edit 改不了")
     e = await wait_for(lambda e: is_send(e, "sendMessage", REVIEW, "用法"), since=n)
     check("/edit without reply or id → usage", e)
-    n = len(log); gm("/edit #2 已经发布了")
+    n = len(log); gm("/edit 已经发布了", reply_to=ctrl2["result"]["message_id"])
     e = await wait_for(lambda e: is_send(e, "sendMessage", REVIEW, "不能修改"), since=n)
     check("/edit on published submission refused", e)
 
@@ -389,13 +394,13 @@ async def scenario():
     check("native edit while draft → updated, no review preview yet", e and not await wait_for(
         lambda e: is_send(e, "sendMessage", REVIEW, "v1b"), timeout=0.5, since=n))
     n = len(log); cb("u:sign:7", USER, USER)
-    ctrl7 = await wait_for(lambda e: is_send(e, "sendMessage", REVIEW, "投稿 #7"), since=n)
+    ctrl7 = await wait_for(lambda e: is_send(e, "sendMessage", REVIEW, CTRL), since=n)
     pv = await wait_for(lambda e: is_send(e, "sendMessage", REVIEW, "草稿改过 v1b"), since=n)
     check("submitted draft carries the edited text", ctrl7 and pv)
 
     # 7b. 待审核阶段用 Telegram 自带编辑，带超链接
     n = len(log); pm_edit(src, "修改后 v2 看这里", [{"type": "text_link", "offset": 7, "length": 3, "url": "https://ex.am/p"}])
-    ok = await wait_for(lambda e: is_send(e, "sendMessage", USER, "#7 已更新"), since=n)
+    ok = await wait_for(lambda e: is_send(e, "sendMessage", USER, "投稿已更新"), since=n)
     pv = await wait_for(lambda e: is_send(e, "sendMessage", REVIEW, "修改后 v2"), since=n)
     mark = await wait_for(lambda e: e["method"] == "editMessageText" and "✏️ 已修改（投稿人 Alice" in e["params"].get("text", ""), since=n)
     check("native edit while pending → user told, admins get new preview + marker",
@@ -405,14 +410,14 @@ async def scenario():
     # 7c. /edit 回复机器人的提示消息
     n = len(log); pm("/edit v3 新版本", reply_to_message={"message_id": prompt7["result"]["message_id"], "date": now(),
                                                        "chat": chat(USER), "from": {"id": 1, "is_bot": True, "first_name": "TestBot"}})
-    ok = await wait_for(lambda e: is_send(e, "sendMessage", USER, "#7 已更新"), since=n)
+    ok = await wait_for(lambda e: is_send(e, "sendMessage", USER, "投稿已更新"), since=n)
     pv = await wait_for(lambda e: is_send(e, "sendMessage", REVIEW, "v3 新版本"), since=n)
     check("/edit replying to bot prompt", ok and pv)
 
-    # 7d. 不回复、只有一条可改的投稿；“2024”不能被当成投稿编号
+    # 7d. 不回复、只有一条可改的投稿：直接改那一条（命令不接受投稿编号，“2024”就是正文）
     n = len(log); pm("/edit 2024年总结")
     pv = await wait_for(lambda e: is_send(e, "sendMessage", REVIEW, "2024年总结"), since=n)
-    check("/edit without reply uses the only editable submission; '2024' kept as text", pv)
+    check("/edit without reply uses the only editable submission; numbers are just text", pv)
 
     # 7e. /edit 只看内容
     n = len(log); pm("/edit")
@@ -432,9 +437,8 @@ async def scenario():
 
     # 8. 等后台任务：定时发布（调度器每 15 秒检查）+ 每分钟统计提醒
     print("… waiting for scheduler + reminder loops (up to ~100s)", flush=True)
-    n_sched = len(log)
     e = await wait_for(lambda e: is_send(e, "sendMessage", CHANNEL, "Hello"), timeout=100, since=0)
-    check("scheduler published #1 to channel on time", e,
+    check("scheduler published the scheduled post on time", e,
           e and f"{e['t'] - scheduled_at:.0f}s after scheduling (+1m target, 15s tick)")
     e = await wait_for(lambda e: is_send(e, "sendMessage", REVIEW, "#审核统计"), timeout=70, since=0)
     check("reminder loop posted stats on its own", e, e and e["params"]["text"].replace("\n", " | "))
@@ -477,6 +481,11 @@ async def main(scenario_fn=None, extra_env=None):
             proc.kill()
         await pump_task
         await runner.cleanup()
+
+    shown = [e["params"].get(k) for e in log for k in ("text", "caption", "name")
+             if isinstance(e["params"].get(k), str) and str(e["params"].get("chat_id")) != str(CHANNEL)]
+    numbered = [x for x in shown if re.search(r"#\d", x)]
+    check("no submission numbers shown to submitters or reviewers", not numbered, numbered[:3])
 
     bad = [l for l in bot_log if "Traceback" in l or " ERROR " in l or " CRITICAL " in l]
     check("no errors in bot process log", not bad, "\n".join(bad[:10]))

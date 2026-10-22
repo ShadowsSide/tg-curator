@@ -82,7 +82,13 @@ def test_chinese_stats_format_unchanged():
     assert stats_text(0, 0, 4, datetime(2026, 1, 1, 16, 3, 10), "zh") == (
         "接受 0 拒绝 0 待审核 4\n通过率: 0.00% 审核率: 0.00%\n#审核统计 [更新于 16:03:10]")
     assert describe([{"type": "photo"}] * 3, "zh") == "3 张图片"
-    assert t("zh", "ctrl_title", sid=1) == "📮 <b>投稿 #1</b>"
+    assert t("zh", "ctrl_title") == "📮 <b>新投稿</b>"
+
+
+def test_no_submission_numbers_in_texts():
+    for key, entry in T.items():
+        for lang in LANGS:
+            assert "{sid}" not in entry[lang] and "{ids}" not in entry[lang], f"{key}/{lang} shows a submission number"
 
 
 if __name__ == "__main__":

@@ -53,7 +53,7 @@ async def scenario():
     prompt = await wait_for(lambda e: is_send(e, "sendMessage", USER, "请选择投稿方式"), since=n)
     t_u1 = utopic and utopic["result"]["message_thread_id"]
     check("private chat: new topic created, content copied in, prompt inside the topic",
-          utopic and "📝 #1" in utopic["params"]["name"] and "话题模式第一条" in utopic["params"]["name"]
+          utopic and utopic["params"]["name"] == "📝 话题模式第一条"
           and copied and int(copied["params"]["message_thread_id"]) == t_u1
           and prompt and int(prompt["params"]["message_thread_id"]) == t_u1,
           utopic and utopic["params"]["name"])
@@ -62,13 +62,13 @@ async def scenario():
     n = len(log); topic_cb("u:sign:1", USER, USER, prompt["result"]["message_id"], t_u1)
     rtopic = await wait_for(lambda e: is_call(e, "createForumTopic", REVIEW), since=n)
     t_r1 = rtopic and rtopic["result"]["message_thread_id"]
-    ctrl1 = await wait_for(lambda e: is_send(e, "sendMessage", REVIEW, "投稿 #1"), since=n)
+    ctrl1 = await wait_for(lambda e: is_send(e, "sendMessage", REVIEW, "新投稿"), since=n)
     pv1 = await wait_for(lambda e: is_send(e, "sendMessage", REVIEW, "话题模式第一条"), since=n)
     check("review group: one topic per submission, preview + control inside it",
-          rtopic and "⏳ #1" in rtopic["params"]["name"] and "Alice" in rtopic["params"]["name"]
+          rtopic and rtopic["params"]["name"] == "⏳ Alice · 文字"
           and ctrl1 and int(ctrl1["params"]["message_thread_id"]) == t_r1
           and pv1 and int(pv1["params"]["message_thread_id"]) == t_r1, rtopic and rtopic["params"]["name"])
-    ren = await wait_for(lambda e: is_call(e, "editForumTopic", USER) and "⏳ #1" in e["params"].get("name", ""), since=n)
+    ren = await wait_for(lambda e: is_call(e, "editForumTopic", USER) and e["params"].get("name", "").startswith("⏳"), since=n)
     check("submitter's topic renamed to pending", ren)
 
     # ---------- 3. 在审核话题里直接 /no（不回复任何消息）→ 拒绝；双方话题改名，审核话题关闭 ----------
@@ -76,9 +76,9 @@ async def scenario():
     note = await wait_for(lambda e: is_send(e, "sendMessage", USER, "理由：主题不符"), since=n)
     check("/no inside the review topic works without replying; user notified inside their topic",
           note and int(note["params"].get("message_thread_id") or 0) == t_u1)
-    r_ren = await wait_for(lambda e: is_call(e, "editForumTopic", REVIEW) and "❌ #1" in e["params"].get("name", ""), since=n)
+    r_ren = await wait_for(lambda e: is_call(e, "editForumTopic", REVIEW) and e["params"].get("name", "").startswith("❌"), since=n)
     r_close = await wait_for(lambda e: is_call(e, "closeForumTopic", REVIEW) and int(e["params"]["message_thread_id"]) == t_r1, since=n)
-    u_ren = await wait_for(lambda e: is_call(e, "editForumTopic", USER) and "❌ #1" in e["params"].get("name", ""), since=n)
+    u_ren = await wait_for(lambda e: is_call(e, "editForumTopic", USER) and e["params"].get("name", "").startswith("❌"), since=n)
     check("rejected: review topic renamed ❌ and closed; user topic renamed ❌", r_ren and r_close and u_ren)
 
     # ---------- 4. 投稿人在自己新建的空话题里投稿 → 直接用这个话题，不再新建 ----------
@@ -93,13 +93,13 @@ async def scenario():
     n = len(log); topic_cb("u:anon:2", USER, USER, p2["result"]["message_id"], own)
     rtopic2 = await wait_for(lambda e: is_call(e, "createForumTopic", REVIEW), since=n)
     t_r2 = rtopic2 and rtopic2["result"]["message_thread_id"]
-    ctrl2 = await wait_for(lambda e: is_send(e, "sendMessage", REVIEW, "投稿 #2"), since=n)
+    ctrl2 = await wait_for(lambda e: is_send(e, "sendMessage", REVIEW, "新投稿"), since=n)
     check("anonymous submission marked in review topic name", rtopic2 and "（匿名）" not in rtopic2["params"]["name"]
           and "(匿名)" in rtopic2["params"]["name"], rtopic2 and rtopic2["params"]["name"])
 
     # ---------- 5. 投稿人在自己的话题里直接 /edit；管理员在审核话题里直接 /edit ----------
     n = len(log); topic_msg(USER, own, "/edit 投稿人改过的内容", USER)
-    ok = await wait_for(lambda e: is_send(e, "sendMessage", USER, "#2 已更新"), since=n)
+    ok = await wait_for(lambda e: is_send(e, "sendMessage", USER, "投稿已更新"), since=n)
     pv = await wait_for(lambda e: is_send(e, "sendMessage", REVIEW, "投稿人改过的内容"), since=n)
     check("submitter /edit inside their topic (no reply) → new preview in the review topic",
           ok and pv and int(pv["params"]["message_thread_id"]) == t_r2)
@@ -111,7 +111,7 @@ async def scenario():
     n = len(log); topic_cb("r:pub:2:0", REVIEW, ADMIN, ctrl2["result"]["message_id"], t_r2)
     post = await wait_for(lambda e: is_send(e, "sendMessage", CHANNEL, "管理员定稿"), since=n)
     note = await wait_for(lambda e: is_send(e, "sendMessage", USER, "已发布到频道"), since=n)
-    done = await wait_for(lambda e: is_call(e, "editForumTopic", REVIEW) and "✅ #2" in e["params"].get("name", ""), since=n)
+    done = await wait_for(lambda e: is_call(e, "editForumTopic", REVIEW) and e["params"].get("name", "").startswith("✅"), since=n)
     closed = await wait_for(lambda e: is_call(e, "closeForumTopic", REVIEW) and int(e["params"]["message_thread_id"]) == t_r2, since=n)
     check("published: channel post has no topic params; user notified in their topic; review topic ✅ + closed",
           post and "message_thread_id" not in post["params"] and note

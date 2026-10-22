@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import html
-import re
 
 from aiogram import F, Router
 from aiogram.exceptions import TelegramAPIError
@@ -13,7 +12,7 @@ from aiogram.types import CallbackQuery, ForceReply, Message
 from .. import entities as ent
 from ..config import Settings
 from ..core import NO_PREVIEW, Core, explicit_reply, mention, topic_of
-from ..i18n import join_ids, t
+from ..i18n import t
 from ..keyboards import ReviewCB
 from ..render import dump_link_preview, user_link
 from ..timeutil import parse_time
@@ -35,14 +34,12 @@ def _clean_reason(text: str) -> str | None:
     return text[:MAX_REASON] or None
 
 
-def _split_ref(args: str) -> tuple[str | None, int | None, str | None]:
-    """'#12 理由' -> ('sid', 12, '理由')；'123 理由' -> ('num', 123, '理由')；不以编号开头 -> (None, None, None)。"""
+def _split_user(args: str) -> tuple[int | None, str | None]:
+    """'/ban 123456 理由'：开头是用户 ID 时返回 (用户ID, 理由)，否则 (None, None)。"""
     head, _, rest = args.strip().partition(" ")
-    if head.startswith("#") and head[1:].isdigit():
-        return "sid", int(head[1:]), _clean_reason(rest)
     if head.lstrip("-").isdigit():
-        return "num", int(head), _clean_reason(rest)
-    return None, None, None
+        return int(head), _clean_reason(rest)
+    return None, None
 
 
 async def _replied_sid(m: Message, core: Core) -> int | None:
@@ -76,12 +73,12 @@ def build_router(settings: Settings) -> Router:
             await cq.answer(t(lang, "toast_publishing"))
             err = await core.publish(sid, reviewer=who)
             if err:
-                await cq.message.answer(f"#{sid} {err}")
+                await cq.message.reply(err)  # 回复在这条投稿的控制消息下面
         elif action == "retry":
             await cq.answer(t(lang, "toast_retrying"))
             err = await core.publish(sid, reviewer=who, from_states=("failed",))
             if err:
-                await cq.message.answer(f"#{sid} {err}")
+                await cq.message.reply(err)
         elif action == "sched":
             await core.show_schedule_picker(sid)
             await cq.answer()
@@ -92,7 +89,7 @@ def build_router(settings: Settings) -> Router:
             err = await core.schedule(sid, callback_data.v, who)
             await cq.answer(err or t(lang, "toast_scheduled", when=core.fmt(callback_data.v)), show_alert=bool(err))
         elif action == "custom":
-            prompt = await cq.message.answer(
+            prompt = await cq.message.reply(  # 回复在控制消息下面，看得出是哪条投稿
                 t(lang, "custom_time_prompt", who=mention(who), sid=sid),
                 reply_markup=ForceReply(selective=True, input_field_placeholder="20:30"),
             )
@@ -147,22 +144,16 @@ def build_router(settings: Settings) -> Router:
     async def reject_cmd(m: Message, command: CommandObject, core: Core) -> None:
         args = command.args or ""
         sid = await _replied_sid(m, core)
-        if sid is not None:
-            reason = _clean_reason(args)
-        elif explicit_reply(m):
-            await m.reply(t(core.lang, "reply_to_submission"))
+        if sid is None:
+            await m.reply(t(core.lang, "reply_to_submission" if explicit_reply(m) else "usage_no"))
             return
-        else:
-            kind, sid, reason = _split_ref(args)
-            if sid is None:
-                await m.reply(t(core.lang, "usage_no"))
-                return
+        reason = _clean_reason(args)
 
         err = await core.reject(sid, m.from_user, reason)
         if err:
             await m.reply(err)
             return
-        await m.reply(t(core.lang, "rejected_reply", sid=sid)
+        await m.reply(t(core.lang, "rejected_reply")
                       + (t(core.lang, "reason_line", reason=html.escape(reason)) if reason else ""))
 
     @router.message(Command("edit"))
@@ -171,15 +162,8 @@ def build_router(settings: Settings) -> Router:
         body, entities = ent.strip_command(m.text or m.caption or "", ent.dump(m.entities or m.caption_entities))
         sid = await _replied_sid(m, core)
         if sid is None:
-            if explicit_reply(m):
-                await m.reply(t(core.lang, "reply_to_submission"))
-                return
-            ref = re.match(r"#?(\d+)[ \t]*\n?", body)
-            if not ref:
-                await m.reply(t(core.lang, "usage_edit"))
-                return
-            sid = int(ref.group(1))
-            body, entities = ent.cut_prefix(body, entities, ref.end())
+            await m.reply(t(core.lang, "reply_to_submission" if explicit_reply(m) else "usage_edit"))
+            return
 
         if not body.strip():
             err = await core.show_text(sid, m.chat.id, reply_to=m.message_id)
@@ -187,7 +171,7 @@ def build_router(settings: Settings) -> Router:
             return
 
         err = await core.edit(sid, m.from_user.full_name, body, entities, dump_link_preview(m.link_preview_options))
-        await m.reply(err or t(core.lang, "admin_edited", sid=sid))
+        await m.reply(err or t(core.lang, "admin_edited"))
 
     @router.message(Command("ban"))
     async def ban_cmd(m: Message, command: CommandObject, core: Core) -> None:
@@ -199,18 +183,10 @@ def build_router(settings: Settings) -> Router:
             await m.reply(t(core.lang, "reply_to_submission"))
             return
         else:
-            kind, ref, reason = _split_ref(args)
-            if ref is None:
+            user_id, reason = _split_user(args)
+            if user_id is None:
                 await m.reply(t(core.lang, "usage_ban"))
                 return
-            if kind == "sid":
-                sub = await core.db.get(ref)
-                if not sub:
-                    await m.reply(t(core.lang, "sub_not_found", sid=ref))
-                    return
-                user_id = sub.user_id
-            else:
-                user_id = ref
 
         rejected = await core.ban_user(user_id, m.from_user, reason)
         user = await core.db.get_user(user_id)
@@ -218,7 +194,7 @@ def build_router(settings: Settings) -> Router:
         if reason:
             text += t(core.lang, "reason_line", reason=html.escape(reason))
         if rejected:
-            text += t(core.lang, "banned_reply_rejected", n=len(rejected), ids=join_ids(core.lang, rejected))
+            text += t(core.lang, "banned_reply_rejected", n=len(rejected))
         await m.reply(text, link_preview_options=NO_PREVIEW)
 
     @router.message(Command("unban"))

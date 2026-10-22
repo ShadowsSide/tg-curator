@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import re
-
 from aiogram import F, Router
 from aiogram.enums import ChatType
 from aiogram.filters import Command, CommandStart
@@ -10,7 +8,7 @@ from aiogram.types import CallbackQuery, Message
 from .. import entities as ent
 from ..core import Core, explicit_reply, topic_of
 from ..db import SUBMITTER_EDITABLE
-from ..i18n import join_ids, t
+from ..i18n import t
 from ..keyboards import UserCB
 from ..render import dump_link_preview, extract_item
 
@@ -47,25 +45,18 @@ def build_router() -> Router:
             sid = found[0]
         elif topic_sid:  # 私聊话题模式：在投稿自己的话题里直接 /edit
             sid = topic_sid
+        elif len(mine) == 1:  # 只有一条可改的投稿：不用回复也知道改哪条
+            sid = mine[0].id
+        elif not mine:
+            await m.reply(t(lang, "u_edit_none"))
+            return
         else:
-            # “#12 新内容”一定是编号；纯数字只有在确实是自己可修改的投稿编号时才当作编号，
-            # 避免把“/edit 2024年总结”里的 2024 误认成投稿编号
-            ref = re.match(r"(#?)(\d+)[ \t]*\n?", body)
-            if ref and (ref.group(1) or int(ref.group(2)) in {s.id for s in mine}):
-                sid = int(ref.group(2))
-                body, entities = ent.cut_prefix(body, entities, ref.end())
-            elif len(mine) == 1:
-                sid = mine[0].id
-            elif not mine:
-                await m.reply(t(lang, "u_edit_none"))
-                return
-            else:
-                await m.reply(t(lang, "u_edit_many", ids=join_ids(lang, (s.id for s in mine))))
-                return
+            await m.reply(t(lang, "u_edit_many"))
+            return
 
         sub = await core.db.get(sid)
         if not sub or sub.user_id != uid:
-            await m.reply(t(lang, "u_edit_not_found", sid=sid))
+            await m.reply(t(lang, "u_edit_not_found"))
             return
         if not body.strip():
             err = await core.show_text(sid, m.chat.id, reply_to=m.message_id, lang=lang)

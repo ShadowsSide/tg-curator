@@ -17,7 +17,7 @@ from .album import AlbumCollector
 from .config import Settings
 from .db import DB, OPEN_STATES, Submission
 from .entities import u16len
-from .i18n import join_ids, normalize, on_off, t
+from .i18n import normalize, on_off, t
 from .keyboards import control_kb, schedule_kb, user_choice_kb
 from .render import (
     caption_index, control_text, describe, extract_item, send_items, signature, stats_text, user_link,
@@ -118,6 +118,13 @@ class Core:
             return f"{self.channel_post_base}{sub.channel_msg_id}"
         return None
 
+    def review_link(self, sub: Submission) -> str | None:
+        """审核群里这条投稿控制消息的链接（群成员可点开跳转），代替投稿编号来指认投稿。"""
+        if not sub.review_msg_id:
+            return None
+        chat = str(self.s.review_chat_id).removeprefix("-100")
+        return f"https://t.me/c/{chat}/{sub.review_msg_id}"
+
     async def _signature(self, sub: Submission):
         user = await self.db.get_user(sub.user_id)
         return signature(sub, user, self.s.sign_template, self.s.anon_signature)
@@ -169,12 +176,12 @@ class Core:
         who = (user.full_name if user and user.full_name else str(sub.user_id))
         if sub.anonymous:
             who += f" ({t(self.lang, 'topic_anon')})"
-        return f"{STATUS_ICON.get(sub.status, '')} #{sub.id} · {who} · {describe(sub.items, self.lang)}"[:128]
+        return f"{STATUS_ICON.get(sub.status, '')} {who} · {describe(sub.items, self.lang)}"[:128]
 
     def _user_topic_name(self, sub: Submission, lang: str) -> str:
         text = next((it["text"] for it in sub.items if it.get("text")), "")
         snippet = " ".join(text.split())[:30] or describe(sub.items, lang)
-        return f"{STATUS_ICON.get(sub.status, '')} #{sub.id} · {snippet}"[:128]
+        return f"{STATUS_ICON.get(sub.status, '')} {snippet}"[:128]
 
     async def _create_topic(self, chat_id: int, name: str) -> int | None:
         try:
@@ -510,7 +517,7 @@ class Core:
         lang = await self.user_lang(user_id)
         text = t(lang, "banned") + _reason_line(lang, reason)
         if rejected:
-            text += t(lang, "notify_banned_rejected", n=len(rejected), ids=join_ids(lang, rejected))
+            text += t(lang, "notify_banned_rejected", n=len(rejected))
         await self.notify_user(user_id, text)
 
         for sid in rejected:
@@ -607,7 +614,9 @@ class Core:
         lines = [t(self.lang, "queue_head"), ""]
         for sub in subs:
             flags = (" 🙈" if sub.spoiler else "") + (" 🔕" if sub.silent else "")
-            lines.append(f"{self.fmt(sub.scheduled_at)} · #{sub.id} · {describe(sub.items, self.lang)}{flags}")
+            link = self.review_link(sub)
+            view = f' · <a href="{link}">{t(self.lang, "queue_view")}</a>' if link else ""
+            lines.append(f"{self.fmt(sub.scheduled_at)} · {describe(sub.items, self.lang)}{flags}{view}")
         return "\n".join(lines)
 
     # ---------- 后台任务 ----------

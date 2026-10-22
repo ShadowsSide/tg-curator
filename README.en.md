@@ -147,7 +147,7 @@ Everything is configured in `.env`. See [`.env.example`](.env.example) for a ful
 |---|---|
 | Send any content | Starts a submission, then choose signed or anonymous |
 | Edit the original message with Telegram's "Edit" | Changes the submission until it has been reviewed: text, formatting, or even the image |
-| `/edit new content` | Reply to your submission. If you have only one pending submission, you don't need to reply; with several, use `/edit #id new content` |
+| `/edit new content` | Reply to your submission. If you have only one pending submission, you don't need to reply |
 | `/edit` | Shows the current content with formatting, so you can copy and change it |
 | `/me` | Your submission stats |
 
@@ -155,7 +155,7 @@ Everything is configured in `.env`. See [`.env.example`](.env.example) for a ful
 
 Buttons on the control message: **✅ Publish now**, **⏰ Schedule**, **❌ Reject**, **🚫 Ban submitter**, plus the **🙈 Spoiler** and **🔕 Silent** toggles.
 
-Use the commands below by **replying** to a submission's preview or control message, or by giving the submission ID:
+Use the commands below by **replying** to a submission's preview or control message (with review-group topics on, just send them inside the submission's topic). The bot never shows submission numbers, and no command needs one:
 
 | Command | Description |
 |---|---|
@@ -169,7 +169,7 @@ Use the commands below by **replying** to a submission's preview or control mess
 | `/active [days]` | Contributor activity ranking (default: 30 days) |
 | `/user <user ID>` | Shows one contributor's stats |
 
-With review-group topics on, just send these commands inside the submission's topic — no reply needed. Without replying: `/no 12 reason`, `/edit #12 new content`, `/ban <user ID or #submission ID> reason`.
+`/ban` and `/unban` also accept a user ID (`/ban <user ID> reason`) for users with nothing under review, or to ban someone in advance. Each scheduled post in `/queue` has a “view” link that jumps to its control message.
 
 ## FAQ
 

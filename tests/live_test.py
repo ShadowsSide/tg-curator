@@ -17,6 +17,7 @@ from aiohttp import web
 
 PROJECT = sys.argv[1] if len(sys.argv) > 1 else os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 USER, REVIEW, CHANNEL, ADMIN = 42, -1001, -1002, 7
+LINKED = -8000  # 发布频道的关联群组（评论区）
 T0 = time.time()
 
 updates: list[dict] = []
@@ -91,7 +92,7 @@ async def handle(request: web.Request):
         if str(params.get("chat_id")) == str(REVIEW):
             result = {**chat(REVIEW), "title": "Review", "is_forum": MOCK["review_is_forum"], **info}
         else:
-            result = {**chat(CHANNEL), "title": "Test Channel", "username": "testchan", **info}
+            result = {**chat(CHANNEL), "title": "Test Channel", "username": "testchan", "linked_chat_id": LINKED, **info}
     elif m == "createforumtopic":
         next_topic[0] += 1
         result = {"message_thread_id": next_topic[0], "name": params["name"], "icon_color": int(params.get("icon_color", 0))}
@@ -185,6 +186,42 @@ async def scenario():
     e = await wait_for(lambda e: e["method"] == "setMyCommands" and e["params"].get("language_code") == "en", 15, since=0)
     check("bot started; command menus registered per language", e and any(
         c.get("command") == "start" and c.get("description") == "Start submitting" for c in e["params"]["commands"]))
+
+    # 0. 只响应私聊和审核群：其他群里不回复，并自动退出
+    OTHER, ADDED, KICKED = -5000, -6000, -7000
+
+    def other_msg(chat_id, text):
+        lt_msg = {"message_id": 30000 + uid[0], "date": now(), "chat": chat(chat_id), "text": text,
+                  "from": {"id": USER, "is_bot": False, "first_name": "Alice"}}
+        if text.startswith("/"):
+            lt_msg["entities"] = [{"type": "bot_command", "offset": 0, "length": len(text.split()[0])}]
+        push(message=lt_msg)
+
+    def member_update(chat_id, old, new):
+        bot_user = {"id": 1, "is_bot": True, "first_name": "TestBot"}
+        push(my_chat_member={"chat": chat(chat_id), "date": now(),
+                             "from": {"id": USER, "is_bot": False, "first_name": "Alice"},
+                             "old_chat_member": {"status": old, "user": bot_user},
+                             "new_chat_member": {"status": new, "user": bot_user,
+                                                 **({"until_date": 0} if new == "kicked" else {})}})
+
+    n = len(log)
+    for text in ("/start", "/stats", "/help", "hello bot"):
+        other_msg(OTHER, text)
+    left = await wait_for(lambda e: e["method"] == "leaveChat" and str(e["params"]["chat_id"]) == str(OTHER), since=n)
+    await asyncio.sleep(0.5)
+    replies = [e for e in log[n:] if e["method"].lower().startswith("send") and str(e["params"].get("chat_id")) == str(OTHER)]
+    check("unknown group: no replies at all, bot leaves", left and not replies, [e["method"] for e in replies])
+    n = len(log); member_update(ADDED, "left", "member")
+    e = await wait_for(lambda e: e["method"] == "leaveChat" and str(e["params"]["chat_id"]) == str(ADDED), since=n)
+    check("added to another group → leaves immediately", e)
+    n = len(log); member_update(KICKED, "member", "kicked")
+    e = await wait_for(lambda e: e["method"] == "leaveChat" and str(e["params"]["chat_id"]) == str(KICKED), timeout=1, since=n)
+    check("removed from a group → does not try to leave again", not e)
+    n = len(log); member_update(LINKED, "left", "member"); other_msg(LINKED, "/start"); other_msg(LINKED, "/stats")
+    await asyncio.sleep(1.5)
+    acted = [e["method"] for e in log[n:] if str(e["params"].get("chat_id")) == str(LINKED)]
+    check("channel's linked discussion group is whitelisted: bot stays, still silent", not acted, acted)
 
     # 1. 文字投稿 → 选匿名
     n = len(log); pm("Hello <b>world</b>", entities=[{"type": "bold", "offset": 0, "length": 5}])

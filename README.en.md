@@ -27,6 +27,7 @@ Built with Python 3.12 + [aiogram 3](https://github.com/aiogram/aiogram) + SQLit
 - Publishing options: 🙈 **spoiler** (blur the media) and 🔕 **silent** (subscribers get a notification without sound)
 - `/edit` to change a post, `/no reason` to reject, `/ban reason` to ban. Banning also rejects every open submission from that user
 - Safe against double actions: if two admins press "Publish" at the same time, the post is still published only once
+- **Only answers in private chats and the review group**: it never replies in other groups, and leaves any other group or channel it's added to. The publishing channel and its linked discussion group are whitelisted and never left
 
 **Scheduling and stats**
 - Schedule with quick buttons or a custom time (`20:30`, `10-20 09:00`, `+2h`, …). Schedules are stored in the database and survive restarts
@@ -118,6 +119,7 @@ Everything is configured in `.env`. See [`.env.example`](.env.example) for a ful
 | `USER_LANGUAGE` | `auto` | Language submitters see: `auto` follows their Telegram app, or fix it to `zh` / `en` |
 | `REVIEW_TOPICS` | `false` | Topic mode in the review group: the group needs topics enabled, and the bot must be an admin allowed to manage topics |
 | `USER_TOPICS` | `false` | Topic mode in private chats: enable topic mode for the bot in @BotFather first |
+| `LEAVE_UNKNOWN_CHATS` | `true` | Leave any other group or channel the bot is added to; `false` stays but never responds. The publishing channel and its linked discussion group (detected at startup) are always kept |
 | `TZ` | `Asia/Shanghai` | Time zone for scheduling and for what counts as "today" in stats |
 | `SIGN_TEMPLATE` | depends on `LANGUAGE`: `Submitted by {name}` / `投稿人：{name}` | Signature for signed posts; `{name}` becomes a link to the submitter |
 | `ANON_SIGNATURE` | depends on `LANGUAGE`: `Anonymous submission` / `匿名投稿` | Signature for anonymous posts; set it to empty for none |
@@ -214,6 +216,7 @@ bot/
   render.py       sending content (single / album, signature, spoiler, silent) and message texts
   entities.py     message formatting (UTF-16 offsets, appending the signature)
   i18n.py         English and Chinese UI texts
+  guard.py        only handle private chats and the review group; leave other groups
   keyboards.py    colored inline buttons
   album.py        album collection
   timeutil.py     time parsing

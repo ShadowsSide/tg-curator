@@ -25,6 +25,7 @@
 - 发布选项：🙈 **剧透遮罩**、🔕 **静音发送**
 - `/edit` 修改稿件，`/no 理由` 拒绝，`/ban 理由` 封禁。封禁时会自动拒绝该用户所有未处理的来稿
 - 防止重复操作：两个管理员同时点“发布”，也只会发布一次
+- **只响应私聊和审核群**：在其他群里不会回复任何消息；被拉进其他群组或频道时会自动退出。发布频道和它的关联群组（评论区）在白名单里，不会退出
 
 **定时与统计**
 - 定时发布支持快捷按钮和自定义时间（`20:30`、`10-20 09:00`、`+2h`……），定时任务保存在数据库里，重启后不会丢失
@@ -116,6 +117,7 @@ docker compose cp bot:/app/data/bot.db ./backup-$(date +%F).db   # 备份数据�
 | `USER_LANGUAGE` | `auto` | 投稿人看到的语言：`auto` 跟随其客户端，或固定为 `zh` / `en` |
 | `REVIEW_TOPICS` | `false` | 审核群话题模式：审核群需开启话题，机器人需是管理员并有“管理话题”权限 |
 | `USER_TOPICS` | `false` | 私聊话题模式：需先在 @BotFather 里为机器人开启话题模式 |
+| `LEAVE_UNKNOWN_CHATS` | `true` | 被拉进其他群组或频道时自动退出；设为 `false` 则留在群里但不响应。发布频道及其关联群组（启动时自动识别）始终保留 |
 | `TZ` | `Asia/Shanghai` | 时区，影响定时发布和“今天”的统计范围 |
 | `SIGN_TEMPLATE` | 随 `LANGUAGE`：`投稿人：{name}` / `Submitted by {name}` | 署名落款，`{name}` 会替换成投稿人链接 |
 | `ANON_SIGNATURE` | 随 `LANGUAGE`：`匿名投稿` / `Anonymous submission` | 匿名落款，设为空则不加落款 |
@@ -212,6 +214,7 @@ bot/
   render.py       发送内容（单条 / 相册、落款、剧透、静音）与文案
   entities.py     消息格式处理（UTF-16 偏移、拼接落款）
   i18n.py         中英文界面文案
+  guard.py        只处理私聊和审核群，自动退出其他群
   keyboards.py    彩色内联按钮
   album.py        相册收集
   timeutil.py     时间解析

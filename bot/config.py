@@ -52,6 +52,7 @@ class Settings:
     user_language: str  # 投稿人看到的语言：auto（跟随客户端）/ zh / en
     review_topics: bool  # 审核群话题模式：每条投稿一个话题
     user_topics: bool  # 私聊话题模式：每条投稿在投稿人私聊里一个话题
+    leave_unknown_chats: bool  # 被拉进私聊/审核群/发布频道以外的聊天时自动退出
 
     def in_quiet_hours(self, hour: int) -> bool:
         if not self.quiet_hours:
@@ -98,4 +99,5 @@ def load_settings() -> Settings:
         user_language=_lang(_env("USER_LANGUAGE", "auto"), ("auto", *LANGS), "USER_LANGUAGE"),
         review_topics=_bool(_env("REVIEW_TOPICS", "false")),
         user_topics=_bool(_env("USER_TOPICS", "false")),
+        leave_unknown_chats=_bool(_env("LEAVE_UNKNOWN_CHATS", "true")),
     )

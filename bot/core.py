@@ -53,6 +53,8 @@ class Core:
         self.user_topics = settings.user_topics
         self.albums = AlbumCollector(settings.album_delay, self.receive)
         self.channel_post_base: str | None = None
+        self.channel_chat_id: int | None = None
+        self.channel_linked_chat_id: int | None = None  # 发布频道的关联群组（评论区）
         self._stats_lock = asyncio.Lock()
         self._tasks: list[asyncio.Task] = []
 
@@ -60,6 +62,8 @@ class Core:
 
     async def init(self) -> None:
         chat = await self.bot.get_chat(self.s.channel_id)
+        self.channel_chat_id = chat.id
+        self.channel_linked_chat_id = chat.linked_chat_id
         if chat.username:
             self.channel_post_base = f"https://t.me/{chat.username}/"
         else:

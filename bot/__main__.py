@@ -15,6 +15,7 @@ from aiogram.types import BotCommand, BotCommandScopeAllPrivateChats, BotCommand
 from .config import Settings, load_settings
 from .core import Core
 from .db import DB
+from .guard import ChatGuard
 from .handlers import review, user
 from .i18n import LANGS, PRIVATE_COMMANDS, REVIEW_COMMANDS
 
@@ -60,11 +61,16 @@ async def main() -> None:
 
     dp = Dispatcher(storage=MemoryStorage())
     dp["core"] = core
+    # 只处理私聊和审核群；必须在所有处理函数之前，放在 update 外层中间件
+    keep = {c for c in (core.channel_chat_id, core.channel_linked_chat_id) if c}  # 发布频道 + 关联群组
+    dp.update.outer_middleware(ChatGuard(settings.review_chat_id, keep, settings.leave_unknown_chats))
     dp.include_routers(review.build_router(settings), user.build_router())
 
     core.start_background()
     try:
-        await dp.start_polling(bot, allowed_updates=dp.resolve_used_update_types())
+        # my_chat_member：机器人被拉进其他群时收到通知，才能自动退出
+        allowed = sorted(set(dp.resolve_used_update_types()) | {"my_chat_member"})
+        await dp.start_polling(bot, allowed_updates=allowed)
     finally:
         await core.stop_background()
         await db.close()

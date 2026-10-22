@@ -72,7 +72,7 @@
 
 1. 在 [@BotFather](https://t.me/BotFather) 创建机器人，拿到 token。隐私模式保持默认开启即可
 2. 把机器人设为**频道**管理员，并给它“发布消息”权限
-3. 建一个**审核群**，把机器人拉进去，普通成员即可。审核群里的任何成员都能审核，所以只拉管理员进去
+3. 建一个**审核群**，把机器人拉进去，普通成员即可。默认只有审核群的**管理员和群主**能审核（`REVIEWERS`），其他成员点按钮或发命令会提示没有权限
 4. 获取频道 ID 和审核群 ID（都是 `-100` 开头的数字）。可以借助 [@RawDataBot](https://t.me/RawDataBot) 这类机器人，或者在群里发一条消息后访问 `https://api.telegram.org/bot<token>/getUpdates` 查看。频道也可以直接填 `@用户名`
 
 ### 2. 部署
@@ -122,6 +122,7 @@ docker compose cp bot:/app/data/bot.db ./backup-$(date +%F).db   # 备份数据�
 | `USER_LANGUAGE` | `auto` | 投稿人看到的语言：`auto` 跟随其客户端，或固定为 `zh` / `en` |
 | `REVIEW_TOPICS` | `false` | 审核群话题模式：审核群需开启话题，机器人需是管理员并有“管理话题”权限 |
 | `USER_TOPICS` | `false` | 私聊话题模式：需先在 @BotFather 里为机器人开启话题模式 |
+| `REVIEWERS` | `admins` | 谁可以审核：`admins` 审核群管理员和群主；`all` 审核群所有成员；也可以写用户 ID，可组合，如 `admins,123456` |
 | `MSG_WINDOW_DAYS` | `3` | `/msg` 沟通：审核结束（发布或拒绝）后还能继续沟通的天数；审核中始终可以 |
 | `LEAVE_UNKNOWN_CHATS` | `true` | 被拉进其他群组或频道时自动退出；设为 `false` 则留在群里但不响应。发布频道及其关联群组（启动时自动识别）始终保留 |
 | `TZ` | `Asia/Shanghai` | 时区，影响定时发布和“今天”的统计范围 |
@@ -214,6 +215,7 @@ DB_PATH=./data/bot.db .venv/bin/python -m bot
 .venv/bin/python tests/live_topics_test.py  # 端到端测试：话题模式（约 10 秒）
 .venv/bin/python tests/live_msg_test.py     # 端到端测试：/msg 沟通的边界情况（约 10 秒）
 .venv/bin/python tests/live_flood_test.py   # 端到端测试：被限流时的自动重试与改期（约 20 秒）
+.venv/bin/python tests/live_perm_test.py    # 端到端测试：审核员权限（约 10 秒）
 ```
 
 ### 项目结构
@@ -228,6 +230,8 @@ bot/
   entities.py     消息格式处理（UTF-16 偏移、拼接落款）
   i18n.py         中英文界面文案
   guard.py        只处理私聊和审核群，自动退出其他群
+  permissions.py  审核员权限（REVIEWERS）
+  ratelimit.py    被限流时自动等待重试
   keyboards.py    彩色内联按钮
   album.py        相册收集
   timeutil.py     时间解析

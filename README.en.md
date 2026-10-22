@@ -74,7 +74,7 @@ User sends content ─► chooses signed / anonymous ─► Review group: previe
 
 1. Create a bot with [@BotFather](https://t.me/BotFather) and copy its token. Leave privacy mode on (the default)
 2. Make the bot an admin of your **channel** with permission to post messages
-3. Create a **review group** and add the bot as a regular member. Anyone in the review group can review posts, so only add your admins
+3. Create a **review group** and add the bot as a regular member. By default only the group's **admins and owner** can review (`REVIEWERS`); other members get a “no permission” notice
 4. Find the channel ID and review group ID (both are numbers starting with `-100`). You can use a bot such as [@RawDataBot](https://t.me/RawDataBot), or send a message in the group and open `https://api.telegram.org/bot<token>/getUpdates`. For the channel you can also use its `@username`
 
 ### 2. Deploy
@@ -124,6 +124,7 @@ Everything is configured in `.env`. See [`.env.example`](.env.example) for a ful
 | `USER_LANGUAGE` | `auto` | Language submitters see: `auto` follows their Telegram app, or fix it to `zh` / `en` |
 | `REVIEW_TOPICS` | `false` | Topic mode in the review group: the group needs topics enabled, and the bot must be an admin allowed to manage topics |
 | `USER_TOPICS` | `false` | Topic mode in private chats: enable topic mode for the bot in @BotFather first |
+| `REVIEWERS` | `admins` | Who can review: `admins` = review group admins and owner; `all` = every member; or user IDs, combinable, e.g. `admins,123456` |
 | `MSG_WINDOW_DAYS` | `3` | `/msg`: days after a submission is published or rejected during which messaging stays open; always open during review |
 | `LEAVE_UNKNOWN_CHATS` | `true` | Leave any other group or channel the bot is added to; `false` stays but never responds. The publishing channel and its linked discussion group (detected at startup) are always kept |
 | `TZ` | `Asia/Shanghai` | Time zone for scheduling and for what counts as "today" in stats |
@@ -216,6 +217,7 @@ The tests need no token and no network access:
 .venv/bin/python tests/live_topics_test.py  # end-to-end: topic mode (~10 seconds)
 .venv/bin/python tests/live_msg_test.py     # end-to-end: /msg edge cases (~10 seconds)
 .venv/bin/python tests/live_flood_test.py   # end-to-end: retries and rescheduling under rate limits (~20 seconds)
+.venv/bin/python tests/live_perm_test.py    # end-to-end: reviewer permissions (~10 seconds)
 ```
 
 ### Project layout
@@ -230,6 +232,8 @@ bot/
   entities.py     message formatting (UTF-16 offsets, appending the signature)
   i18n.py         English and Chinese UI texts
   guard.py        only handle private chats and the review group; leave other groups
+  permissions.py  reviewer permissions (REVIEWERS)
+  ratelimit.py    automatic waiting and retrying when rate-limited
   keyboards.py    colored inline buttons
   album.py        album collection
   timeutil.py     time parsing

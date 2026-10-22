@@ -12,6 +12,7 @@ from aiogram.types import CallbackQuery, ForceReply, Message
 from .. import entities as ent
 from ..config import Settings
 from ..core import NO_PREVIEW, Core, explicit_reply, mention, topic_of
+from ..permissions import ReviewerCheck, ReviewerOnly, ReviewerPolicy
 from ..i18n import t
 from ..keyboards import ReviewCB
 from ..render import dump_link_preview, message_item, user_link
@@ -56,6 +57,11 @@ def build_router(settings: Settings) -> Router:
     router = Router(name="review")
     router.message.filter(F.chat.id == settings.review_chat_id)
     router.callback_query.filter(F.message.chat.id == settings.review_chat_id)
+    # 只有审核员能用审核群里的按钮和命令（REVIEWERS 配置）
+    guard = ReviewerOnly(ReviewerCheck(ReviewerPolicy.parse(settings.reviewers), settings.review_chat_id),
+                         settings.language)
+    router.message.middleware(guard)
+    router.callback_query.middleware(guard)
 
     # ---------- 控制按钮 ----------
 

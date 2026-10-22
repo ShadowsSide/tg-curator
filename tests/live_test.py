@@ -40,7 +40,9 @@ def chat(cid):
 
 MOCK = {"review_is_forum": False, "bot_topics": False,
         # 限流注入："方法名:chat_id" → 依次返回的 retry_after 秒数列表，每次调用消耗一个
-        "flood": {}}
+        "flood": {},
+        # 审核群管理员（getChatMember 返回 creator），其他人返回普通成员
+        "admins": {7}}
 next_topic = [7000]
 
 
@@ -104,6 +106,11 @@ async def handle(request: web.Request):
             result = {**chat(REVIEW), "title": "Review", "is_forum": MOCK["review_is_forum"], **info}
         else:
             result = {**chat(CHANNEL), "title": "Test Channel", "username": "testchan", "linked_chat_id": LINKED, **info}
+    elif m == "getchatmember":
+        uid_ = int(params["user_id"])
+        member_user = {"id": uid_, "is_bot": False, "first_name": f"U{uid_}"}
+        result = ({"status": "creator", "user": member_user, "is_anonymous": False} if uid_ in MOCK["admins"]
+                  else {"status": "member", "user": member_user})
     elif m == "createforumtopic":
         next_topic[0] += 1
         result = {"message_thread_id": next_topic[0], "name": params["name"], "icon_color": int(params.get("icon_color", 0))}

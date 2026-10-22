@@ -213,6 +213,7 @@ The tests need no token and no network access:
 ```bash
 .venv/bin/python tests/test_entities.py   # unit tests: formatting offsets (UTF-16)
 .venv/bin/python tests/test_i18n.py       # unit tests: every text exists in both languages
+.venv/bin/python tests/test_errors.py     # unit tests: business logic returns notice codes, translated only when shown
 .venv/bin/python tests/live_test.py       # end-to-end: runs the real bot against a mock Bot API server (~1 minute)
 .venv/bin/python tests/live_topics_test.py  # end-to-end: topic mode (~10 seconds)
 .venv/bin/python tests/live_msg_test.py     # end-to-end: /msg edge cases (~10 seconds)
@@ -231,6 +232,7 @@ bot/
   render.py       sending content (single / album, signature, spoiler, silent) and message texts
   entities.py     message formatting (UTF-16 offsets, appending the signature)
   i18n.py         English and Chinese UI texts
+  errors.py       notice codes returned by the business logic (translated when shown)
   guard.py        only handle private chats and the review group; leave other groups
   permissions.py  reviewer permissions (REVIEWERS)
   ratelimit.py    automatic waiting and retrying when rate-limited

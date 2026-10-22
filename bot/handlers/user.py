@@ -50,13 +50,13 @@ def build_router() -> Router:
             await m.reply(t(lang, "u_edit_not_found"))
             return
         if not body.strip():
-            err = await core.show_text(sid, m.chat.id, reply_to=m.message_id, lang=lang)
-            await m.reply(err or t(lang, "u_edit_echo_hint"))
+            err = await core.show_text(sid, m.chat.id, reply_to=m.message_id)
+            await m.reply(err.text(lang) if err else t(lang, "u_edit_echo_hint"))
             return
 
         err = await core.edit(sid, _editor(core, m), body, entities, dump_link_preview(m.link_preview_options),
-                              allowed=SUBMITTER_EDITABLE, lang=lang)
-        await m.reply(err or _edited_text(lang, sid, sub.status))
+                              allowed=SUBMITTER_EDITABLE)
+        await m.reply(err.text(lang) if err else _edited_text(lang, sid, sub.status))
 
     @router.message(Command("msg"))
     async def msg_cmd(m: Message, core: Core) -> None:
@@ -73,7 +73,7 @@ def build_router() -> Router:
             await m.reply(t(lang, "msg_empty"))
             return
         err = await core.relay_to_review(found[0], m.from_user, item, m.message_id)
-        await m.reply(err or t(lang, "msg_sent_to_review"))
+        await m.reply(err.text(lang) if err else t(lang, "msg_sent_to_review"))
 
     @router.edited_message()
     async def native_edit(m: Message, core: Core) -> None:
@@ -87,8 +87,8 @@ def build_router() -> Router:
             return
         sub = await core.db.get(sid)
         lang = core.lang_of(m.from_user)
-        err = await core.replace_item(sid, index, new_item, _editor(core, m), SUBMITTER_EDITABLE, lang)
-        await m.reply(err or _edited_text(lang, sid, sub.status))
+        err = await core.replace_item(sid, index, new_item, _editor(core, m), SUBMITTER_EDITABLE)
+        await m.reply(err.text(lang) if err else _edited_text(lang, sid, sub.status))
 
     @router.message(F.media_group_id)
     async def album_part(m: Message, core: Core) -> None:
@@ -111,16 +111,16 @@ def build_router() -> Router:
         sid = callback_data.sid
         lang = core.lang_of(cq.from_user)
         if callback_data.a == "cancel":
-            err = await core.cancel_draft(sid, cq.from_user.id, lang)
+            err = await core.cancel_draft(sid, cq.from_user.id)
             if not err:
                 await cq.message.edit_text(t(lang, "cancelled"))
-            await cq.answer(err or t(lang, "cancelled"))
+            await cq.answer(err.text(lang) if err else t(lang, "cancelled"))
             return
 
         anonymous = callback_data.a == "anon"
-        err = await core.submit(sid, cq.from_user.id, anonymous, lang)
+        err = await core.submit(sid, cq.from_user.id, anonymous)
         if err:
-            await cq.answer(err, show_alert=True)
+            await cq.answer(err.text(lang), show_alert=True)
             return
         mode = t(lang, "mode_anon" if anonymous else "mode_signed")
         await cq.message.edit_text(t(lang, "submitted", mode=mode, sid=sid))

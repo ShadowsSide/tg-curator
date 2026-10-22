@@ -211,6 +211,7 @@ DB_PATH=./data/bot.db .venv/bin/python -m bot
 ```bash
 .venv/bin/python tests/test_entities.py   # 单元测试：格式偏移（UTF-16）计算
 .venv/bin/python tests/test_i18n.py       # 单元测试：中英文文案齐全、占位符一致
+.venv/bin/python tests/test_errors.py     # 单元测试：业务层只返回提示代码，翻译在显示时进行
 .venv/bin/python tests/live_test.py       # 端到端测试：启动模拟的 Bot API 服务器，运行真实的机器人进程（约 1 分钟）
 .venv/bin/python tests/live_topics_test.py  # 端到端测试：话题模式（约 10 秒）
 .venv/bin/python tests/live_msg_test.py     # 端到端测试：/msg 沟通的边界情况（约 10 秒）
@@ -229,6 +230,7 @@ bot/
   render.py       发送内容（单条 / 相册、落款、剧透、静音）与文案
   entities.py     消息格式处理（UTF-16 偏移、拼接落款）
   i18n.py         中英文界面文案
+  errors.py       业务层返回的提示代码（显示时再翻译）
   guard.py        只处理私聊和审核群，自动退出其他群
   permissions.py  审核员权限（REVIEWERS）
   ratelimit.py    被限流时自动等待重试

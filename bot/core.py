@@ -15,10 +15,11 @@ from aiogram.types import LinkPreviewOptions, Message, ReplyParameters, User as 
 
 from .album import AlbumCollector
 from .config import Settings
+from .errors import Notice, notice
 from .db import DB, OPEN_STATES, Submission
 from . import entities as ent
 from .entities import u16len
-from .i18n import normalize, on_off, t
+from .i18n import normalize, t
 from .keyboards import control_kb, schedule_kb, user_choice_kb
 from .render import (
     caption_index, control_text, describe, extract_item, send_items, signature, stats_text, user_link,
@@ -277,23 +278,23 @@ class Core:
             return thread
         return await self._create_topic(first.from_user.id, self._user_topic_name(sub, lang))
 
-    async def submit(self, sid: int, user_id: int, anonymous: bool, lang: str) -> str | None:
+    async def submit(self, sid: int, user_id: int, anonymous: bool) -> Notice | None:
         sub = await self.db.get(sid)
         if not sub or sub.user_id != user_id:
-            return t(lang, "invalid_sub")
+            return notice("invalid_sub")
         if not await self.db.transition(sid, ("draft",), "pending", anonymous=int(anonymous), submitted_at=now_ts()):
-            return t(lang, "already_handled")
+            return notice("already_handled")
         await self._send_to_review(sid)
         await self.sync_topics(sid, review_is_fresh=True)
         await self.refresh_stats()
         return None
 
-    async def cancel_draft(self, sid: int, user_id: int, lang: str) -> str | None:
+    async def cancel_draft(self, sid: int, user_id: int) -> Notice | None:
         sub = await self.db.get(sid)
         if not sub or sub.user_id != user_id:
-            return t(lang, "invalid_sub")
+            return notice("invalid_sub")
         if not await self.db.transition(sid, ("draft",), "cancelled"):
-            return t(lang, "cannot_cancel")
+            return notice("cannot_cancel")
         await self.sync_topics(sid)
         return None
 
@@ -333,58 +334,57 @@ class Core:
     # ---------- 修改稿件（管理员 / 投稿人共用；lang 是调用方的语言） ----------
 
     async def edit(self, sid: int, editor: str, text: str, entities: list, link_preview: dict | None = None,
-                   allowed: tuple[str, ...] = OPEN_STATES, lang: str | None = None) -> str | None:
+                   allowed: tuple[str, ...] = OPEN_STATES) -> Notice | None:
         """修改稿件的文字（文字投稿改正文，媒体投稿改说明文字），格式由 entities 原样保留。"""
-        lang = lang or self.lang
         sub = await self.db.get(sid)
-        err = self._check_editable(sub, sid, allowed, lang)
+        err = self._check_editable(sub, sid, allowed)
         if err:
             return err
         items = [dict(it) for it in sub.items]
         target = items[caption_index(items)]
         is_text = target["type"] == "text"
         if is_text and not text.strip():
-            return t(lang, "text_empty")
+            return notice("text_empty")
         target["text"], target["entities"] = text, entities
         if is_text:
             target["link_preview"] = link_preview
-        return await self._save_edit(sub, items, editor, allowed, lang)
+        return await self._save_edit(sub, items, editor, allowed)
 
     async def replace_item(self, sid: int, index: int, new_item: dict, editor: str,
-                           allowed: tuple[str, ...], lang: str) -> str | None:
+                           allowed: tuple[str, ...]) -> Notice | None:
         """投稿人用 Telegram 自带的“编辑”修改了原消息：整项替换（文字、格式、甚至换图都会同步）。"""
         sub = await self.db.get(sid)
-        err = self._check_editable(sub, sid, allowed, lang)
+        err = self._check_editable(sub, sid, allowed)
         if err:
             return err
         items = [dict(it) for it in sub.items]
         if (items[index]["type"] == "text") != (new_item["type"] == "text"):
-            return t(lang, "type_change")
+            return notice("type_change")
         items[index] = new_item
-        return await self._save_edit(sub, items, editor, allowed, lang)
+        return await self._save_edit(sub, items, editor, allowed)
 
     @staticmethod
-    def _check_editable(sub: Submission | None, sid: int, allowed: tuple[str, ...], lang: str) -> str | None:
+    def _check_editable(sub: Submission | None, sid: int, allowed: tuple[str, ...]) -> Notice | None:
         if not sub:
-            return t(lang, "sub_not_found", sid=sid)
+            return notice("sub_not_found", sid=sid)
         if sub.status in allowed:
             return None
         known = ("scheduled", "publishing", "published", "rejected", "cancelled", "failed")
-        return t(lang, f"not_editable_{sub.status if sub.status in known else 'other'}", sid=sid)
+        return notice(f"not_editable_{sub.status if sub.status in known else 'other'}", sid=sid)
 
     async def _save_edit(self, sub: Submission, items: list[dict], editor: str,
-                         allowed: tuple[str, ...], lang: str) -> str | None:
+                         allowed: tuple[str, ...]) -> Notice | None:
         for it in items:
             limit = 4096 if it["type"] == "text" else 1024
             if u16len(it.get("text", "")) > limit:
-                return t(lang, "too_long", n=u16len(it["text"]), limit=limit)
+                return notice("too_long", n=u16len(it["text"]), limit=limit)
         # 第一次修改前的原稿单独保存；状态变了（比如刚好被发布）就不改
         ok = await self.db.update_if(
             sub.id, allowed, items=items, original_items=sub.original_items or sub.items,
             edited_by=editor, edited_at=now_ts(),
         )
         if not ok:
-            return t(lang, "edit_race")
+            return notice("edit_race")
         sub = await self.db.get(sub.id)
         if sub.status != "draft":  # 草稿还没进审核群，不用发预览
             preview = await send_items(
@@ -395,45 +395,44 @@ class Core:
             await self.refresh_control(sub.id)
         return None
 
-    async def show_text(self, sid: int, chat_id: int, reply_to: int, lang: str | None = None) -> str | None:
+    async def show_text(self, sid: int, chat_id: int, reply_to: int) -> Notice | None:
         """把稿件当前的文字（带格式）发出来，方便复制后修改再 /edit。"""
-        lang = lang or self.lang
         sub = await self.db.get(sid)
         if not sub:
-            return t(lang, "sub_not_found", sid=sid)
+            return notice("sub_not_found", sid=sid)
         target = sub.items[caption_index(sub.items)]
         if not target.get("text"):
-            return t(lang, "no_text_to_show", sid=sid)
+            return notice("no_text_to_show", sid=sid)
         only_text = {"type": "text", "text": target["text"], "entities": target.get("entities", []),
                      "link_preview": {"is_disabled": True}}
         await send_items(self.bot, chat_id, [only_text], sig=("", []), spoiler=False, reply_to=reply_to)
         return None
 
-    async def toggle_spoiler(self, sid: int) -> str:
+    async def toggle_spoiler(self, sid: int) -> Notice:
         sub = await self.db.get(sid)
         if not sub or sub.status not in ("pending", "scheduled", "failed"):
-            return t(self.lang, "toast_state_locked")
+            return notice("toast_state_locked")
         await self.db.update(sid, spoiler=int(not sub.spoiler))
         await self.refresh_control(sid)
-        return t(self.lang, "toast_spoiler", state=on_off(self.lang, not sub.spoiler))
+        return notice("toast_spoiler", state=notice("on" if not sub.spoiler else "off"))
 
-    async def toggle_silent(self, sid: int) -> str:
+    async def toggle_silent(self, sid: int) -> Notice:
         sub = await self.db.get(sid)
         if not sub or sub.status not in ("pending", "scheduled", "failed"):
-            return t(self.lang, "toast_state_locked")
+            return notice("toast_state_locked")
         await self.db.update(sid, silent=int(not sub.silent))
         await self.refresh_control(sid)
-        return t(self.lang, "toast_silent", state=on_off(self.lang, not sub.silent))
+        return notice("toast_silent", state=notice("on" if not sub.silent else "off"))
 
     async def publish(self, sid: int, reviewer: TgUser | None = None,
-                      from_states: tuple[str, ...] = ("pending", "scheduled", "failed")) -> str | None:
+                      from_states: tuple[str, ...] = ("pending", "scheduled", "failed")) -> Notice | None:
         """立即发布到频道。返回错误信息，成功返回 None。"""
         sub = await self.db.get(sid)
         if not sub:
-            return t(self.lang, "sub_not_found", sid=sid)
+            return notice("sub_not_found", sid=sid)
         fields = self._review_fields(sub, reviewer, "approved")
         if not await self.db.transition(sid, from_states, "publishing", error=None, **fields):
-            return t(self.lang, "status_changed")
+            return notice("status_changed")
         await self.refresh_control(sid)
 
         sub = await self.db.get(sid)
@@ -449,13 +448,13 @@ class Core:
             await self.db.update(sid, status="scheduled", scheduled_at=ts, error=None)
             await self.refresh_control(sid)
             await self.refresh_stats()
-            return t(self.lang, "publish_postponed", when=self.fmt(ts))
+            return notice("publish_postponed", when=self.fmt(ts))
         except TelegramAPIError as e:
             log.exception("发布 #%s 失败", sid)
             await self.db.update(sid, status="failed", error=str(e)[:300])
             await self.refresh_control(sid)
             await self.refresh_stats()
-            return t(self.lang, "publish_failed", error=e)
+            return notice("publish_failed", error=str(e))
 
         await self.db.update(sid, status="published", published_at=now_ts(), channel_msg_id=sent[0].message_id)
         sub = await self.db.get(sid)
@@ -467,30 +466,30 @@ class Core:
         await self.refresh_stats()
         return None
 
-    async def schedule(self, sid: int, ts: int, reviewer: TgUser) -> str | None:
+    async def schedule(self, sid: int, ts: int, reviewer: TgUser) -> Notice | None:
         if ts <= now_ts() + 30:
-            return t(self.lang, "time_past")
+            return notice("time_past")
         sub = await self.db.get(sid)
         if not sub:
-            return t(self.lang, "sub_not_found", sid=sid)
+            return notice("sub_not_found", sid=sid)
         was_pending = sub.status == "pending"
         fields = self._review_fields(sub, reviewer, "approved")
         if not await self.db.transition(sid, ("pending", "scheduled", "failed"), "scheduled",
                                         scheduled_at=ts, error=None, **fields):
-            return t(self.lang, "status_changed")
+            return notice("status_changed")
         if was_pending:
             await self.notify(sub, "notify_scheduled", sid=sid, when=self.fmt(ts, await self.user_lang(sub.user_id)))
         await self.refresh_control(sid)
         await self.refresh_stats()
         return None
 
-    async def unschedule(self, sid: int) -> str | None:
+    async def unschedule(self, sid: int) -> Notice | None:
         ok = await self.db.transition(
             sid, ("scheduled",), "pending",
             scheduled_at=None, decision=None, reviewed_at=None, reviewer_id=None, reviewer_name=None,
         )
         if not ok:
-            return t(self.lang, "status_changed")
+            return notice("status_changed")
         await self.refresh_control(sid)
         await self.refresh_stats()
         return None
@@ -501,16 +500,16 @@ class Core:
             sub.id, OPEN_STATES, "rejected", scheduled_at=None, reject_reason=reason, **fields
         )
 
-    async def reject(self, sid: int, reviewer: TgUser, reason: str | None = None) -> str | None:
+    async def reject(self, sid: int, reviewer: TgUser, reason: str | None = None) -> Notice | None:
         sub = await self.db.get(sid)
         if not sub:
-            return t(self.lang, "sub_not_found", sid=sid)
+            return notice("sub_not_found", sid=sid)
         if sub.status not in OPEN_STATES:
             key = {"published": "reject_published", "rejected": "reject_rejected",
                    "publishing": "reject_publishing"}.get(sub.status, "reject_other")
-            return t(self.lang, key, sid=sid)
+            return notice(key, sid=sid)
         if not await self._mark_rejected(sub, reviewer, reason):
-            return t(self.lang, "status_changed")
+            return notice("status_changed")
         lang = await self.user_lang(sub.user_id)
         await self.notify_user(sub.user_id, t(lang, "notify_rejected", sid=sid) + _reason_line(lang, reason),
                                reply_to=sub.user_msg_id, thread_id=sub.user_topic_id)
@@ -548,14 +547,14 @@ class Core:
 
     # ---------- 沟通（/msg）：审核员 ↔ 投稿人，由机器人转达，双方都看不到对方账号 ----------
 
-    def msg_blocked(self, sub: Submission, lang: str) -> str | None:
+    def msg_blocked(self, sub: Submission) -> Notice | None:
         """审核中随时可以沟通；发布或拒绝后 MSG_WINDOW_DAYS 天内也可以；还没提交的草稿不行。"""
         if sub.status in ("draft", "cancelled"):
-            return t(lang, "msg_not_submitted")
+            return notice("msg_not_submitted")
         if sub.status in ("published", "rejected"):
             ended = sub.published_at if sub.status == "published" else sub.reviewed_at
             if ended and now_ts() - ended > self.s.msg_window_days * 86400:
-                return t(lang, "msg_closed", days=self.s.msg_window_days)
+                return notice("msg_closed", days=self.s.msg_window_days)
         return None
 
     @staticmethod
@@ -565,12 +564,12 @@ class Core:
         text, entities = ent.join(label, label_entities, item.get("text", ""), item.get("entities", []), sep="\n")
         return {**item, "text": text, "entities": entities}
 
-    async def relay_to_user(self, sid: int, reviewer: TgUser, item: dict) -> str | None:
+    async def relay_to_user(self, sid: int, reviewer: TgUser, item: dict) -> Notice | None:
         """审核员 → 投稿人：以“审核员”的身份发到投稿人那条投稿下面（话题模式下在对应话题里）。"""
         sub = await self.db.get(sid)
         if not sub:
-            return t(self.lang, "sub_not_found")
-        err = self.msg_blocked(sub, self.lang)
+            return notice("sub_not_found")
+        err = self.msg_blocked(sub)
         if err:
             return err
         lang = await self.user_lang(sub.user_id)
@@ -580,22 +579,21 @@ class Core:
                 spoiler=bool(item.get("spoiler")), reply_to=sub.user_msg_id, thread_id=sub.user_topic_id,
             )
         except TelegramAPIError as e:
-            return t(self.lang, "msg_undelivered", error=e)
+            return notice("msg_undelivered", error=str(e))
         await self.db.log_message(sid, "to_user", reviewer.id, reviewer.full_name, item,
                                   user_msg_id=sent[0].message_id, review_msg_id=None)
         await self.refresh_control(sid)
         return None
 
-    async def relay_to_review(self, sid: int, user: TgUser, item: dict, user_msg_id: int) -> str | None:
+    async def relay_to_review(self, sid: int, user: TgUser, item: dict, user_msg_id: int) -> Notice | None:
         """投稿人 → 审核员：发到审核群，回复在这条投稿的控制消息下面（话题模式下在对应话题里）。"""
-        lang = self.lang_of(user)
         sub = await self.db.get(sid)
         if not sub or sub.user_id != user.id:
-            return t(lang, "u_edit_not_found")
+            return notice("u_edit_not_found")
         db_user = await self.db.get_user(user.id)
         if db_user and db_user.banned:
-            return t(lang, "banned")
-        err = self.msg_blocked(sub, lang)
+            return notice("banned")
+        err = self.msg_blocked(sub)
         if err:
             return err
         try:
@@ -605,7 +603,7 @@ class Core:
                 thread_id=sub.review_topic_id,
             )
         except TelegramAPIError as e:
-            return t(lang, "msg_failed", error=e)
+            return notice("msg_failed", error=str(e))
         # 审核员回复这条转来的消息发 /msg，就能定位到这条投稿
         await self.db.link_review_messages(sid, [m.message_id for m in sent])
         await self.db.log_message(sid, "to_review", user.id, user.full_name, item,
@@ -725,7 +723,7 @@ class Core:
                 for sub in await self.db.due_scheduled(now_ts()):
                     err = await self.publish(sub.id, from_states=("scheduled",))
                     if err:
-                        log.warning("定时发布 #%s：%s", sub.id, err)
+                        log.warning("定时发布 #%s：%s", sub.id, err.key)
                 for sub in await self.db.expire_drafts(now_ts() - DRAFT_TTL):
                     if sub.user_msg_id:
                         try:

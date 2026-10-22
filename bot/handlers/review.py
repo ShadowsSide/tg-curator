@@ -72,19 +72,19 @@ def build_router(settings: Settings) -> Router:
         lang = core.lang
 
         if action == "spoiler":
-            await cq.answer(await core.toggle_spoiler(sid))
+            await cq.answer((await core.toggle_spoiler(sid)).text(lang))
         elif action == "silent":
-            await cq.answer(await core.toggle_silent(sid))
+            await cq.answer((await core.toggle_silent(sid)).text(lang))
         elif action == "pub":
             await cq.answer(t(lang, "toast_publishing"))
             err = await core.publish(sid, reviewer=who)
             if err:
-                await cq.message.reply(err)  # 回复在这条投稿的控制消息下面
+                await cq.message.reply(err.text(lang))  # 回复在这条投稿的控制消息下面
         elif action == "retry":
             await cq.answer(t(lang, "toast_retrying"))
             err = await core.publish(sid, reviewer=who, from_states=("failed",))
             if err:
-                await cq.message.reply(err)
+                await cq.message.reply(err.text(lang))
         elif action == "sched":
             await core.show_schedule_picker(sid)
             await cq.answer()
@@ -93,7 +93,8 @@ def build_router(settings: Settings) -> Router:
             await cq.answer()
         elif action == "preset":
             err = await core.schedule(sid, callback_data.v, who)
-            await cq.answer(err or t(lang, "toast_scheduled", when=core.fmt(callback_data.v)), show_alert=bool(err))
+            await cq.answer(err.text(lang) if err else t(lang, "toast_scheduled", when=core.fmt(callback_data.v)),
+                            show_alert=bool(err))
         elif action == "custom":
             prompt = await cq.message.reply(  # 回复在控制消息下面，看得出是哪条投稿
                 t(lang, "custom_time_prompt", who=mention(who), sid=sid),
@@ -104,10 +105,10 @@ def build_router(settings: Settings) -> Router:
             await cq.answer()
         elif action == "unsched":
             err = await core.unschedule(sid)
-            await cq.answer(err or t(lang, "toast_unscheduled"))
+            await cq.answer(err.text(lang) if err else t(lang, "toast_unscheduled"))
         elif action == "reject":
             err = await core.reject(sid, who)
-            await cq.answer(err or t(lang, "toast_rejected"), show_alert=bool(err))
+            await cq.answer(err.text(lang) if err else t(lang, "toast_rejected"), show_alert=bool(err))
         elif action == "ban":
             sub = await core.db.get(sid)
             if not sub:
@@ -157,7 +158,7 @@ def build_router(settings: Settings) -> Router:
 
         err = await core.reject(sid, m.from_user, reason)
         if err:
-            await m.reply(err)
+            await m.reply(err.text(core.lang))
             return
         await m.reply(t(core.lang, "rejected_reply")
                       + (t(core.lang, "reason_line", reason=html.escape(reason)) if reason else ""))
@@ -173,11 +174,11 @@ def build_router(settings: Settings) -> Router:
 
         if not body.strip():
             err = await core.show_text(sid, m.chat.id, reply_to=m.message_id)
-            await m.reply(err or t(core.lang, "admin_echo_hint"))
+            await m.reply(err.text(core.lang) if err else t(core.lang, "admin_echo_hint"))
             return
 
         err = await core.edit(sid, m.from_user.full_name, body, entities, dump_link_preview(m.link_preview_options))
-        await m.reply(err or t(core.lang, "admin_edited"))
+        await m.reply(err.text(core.lang) if err else t(core.lang, "admin_edited"))
 
     @router.message(Command("msg"))
     async def msg_cmd(m: Message, core: Core) -> None:
@@ -192,7 +193,7 @@ def build_router(settings: Settings) -> Router:
             await m.reply(t(core.lang, "msg_empty"))
             return
         err = await core.relay_to_user(sid, m.from_user, item)
-        await m.reply(err or t(core.lang, "msg_sent_to_user"))
+        await m.reply(err.text(core.lang) if err else t(core.lang, "msg_sent_to_user"))
 
     @router.message(Command("ban"))
     async def ban_cmd(m: Message, command: CommandObject, core: Core) -> None:
@@ -255,8 +256,8 @@ def build_router(settings: Settings) -> Router:
 
         err = await core.schedule(sid, ts, m.from_user)
         if err:
-            await m.reply(err)
-            if err != t(core.lang, "time_past"):  # 时间已过：保留状态，让管理员重新输入
+            await m.reply(err.text(core.lang))
+            if err.key != "time_past":  # 时间已过：保留状态，让管理员重新输入
                 await state.clear()
             return
 

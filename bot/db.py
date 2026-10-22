@@ -59,6 +59,7 @@ CREATE TABLE IF NOT EXISTS submissions (
     review_topic_id INTEGER,
     user_topic_id  INTEGER,
     topic_status   TEXT,
+    msg_count      INTEGER NOT NULL DEFAULT 0,
     error          TEXT
 );
 
@@ -70,6 +71,21 @@ CREATE TABLE IF NOT EXISTS review_messages (
     message_id INTEGER PRIMARY KEY,
     sid        INTEGER NOT NULL
 );
+
+-- 审核员与投稿人通过机器人转达的沟通记录（/msg）
+CREATE TABLE IF NOT EXISTS conversations (
+    id             INTEGER PRIMARY KEY AUTOINCREMENT,
+    sid            INTEGER NOT NULL,
+    direction      TEXT    NOT NULL,  -- to_user：审核员 → 投稿人；to_review：投稿人 → 审核员
+    sender_id      INTEGER NOT NULL,
+    sender_name    TEXT,
+    item           TEXT    NOT NULL,  -- 转达的内容（文字 + entities / 媒体 file_id），JSON
+    created_at     INTEGER NOT NULL,
+    user_msg_id    INTEGER,           -- 投稿人私聊里对应的那条消息（机器人转来的，或投稿人自己发的）
+    review_msg_id  INTEGER            -- 审核群里对应的那条消息
+);
+CREATE INDEX IF NOT EXISTS idx_conv_sid  ON conversations(sid);
+CREATE INDEX IF NOT EXISTS idx_conv_user ON conversations(user_msg_id);
 
 CREATE TABLE IF NOT EXISTS kv (
     key   TEXT PRIMARY KEY,
@@ -91,6 +107,7 @@ MIGRATIONS = [
     ("submissions", "review_topic_id", "ALTER TABLE submissions ADD COLUMN review_topic_id INTEGER"),
     ("submissions", "user_topic_id", "ALTER TABLE submissions ADD COLUMN user_topic_id INTEGER"),
     ("submissions", "topic_status", "ALTER TABLE submissions ADD COLUMN topic_status TEXT"),
+    ("submissions", "msg_count", "ALTER TABLE submissions ADD COLUMN msg_count INTEGER NOT NULL DEFAULT 0"),
 ]
 
 OPEN_STATES = ("pending", "scheduled", "failed")  # 已提交、尚未发布或拒绝
@@ -140,6 +157,7 @@ class Submission:
     review_topic_id: int | None  # 话题模式：审核群里这条投稿的话题
     user_topic_id: int | None  # 话题模式：投稿人私聊里这条投稿的话题
     topic_status: str | None  # 话题名称上次同步时的状态，避免重复改名
+    msg_count: int  # /msg 沟通的条数
     error: str | None
 
     @property
@@ -276,7 +294,38 @@ class DB:
             "SELECT id FROM submissions WHERE user_id=? AND user_msg_id=? ORDER BY id DESC LIMIT 1",
             (user_id, message_id),
         )
-        return (row[0], None) if row else None
+        if row:
+            return row[0], None
+        sid = await self.sid_by_relay_message(user_id, message_id)
+        return (sid, None) if sid else None
+
+    # ---------- 沟通（/msg） ----------
+
+    async def sid_by_relay_message(self, user_id: int, message_id: int) -> int | None:
+        """投稿人私聊里的这条消息是不是沟通消息（审核员转来的，或投稿人自己的 /msg）。"""
+        row = await self._one(
+            """SELECT c.sid FROM conversations c JOIN submissions s ON s.id = c.sid
+               WHERE s.user_id=? AND c.user_msg_id=? ORDER BY c.id DESC LIMIT 1""",
+            (user_id, message_id),
+        )
+        return row[0] if row else None
+
+    async def is_review_relay_message(self, message_id: int) -> bool:
+        """审核群里的这条消息是不是机器人转来的投稿人消息。"""
+        return await self._one(
+            "SELECT 1 FROM conversations WHERE direction='to_review' AND review_msg_id=?", (message_id,)
+        ) is not None
+
+    async def log_message(self, sid: int, direction: str, sender_id: int, sender_name: str, item: dict,
+                          user_msg_id: int | None, review_msg_id: int | None) -> None:
+        await self.conn.execute(
+            """INSERT INTO conversations(sid, direction, sender_id, sender_name, item, created_at,
+                                         user_msg_id, review_msg_id) VALUES(?, ?, ?, ?, ?, ?, ?, ?)""",
+            (sid, direction, sender_id, sender_name, json.dumps(item, ensure_ascii=False), now_ts(),
+             user_msg_id, review_msg_id),
+        )
+        await self.conn.execute("UPDATE submissions SET msg_count = msg_count + 1 WHERE id=?", (sid,))
+        await self.conn.commit()
 
     async def sid_by_review_topic(self, thread_id: int) -> int | None:
         row = await self._one("SELECT id FROM submissions WHERE review_topic_id=? ORDER BY id DESC LIMIT 1", (thread_id,))

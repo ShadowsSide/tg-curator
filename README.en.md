@@ -21,6 +21,11 @@ Built with Python 3.12 + [aiogram 3](https://github.com/aiogram/aiogram) + SQLit
 - **Formatting is kept exactly as sent**: links, bold, quotes, spoiler text, code, date/time and emoji all come through to the channel unchanged
 - Submitters can **edit their post** until it has been reviewed, either with Telegram's built-in "Edit" or by **replying** to it with `/edit`
 
+**Reviewer ↔ submitter messaging**
+- Both sides use `/msg message` as a reply to the relevant submission or message, and the bot relays it. Submitters always see the sender as “Reviewer”; neither side sees the other's account
+- Formatting is kept, and a single photo or file can be attached; the conversation is stored and the control message shows the message count
+- Possible any time during review, and for 3 days after it's published or rejected (`MSG_WINDOW_DAYS`); banned users can't send
+
 **Reviewing**
 - Each submission gets a preview in the review group (exactly what the channel will show), followed by a control message with colored buttons
 - Publish now · Schedule · Reject · Ban submitter
@@ -119,6 +124,7 @@ Everything is configured in `.env`. See [`.env.example`](.env.example) for a ful
 | `USER_LANGUAGE` | `auto` | Language submitters see: `auto` follows their Telegram app, or fix it to `zh` / `en` |
 | `REVIEW_TOPICS` | `false` | Topic mode in the review group: the group needs topics enabled, and the bot must be an admin allowed to manage topics |
 | `USER_TOPICS` | `false` | Topic mode in private chats: enable topic mode for the bot in @BotFather first |
+| `MSG_WINDOW_DAYS` | `3` | `/msg`: days after a submission is published or rejected during which messaging stays open; always open during review |
 | `LEAVE_UNKNOWN_CHATS` | `true` | Leave any other group or channel the bot is added to; `false` stays but never responds. The publishing channel and its linked discussion group (detected at startup) are always kept |
 | `TZ` | `Asia/Shanghai` | Time zone for scheduling and for what counts as "today" in stats |
 | `SIGN_TEMPLATE` | depends on `LANGUAGE`: `Submitted by {name}` / `投稿人：{name}` | Signature for signed posts; `{name}` becomes a link to the submitter |
@@ -149,6 +155,7 @@ Everything is configured in `.env`. See [`.env.example`](.env.example) for a ful
 | Edit the original message with Telegram's "Edit" | Changes the submission until it has been reviewed: text, formatting, or even the image |
 | `/edit new content` | Only works as a **reply** to your submission (or the bot's message about it); without a reply nothing is changed |
 | `/edit` (as a reply) | Shows the current content with formatting, so you can copy and change it |
+| `/msg message` | Message the reviewers: **reply** to the reviewer's message or your submission. Replying to the reviewer without `/msg` gets a reminder |
 | `/me` | Your submission stats |
 
 ### Admins (review group)
@@ -161,6 +168,7 @@ Use the commands below by **replying** to a submission's preview or control mess
 |---|---|
 | `/edit new content` | Changes the text or caption, keeping its formatting, and posts a new preview. The original is kept |
 | `/edit` | Shows the current content with formatting |
+| `/msg message` | Message the submitter as “Reviewer”; also works as a reply to a relayed submitter message |
 | `/no [reason]` | Rejects the submission; the reason is sent to the submitter |
 | `/ban [reason]` | Bans the submitter and rejects all their open submissions |
 | `/unban <user ID>` | Lifts a ban |
@@ -203,6 +211,7 @@ The tests need no token and no network access:
 .venv/bin/python tests/test_i18n.py       # unit tests: every text exists in both languages
 .venv/bin/python tests/live_test.py       # end-to-end: runs the real bot against a mock Bot API server (~1 minute)
 .venv/bin/python tests/live_topics_test.py  # end-to-end: topic mode (~10 seconds)
+.venv/bin/python tests/live_msg_test.py     # end-to-end: /msg edge cases (~10 seconds)
 ```
 
 ### Project layout

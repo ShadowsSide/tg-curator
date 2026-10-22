@@ -65,6 +65,7 @@ T: dict[str, dict[str, str]] = {
             "<b>修改投稿</b>（审核结果出来之前都可以改）：\n"
             "· 直接用 Telegram 的“编辑”修改你发出的那条消息，机器人会自动同步（换图也可以）\n"
             "· 或者<b>回复</b>你的投稿，发送 <code>/edit 新内容</code>；回复时只发 /edit 会把当前内容发给你，方便复制修改\n\n"
+            "<b>和审核员沟通</b>：回复审核员的消息或你的投稿，发送 <code>/msg 内容</code>\n\n"
             "/me 查看我的投稿统计"
         ),
         "en": (
@@ -76,6 +77,8 @@ T: dict[str, dict[str, str]] = {
             "· Use Telegram's “Edit” on the message you sent; the bot syncs it automatically (you can even swap the image)\n"
             "· Or <b>reply</b> to your submission with <code>/edit new content</code>; replying with just /edit sends "
             "you the current content so you can copy and change it\n\n"
+            "<b>Talking to the reviewers</b>: reply to their message or your submission with "
+            "<code>/msg message</code>\n\n"
             "/me shows your submission stats"
         ),
     },
@@ -308,8 +311,8 @@ T: dict[str, dict[str, str]] = {
 
     # ---------- 审核：命令 ----------
     "review_help": {
-        "zh": '🛠 <b>审核群命令</b>\n/stats 发送最新审核统计\n/queue 定时发布队列\n/active [天数] 投稿人活跃度排行（默认 30 天）\n/user &lt;用户ID&gt; 查看某位投稿人\n\n<b>处理投稿</b>（回复投稿的预览或控制消息使用；开启话题模式时，在投稿的话题里直接发送即可）\n/edit 新内容 —— 替换正文或说明文字，格式原样保留\n/edit —— 不带内容：把当前文字（含格式）发出来，方便复制后修改\n/no [理由] —— 拒绝，理由会发给投稿人\n/ban [理由] —— 封禁投稿人，并自动拒绝其所有未处理来稿\n\n<b>按用户处理</b>\n/ban &lt;用户ID&gt; [理由] · /unban &lt;用户ID&gt;',
-        "en": "🛠 <b>Review group commands</b>\n/stats post the latest review summary\n/queue scheduled posts\n/active [days] contributor ranking (default 30 days)\n/user &lt;user ID&gt; show one contributor\n\n<b>Handling a submission</b> (reply to its preview or control message; with topic mode on, just send it inside the submission's topic)\n/edit new content — replace the text or caption, keeping formatting\n/edit — on its own: show the current text with formatting so you can copy it\n/no [reason] — reject; the reason is sent to the submitter\n/ban [reason] — ban the submitter and reject all their open submissions\n\n<b>By user</b>\n/ban &lt;user ID&gt; [reason] · /unban &lt;user ID&gt;",
+        "zh": '🛠 <b>审核群命令</b>\n/stats 发送最新审核统计\n/queue 定时发布队列\n/active [天数] 投稿人活跃度排行（默认 30 天）\n/user &lt;用户ID&gt; 查看某位投稿人\n\n<b>处理投稿</b>（回复投稿的预览或控制消息使用；开启话题模式时，在投稿的话题里直接发送即可）\n/edit 新内容 —— 替换正文或说明文字，格式原样保留\n/edit —— 不带内容：把当前文字（含格式）发出来，方便复制后修改\n/msg 内容 —— 发消息给投稿人（以“审核员”身份），投稿人也可以用 /msg 回复\n/no [理由] —— 拒绝，理由会发给投稿人\n/ban [理由] —— 封禁投稿人，并自动拒绝其所有未处理来稿\n\n<b>按用户处理</b>\n/ban &lt;用户ID&gt; [理由] · /unban &lt;用户ID&gt;',
+        "en": "🛠 <b>Review group commands</b>\n/stats post the latest review summary\n/queue scheduled posts\n/active [days] contributor ranking (default 30 days)\n/user &lt;user ID&gt; show one contributor\n\n<b>Handling a submission</b> (reply to its preview or control message; with topic mode on, just send it inside the submission's topic)\n/edit new content — replace the text or caption, keeping formatting\n/edit — on its own: show the current text with formatting so you can copy it\n/msg message — message the submitter (shown as “Reviewer”); they can answer with /msg too\n/no [reason] — reject; the reason is sent to the submitter\n/ban [reason] — ban the submitter and reject all their open submissions\n\n<b>By user</b>\n/ban &lt;user ID&gt; [reason] · /unban &lt;user ID&gt;",
     },
     "reply_to_submission": {
         "zh": "请回复投稿的预览或控制消息。",
@@ -356,6 +359,45 @@ T: dict[str, dict[str, str]] = {
     "not_banned": {"zh": "用户 <code>{uid}</code> 没有被封禁。", "en": "User <code>{uid}</code> is not banned."},
     "unbanned_reply": {"zh": "✅ 已解除封禁 <code>{uid}</code>。", "en": "✅ Unbanned <code>{uid}</code>."},
 
+    # ---------- 沟通（/msg） ----------
+    "msg_from_reviewer": {"zh": "💬 审核员：", "en": "💬 Reviewer:"},
+    "msg_from_submitter": {"zh": "💬 投稿人：", "en": "💬 Submitter:"},
+    "msg_sent_to_user": {"zh": "✅ 已发送给投稿人", "en": "✅ Sent to the submitter"},
+    "msg_sent_to_review": {"zh": "✅ 已发送给审核员", "en": "✅ Sent to the reviewers"},
+    "msg_usage_admin": {
+        "zh": "用法：回复投稿的预览或控制消息（话题模式下在投稿的话题里），发送 <code>/msg 内容</code>",
+        "en": "Usage: reply to a submission's preview or control message (or post inside its topic) with "
+              "<code>/msg message</code>",
+    },
+    "msg_usage_user": {
+        "zh": "请<b>回复</b>审核员的消息或你的投稿，发送 <code>/msg 内容</code>。",
+        "en": "Please <b>reply</b> to the reviewer's message or your submission with <code>/msg message</code>.",
+    },
+    "msg_empty": {"zh": "请在 /msg 后面写上要说的话。", "en": "Please write your message after /msg."},
+    "msg_not_submitted": {
+        "zh": "这条投稿还没有提交审核，暂时不能沟通。",
+        "en": "This submission hasn't been sent for review yet, so there's nobody to talk to.",
+    },
+    "msg_closed": {
+        "zh": "这条投稿的审核已结束超过 {days} 天，沟通已关闭。",
+        "en": "The review of this submission ended more than {days} day(s) ago, so messaging is closed.",
+    },
+    "msg_undelivered": {
+        "zh": "⚠️ 没能送达投稿人（可能已屏蔽机器人）：{error}",
+        "en": "⚠️ Couldn't reach the submitter (they may have blocked the bot): {error}",
+    },
+    "msg_failed": {"zh": "⚠️ 发送失败：{error}", "en": "⚠️ Failed to send: {error}"},
+    "msg_hint_user": {
+        "zh": "要回复审核员，请回复这条消息并以 <code>/msg</code> 开头，例如 <code>/msg 好的，我马上补充</code>。",
+        "en": "To answer the reviewer, reply to their message starting with <code>/msg</code>, e.g. "
+              "<code>/msg OK, I'll add it</code>.",
+    },
+    "msg_hint_admin": {
+        "zh": "要回复投稿人，请回复这条消息并以 <code>/msg</code> 开头。",
+        "en": "To answer the submitter, reply to this message starting with <code>/msg</code>.",
+    },
+    "ctrl_msgs": {"zh": "💬 沟通 {n} 条", "en": "💬 Messages: {n}"},
+
     # ---------- 统计 ----------
     "stats": {
         "zh": "接受 {accepted} 拒绝 {rejected} 待审核 {pending}\n"
@@ -394,16 +436,18 @@ T: dict[str, dict[str, str]] = {
 
 # 命令菜单（/ 后面弹出的列表），按语言注册
 PRIVATE_COMMANDS = {
-    "zh": [("start", "开始投稿"), ("edit", "修改投稿（回复你的投稿）新内容"), ("me", "我的投稿统计"), ("help", "使用说明")],
+    "zh": [("start", "开始投稿"), ("edit", "修改投稿（回复你的投稿）新内容"), ("msg", "给审核员留言（回复消息）内容"), ("me", "我的投稿统计"), ("help", "使用说明")],
     "en": [("start", "Start submitting"), ("edit", "Edit a submission (reply to it) new content"),
-           ("me", "My submission stats"), ("help", "How to use")],
+           ("msg", "Message the reviewers (reply) text"), ("me", "My submission stats"), ("help", "How to use")],
 }
 REVIEW_COMMANDS = {
     "zh": [("stats", "审核统计"), ("queue", "定时发布队列"), ("active", "投稿人活跃度"),
-           ("edit", "修改稿件（回复投稿）新内容"), ("no", "拒绝投稿（回复投稿）[理由]"),
+           ("edit", "修改稿件（回复投稿）新内容"), ("msg", "给投稿人发消息（回复投稿）内容"),
+           ("no", "拒绝投稿（回复投稿）[理由]"),
            ("ban", "封禁投稿人并拒绝其来稿 [理由]"), ("unban", "解除封禁"), ("user", "查看投稿人"), ("help", "命令说明")],
     "en": [("stats", "Review summary"), ("queue", "Scheduled posts"), ("active", "Contributor activity"),
-           ("edit", "Edit a submission (reply to it) new content"), ("no", "Reject a submission (reply to it) [reason]"),
+           ("edit", "Edit a submission (reply to it) new content"), ("msg", "Message the submitter (reply) text"),
+           ("no", "Reject a submission (reply to it) [reason]"),
            ("ban", "Ban the submitter and reject their posts [reason]"), ("unban", "Lift a ban"),
            ("user", "Show a contributor"), ("help", "Command help")],
 }

@@ -447,6 +447,60 @@ async def scenario():
     e = await wait_for(lambda e: is_send(e, "sendMessage", USER, "已经发布，不能修改"), since=n)
     check("/edit by reply after publish → refused with reason", e)
 
+    # 7g. 审核员 ↔ 投稿人沟通（/msg）
+    n = len(log); src_m = pm("需要沟通的投稿")
+    pr = await wait_for(lambda e: is_send(e, "sendMessage", USER, "请选择投稿方式"), since=n)
+    n = len(log); cb("u:sign:8", USER, USER)  # 内部编号，只在按钮数据里用
+    ctrl_m = await wait_for(lambda e: is_send(e, "sendMessage", REVIEW, CTRL), since=n)
+
+    ask = "/msg 请补充出处 链接"
+    n = len(log); gm(ask, reply_to=ctrl_m["result"]["message_id"],
+                     entities=[{"type": "text_link", "offset": 11, "length": 2, "url": "https://ex.am/src"}])
+    assert ask.encode("utf-16-le")[11 * 2:13 * 2].decode("utf-16-le") == "链接"
+    to_user = await wait_for(lambda e: is_send(e, "sendMessage", USER, "审核员"), since=n)
+    sent_ok = await wait_for(lambda e: is_send(e, "sendMessage", REVIEW, "已发送给投稿人"), since=n)
+    label = "💬 审核员："
+    want = [{"type": "bold", "offset": 0, "length": u16(label)},
+            {"type": "text_link", "offset": u16(label + "\n请补充出处 "), "length": 2, "url": "https://ex.am/src"}]
+    check("reviewer /msg → submitter gets it as “审核员”, formatting kept, under their submission",
+          to_user and sent_ok and to_user["params"]["text"] == label + "\n请补充出处 链接"
+          and norm(to_user["params"].get("entities")) == norm(want)
+          and to_user["params"]["reply_parameters"]["message_id"] == pr["result"]["message_id"]
+          and "Admin" not in to_user["params"]["text"], to_user and to_user["params"])
+    cnt = await wait_for(lambda e: e["method"] == "editMessageText" and "💬 沟通 1 条" in e["params"].get("text", ""), since=n)
+    check("control message shows message count", cnt)
+
+    n = len(log); gm("/msg 没回复")
+    e = await wait_for(lambda e: is_send(e, "sendMessage", REVIEW, "用法"), since=n)
+    check("reviewer /msg without reply → usage", e)
+
+    relay_id = to_user["result"]["message_id"]
+    n = len(log); pm("直接回复不带命令", reply_to_message=reply_to(relay_id, by_bot=True))
+    hint = await wait_for(lambda e: is_send(e, "sendMessage", USER, "<code>/msg</code>"), since=n)
+    new_sub = await wait_for(lambda e: is_send(e, "sendMessage", USER, "请选择投稿方式"), timeout=0.5, since=n)
+    check("submitter plain reply to reviewer → hint, not treated as a new submission", hint and not new_sub)
+
+    n = len(log); pm("/msg 出处是官网", reply_to_message=reply_to(relay_id, by_bot=True))
+    to_rev = await wait_for(lambda e: is_send(e, "sendMessage", REVIEW, "出处是官网"), since=n)
+    ok = await wait_for(lambda e: is_send(e, "sendMessage", USER, "已发送给审核员"), since=n)
+    check("submitter /msg by reply → reviewers get it under the control message",
+          to_rev and ok and to_rev["params"]["text"].startswith("💬 投稿人：")
+          and to_rev["params"]["reply_parameters"]["message_id"] == ctrl_m["result"]["message_id"])
+
+    n = len(log); gm("直接回复投稿人", reply_to=to_rev["result"]["message_id"])
+    e = await wait_for(lambda e: is_send(e, "sendMessage", REVIEW, "要回复投稿人"), since=n)
+    check("reviewer plain reply to a relayed message → hint", e)
+    n = len(log); gm("/msg 收到，谢谢", reply_to=to_rev["result"]["message_id"])
+    e = await wait_for(lambda e: is_send(e, "sendMessage", USER, "收到，谢谢"), since=n)
+    check("reviewer /msg replying to the relayed message reaches the submitter", e)
+
+    n = len(log); pm("/msg 不回复")
+    e = await wait_for(lambda e: is_send(e, "sendMessage", USER, "请<b>回复</b>审核员的消息"), since=n)
+    check("submitter /msg without reply → asked to reply", e)
+    n = len(log); pm("/msg 回复原投稿也行", reply_to_message=reply_to(src_m, by_bot=False))
+    e = await wait_for(lambda e: is_send(e, "sendMessage", REVIEW, "回复原投稿也行"), since=n)
+    check("submitter /msg replying to their own submission also works", e)
+
     # 8. 等后台任务：定时发布（调度器每 15 秒检查）+ 每分钟统计提醒
     print("… waiting for scheduler + reminder loops (up to ~100s)", flush=True)
     e = await wait_for(lambda e: is_send(e, "sendMessage", CHANNEL, "Hello"), timeout=100, since=0)

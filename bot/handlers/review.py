@@ -14,7 +14,7 @@ from ..config import Settings
 from ..core import NO_PREVIEW, Core, explicit_reply, mention, topic_of
 from ..i18n import t
 from ..keyboards import ReviewCB
-from ..render import dump_link_preview, user_link
+from ..render import dump_link_preview, message_item, user_link
 from ..timeutil import parse_time
 
 MAX_REASON = 500
@@ -173,6 +173,21 @@ def build_router(settings: Settings) -> Router:
         err = await core.edit(sid, m.from_user.full_name, body, entities, dump_link_preview(m.link_preview_options))
         await m.reply(err or t(core.lang, "admin_edited"))
 
+    @router.message(Command("msg"))
+    async def msg_cmd(m: Message, core: Core) -> None:
+        """审核员给投稿人发消息：回复投稿（或在投稿的话题里）发送 /msg 内容。"""
+        body, entities = ent.strip_command(m.text or m.caption or "", ent.dump(m.entities or m.caption_entities))
+        sid = await _replied_sid(m, core)
+        if sid is None:
+            await m.reply(t(core.lang, "reply_to_submission" if explicit_reply(m) else "msg_usage_admin"))
+            return
+        item = message_item(m, body, entities)
+        if item is None:
+            await m.reply(t(core.lang, "msg_empty"))
+            return
+        err = await core.relay_to_user(sid, m.from_user, item)
+        await m.reply(err or t(core.lang, "msg_sent_to_user"))
+
     @router.message(Command("ban"))
     async def ban_cmd(m: Message, command: CommandObject, core: Core) -> None:
         args = command.args or ""
@@ -245,5 +260,12 @@ def build_router(settings: Settings) -> Router:
             await m.bot.delete_message(m.chat.id, prompt_id)
         except TelegramAPIError:
             pass
+
+    @router.message(F.reply_to_message)
+    async def plain_reply(m: Message, core: Core) -> None:
+        """直接回复了投稿人转来的消息但没写 /msg：提醒一下，免得以为对方收到了。"""
+        reply = explicit_reply(m)
+        if reply and await core.db.is_review_relay_message(reply.message_id):
+            await m.reply(t(core.lang, "msg_hint_admin"))
 
     return router

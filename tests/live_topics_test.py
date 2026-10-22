@@ -114,6 +114,18 @@ async def scenario():
     pv = await wait_for(lambda e: is_send(e, "sendMessage", REVIEW, "管理员定稿"), since=n)
     check("admin /edit inside the review topic (no reply)", pv and int(pv["params"]["message_thread_id"]) == t_r2)
 
+    # ---------- 5b. /msg 沟通走各自的话题 ----------
+    n = len(log); topic_msg(REVIEW, t_r2, "/msg 话题里的提问", ADMIN)
+    q = await wait_for(lambda e: is_send(e, "sendMessage", USER, "话题里的提问"), since=n)
+    check("reviewer /msg inside the review topic → arrives in the submitter's topic",
+          q and int(q["params"].get("message_thread_id") or 0) == own)
+    n = len(log)
+    topic_msg(USER, own, "/msg 话题里的回答", USER, reply_to_message={
+        "message_id": q["result"]["message_id"], "date": now(), "chat": lt.chat(USER),
+        "from": {"id": 1, "is_bot": True, "first_name": "TestBot"}})
+    a = await wait_for(lambda e: is_send(e, "sendMessage", REVIEW, "话题里的回答"), since=n)
+    check("submitter /msg reply → arrives in the review topic", a and int(a["params"]["message_thread_id"]) == t_r2)
+
     # ---------- 6. 在话题里点发布 → 发到频道，通知进投稿人话题，审核话题 ✅ 并关闭 ----------
     n = len(log); topic_cb("r:pub:2:0", REVIEW, ADMIN, ctrl2["result"]["message_id"], t_r2)
     post = await wait_for(lambda e: is_send(e, "sendMessage", CHANNEL, "管理员定稿"), since=n)

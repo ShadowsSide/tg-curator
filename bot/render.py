@@ -68,6 +68,20 @@ def extract_item(m: Message) -> dict[str, Any] | None:
     }
 
 
+def message_item(m: Message, text: str, entities: list[ent.Entity]) -> dict[str, Any] | None:
+    """/msg 要转达的内容：文字（去掉命令后的部分，格式保留），或一张带说明的图片 / 一个文件等。"""
+    item = extract_item(m)
+    if item is None:
+        return None
+    item.pop("msg_id", None)
+    if item["type"] == "text" and not text.strip():
+        return None
+    item["text"], item["entities"] = text, entities
+    if item["type"] == "text":
+        item["link_preview"] = dump_link_preview(m.link_preview_options)
+    return item
+
+
 def caption_index(items: list[dict[str, Any]]) -> int:
     """相册里承载说明文字（和落款）的那一项：第一条有文字的，没有就是第一条。"""
     return next((i for i, it in enumerate(items) if it.get("text")), 0)
@@ -201,6 +215,8 @@ def control_text(sub: Submission, user: User | None, tz: ZoneInfo, post_url: str
     if sub.spoilerable:
         lines.append(t(lang, "ctrl_spoiler", state=("🙈 " if sub.spoiler else "") + on_off(lang, sub.spoiler)))
     lines.append(t(lang, "ctrl_silent", state=("🔕 " if sub.silent else "") + on_off(lang, sub.silent)))
+    if sub.msg_count:
+        lines.append(t(lang, "ctrl_msgs", n=sub.msg_count))
 
     by = html.escape(sub.reviewer_name or "")
     status = sub.status

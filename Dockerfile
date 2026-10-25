@@ -1,6 +1,6 @@
 # python:3.12-slim-bookworm 是多架构镜像（linux/amd64、linux/arm64），
 # 在哪种机器上 build 就得到对应架构；也可以用 buildx 一次构建两种。
-FROM python:3.12-slim-bookworm
+FROM python:3.15-slim-bookworm
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \

@@ -193,6 +193,23 @@ Use the commands below by **replying** to a submission's preview or control mess
 
 `/ban` and `/unban` also accept a user ID (`/ban <user ID> reason`) for users with nothing under review, or to ban someone in advance. Each scheduled post in `/queue` has a “view” link that jumps to its control message.
 
+## Known limitations and risks
+
+**Review actions**
+- **More taps**: Publish now, Reject and Ban always need a second tap, and Reject first asks for a reason by default (Reject → reason → Confirm, three taps). Set `REJECT_TEMPLATES=` to skip the reason; the confirmation itself can't be turned off
+- **The confirm panel can be reset**: if the control message refreshes while you're about to confirm (the submitter edits, someone sends `/msg`, …), the buttons go back to normal and you need to tap again. Nothing runs by accident
+- **Changing `REJECT_TEMPLATES` can shift old panels**: buttons store the reason's position. After reordering the reasons and restarting, a panel opened before the restart picks the reason by the new order; an out-of-range position means “No reason”. Finish any rejection in progress before changing it
+- **Reasons can't contain `|`**: it's the separator
+- **The review group hits rate limits sooner**: the confirm and reason panels each edit the control message once more, so with heavy review traffic Telegram's limits come sooner. The bot waits and retries automatically, but actions get slower
+
+**Spam checks**
+- **Chinese keywords can over-match**: Chinese has no word boundaries, so keywords match as substrings (e.g. “微信” also matches “微信公众号推荐”). That's why the default only flags (`SPAM_ACTION=flag`); watch the flags for a while before switching to `block`
+- **Blocking doesn't tell the submitter which word matched**: so it can't be dodged on purpose, but the submitter may not know what to change
+- **Only URLs and hyperlinks count as links**: `@usernames`, emails and phone numbers don't
+- **Edits only update the flags, never block**: even with `SPAM_ACTION=block`, adding a keyword by editing after submitting just shows a flag for reviewers
+- **The cooldown only applies to submitters with nothing published yet**: one published post lifts it; it counts from the last submission, rejected ones included
+- **Bad values stop the bot from starting**: a non-number in `MAX_LINKS` or `NEW_USER_COOLDOWN_MINUTES`, or a `SPAM_ACTION` other than `flag` / `block`, makes the bot exit with an error at startup
+
 ## FAQ
 
 **Custom (premium) emoji turn into regular emoji in the channel. Why?**
@@ -228,11 +245,18 @@ The tests need no token and no network access:
 .venv/bin/python tests/test_i18n.py       # unit tests: every text exists in both languages
 .venv/bin/python tests/test_errors.py     # unit tests: business logic returns notice codes, translated only when shown
 .venv/bin/python tests/test_structure.py  # unit tests: handlers don't touch the database; core modules don't redefine methods
+.venv/bin/python tests/test_confirm.py    # unit tests: confirm panel; bots are never reviewers
+.venv/bin/python tests/test_reject_templates.py  # unit tests: reject reasons parsing and panel
+.venv/bin/python tests/test_spam.py       # unit tests: keywords, link counting and whitelist
 .venv/bin/python tests/live_test.py       # end-to-end: runs the real bot against a mock Bot API server (~1 minute)
 .venv/bin/python tests/live_topics_test.py  # end-to-end: topic mode (~10 seconds)
 .venv/bin/python tests/live_msg_test.py     # end-to-end: /msg edge cases (~10 seconds)
 .venv/bin/python tests/live_flood_test.py   # end-to-end: retries and rescheduling under rate limits (~20 seconds)
-.venv/bin/python tests/live_perm_test.py    # end-to-end: reviewer permissions (~10 seconds)
+.venv/bin/python tests/live_perm_test.py    # end-to-end: reviewer permissions (~20 seconds)
+.venv/bin/python tests/live_confirm_test.py   # end-to-end: confirmation, default reject reasons (~15 seconds)
+.venv/bin/python tests/live_reject_test.py    # end-to-end: custom reject reasons (~10 seconds)
+.venv/bin/python tests/live_spam_test.py      # end-to-end: spam flags, re-check on edit, new-user cooldown (~10 seconds)
+.venv/bin/python tests/live_spam_block_test.py  # end-to-end: spam block mode (~10 seconds)
 ```
 
 ### Project layout

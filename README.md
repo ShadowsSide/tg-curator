@@ -191,6 +191,23 @@ docker compose cp bot:/app/data/bot.db ./backup-$(date +%F).db   # 备份数据�
 
 `/ban` 和 `/unban` 也可以直接写用户 ID（`/ban <用户ID> 理由`），用来处理没有投稿在审核中的用户，或预先封禁。`/queue` 里每条定时投稿后面有“查看”链接，点开即跳到它的控制消息。
 
+## 已知限制与风险
+
+**审核操作**
+- **点击次数变多**：立即发布、拒绝、封禁都要二次确认，拒绝默认还要先选理由（拒绝 → 选理由 → 确认，共三次点击）。不想选理由可以设 `REJECT_TEMPLATES=`，二次确认不能关闭
+- **确认面板可能被冲掉**：点了按钮还没确认时，如果投稿人改稿、有人发 `/msg` 等让控制消息刷新，按钮会变回原样，需要重新点。不会误执行
+- **改了 `REJECT_TEMPLATES` 后旧面板可能对应到别的理由**：按钮里记的是理由的序号。调整理由顺序并重启后，之前打开还没点完的面板会按新顺序取理由；序号超出范围时按“不附理由”处理。改配置前最好先处理完正在拒绝的投稿
+- **理由里不能有 `|`**：它是分隔符
+- **审核群更容易被限流**：确认面板、理由面板都会多编辑一次控制消息，审核量大时会更早碰到 Telegram 的频率限制。机器人会自动等待重试，但操作会变慢
+
+**防垃圾**
+- **中文关键词会误伤**：中文没有词边界，只能按“包含”匹配，例如关键词“微信”也会命中“微信公众号推荐”。所以默认只标记（`SPAM_ACTION=flag`）；改成 `block` 前请先观察一段时间的标记结果
+- **拦截时不告诉投稿人命中了哪个词**：避免照着绕过，但投稿人可能不知道该改哪里
+- **只检查网址和超链接**：`@用户名`、邮箱、电话号码不算链接
+- **改稿只更新标记，不拦截**：即使 `SPAM_ACTION=block`，投稿后再改稿加进关键词也只会出现标记，由审核员判断
+- **冷却只针对还没有稿件发布过的人**：只要发布过一条就不再受限；按“上次提交时间”计算，被拒绝的投稿也算
+- **配置写错会启动失败**：`MAX_LINKS`、`NEW_USER_COOLDOWN_MINUTES` 不是数字，或 `SPAM_ACTION` 不是 `flag` / `block` 时，机器人启动会报错退出
+
 ## 常见问题
 
 **自定义 emoji（会员表情）发到频道后变成了普通 emoji？**
@@ -226,11 +243,18 @@ DB_PATH=./data/bot.db .venv/bin/python -m bot
 .venv/bin/python tests/test_i18n.py       # 单元测试：中英文文案齐全、占位符一致
 .venv/bin/python tests/test_errors.py     # 单元测试：业务层只返回提示代码，翻译在显示时进行
 .venv/bin/python tests/test_structure.py  # 单元测试：处理函数不直接访问数据库，core 各模块不重复定义方法
+.venv/bin/python tests/test_confirm.py    # 单元测试：确认面板、机器人不算审核员
+.venv/bin/python tests/test_reject_templates.py  # 单元测试：拒绝理由的解析与面板
+.venv/bin/python tests/test_spam.py       # 单元测试：关键词、链接计数与白名单
 .venv/bin/python tests/live_test.py       # 端到端测试：启动模拟的 Bot API 服务器，运行真实的机器人进程（约 1 分钟）
 .venv/bin/python tests/live_topics_test.py  # 端到端测试：话题模式（约 10 秒）
 .venv/bin/python tests/live_msg_test.py     # 端到端测试：/msg 沟通的边界情况（约 10 秒）
 .venv/bin/python tests/live_flood_test.py   # 端到端测试：被限流时的自动重试与改期（约 20 秒）
-.venv/bin/python tests/live_perm_test.py    # 端到端测试：审核员权限（约 10 秒）
+.venv/bin/python tests/live_perm_test.py    # 端到端测试：审核员权限（约 20 秒）
+.venv/bin/python tests/live_confirm_test.py   # 端到端测试：二次确认、默认拒绝理由（约 15 秒）
+.venv/bin/python tests/live_reject_test.py    # 端到端测试：自定义拒绝理由（约 10 秒）
+.venv/bin/python tests/live_spam_test.py      # 端到端测试：防垃圾标记、改稿重新检查、新用户冷却（约 10 秒）
+.venv/bin/python tests/live_spam_block_test.py  # 端到端测试：防垃圾拦截模式（约 10 秒）
 ```
 
 ### 项目结构

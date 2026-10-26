@@ -2,7 +2,7 @@
 
 用法（项目根目录下）：python tests/live_perm_test.py
 以 REVIEWERS=admins,55 运行：管理员 7 和指定用户 55 可以审核，普通成员 99 和机器人不行。
-同时关闭二次确认（CONFIRM_ACTIONS=false），验证点一下就执行。约 10 秒。
+同时关闭二次确认和拒绝理由（CONFIRM_ACTIONS=false、REJECT_TEMPLATES=），验证和以前一样点一下就执行。约 10 秒。
 """
 import asyncio
 import os
@@ -106,6 +106,13 @@ async def scenario():
                            timeout=1, since=n)
     check("a bot that is a group admin is not a reviewer (button and command denied)", alert and denied and not acted)
 
+    # REJECT_TEMPLATES 为空 + 不要确认：和以前一样，点一下“拒绝”直接拒绝，不出理由面板
+    c5 = await submit("权限测试五", 5)
+    n = len(log); group_cb("r:reject:5:0", ADMIN, c5["result"]["message_id"])
+    told = await wait_for(lambda e: is_send(e, "sendMessage", USER, "未通过"), since=n)
+    panel = [e for e in log[n:] if e["method"] == "editMessageReplyMarkup"]
+    check("no REJECT_TEMPLATES + CONFIRM_ACTIONS=false: one tap rejects, no reason panel", told and not panel)
+
 
 if __name__ == "__main__":
-    asyncio.run(lt.main(scenario, {"REVIEWERS": "admins,55", "CONFIRM_ACTIONS": "false", "REMINDER_INTERVAL_MINUTES": "0"}))
+    asyncio.run(lt.main(scenario, {"REVIEWERS": "admins,55", "CONFIRM_ACTIONS": "false", "REJECT_TEMPLATES": "", "REMINDER_INTERVAL_MINUTES": "0"}))

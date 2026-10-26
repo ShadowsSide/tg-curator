@@ -16,7 +16,7 @@ from ..album import AlbumCollector
 from ..config import Settings
 from ..db import DB, Submission, User
 from ..i18n import normalize, t
-from ..keyboards import confirm_kb, control_kb, schedule_kb
+from ..keyboards import confirm_kb, control_kb, reasons_kb, schedule_kb
 from ..render import control_text, signature
 from ..timeutil import fmt_ts
 
@@ -190,9 +190,13 @@ class CoreBase:
     async def show_schedule_picker(self, sid: int) -> None:
         await self._swap_control_kb(sid, schedule_kb(sid, self.s.schedule_presets, self.s.tz, self.lang))
 
-    async def show_confirm(self, sid: int, action: str) -> None:
-        """发布 / 拒绝 / 封禁的二次确认：把控制消息的按钮换成“确认 / 返回”。"""
-        await self._swap_control_kb(sid, confirm_kb(sid, action, self.lang))
+    async def show_confirm(self, sid: int, action: str, v: int = 0) -> None:
+        """发布 / 拒绝 / 封禁的二次确认：把控制消息的按钮换成“确认 / 返回”。拒绝时 v 是选的理由。"""
+        detail = self.s.reject_template(v) if action == "reject" else None
+        await self._swap_control_kb(sid, confirm_kb(sid, action, self.lang, v, detail))
+
+    async def show_reject_reasons(self, sid: int) -> None:
+        await self._swap_control_kb(sid, reasons_kb(sid, self.s.reject_templates, self.lang))
 
     async def _swap_control_kb(self, sid: int, kb: InlineKeyboardMarkup) -> None:
         """只换控制消息的按钮（定时面板、确认面板），文字不变；点“返回”时由 refresh_control 恢复。"""

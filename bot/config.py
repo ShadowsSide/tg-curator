@@ -22,6 +22,10 @@ def _chat_id(value: str) -> int | str:
     return int(value) if value.lstrip("-").isdigit() else value
 
 
+def _templates(value: str) -> tuple[str, ...]:
+    return tuple(x.strip() for x in value.split("|") if x.strip())
+
+
 def _quiet_hours(value: str) -> tuple[int, int] | None:
     if not value:
         return None
@@ -56,6 +60,11 @@ class Settings:
     msg_window_days: int  # /msg 沟通：审核结束（发布/拒绝）后还能沟通的天数
     reviewers: str  # 谁可以审核：admins（默认）/ all / 用户 ID，可组合，见 permissions.py
     confirm_actions: bool  # 发布、拒绝、封禁按钮需要再点一次确认，防止误触
+    reject_templates: tuple[str, ...]  # 点“拒绝”后可选的理由；为空则不显示理由面板
+
+    def reject_template(self, index: int) -> str | None:
+        """理由面板上的第 index 个理由（从 1 开始）；0 或超出范围 = 不附理由。"""
+        return self.reject_templates[index - 1] if 0 < index <= len(self.reject_templates) else None
 
     def in_quiet_hours(self, hour: int) -> bool:
         if not self.quiet_hours:
@@ -78,6 +87,7 @@ def load_settings() -> Settings:
     # 落款没配置时用对应语言的默认值；配置成空字符串表示不要落款
     sign = os.environ.get("SIGN_TEMPLATE")
     anon = os.environ.get("ANON_SIGNATURE")
+    reasons = os.environ.get("REJECT_TEMPLATES")  # 同上：没配置用默认理由，配置成空字符串表示不要理由面板
     return Settings(
         bot_token=_env("BOT_TOKEN", required=True),
         channel_id=_chat_id(_env("CHANNEL_ID", required=True)),
@@ -106,4 +116,5 @@ def load_settings() -> Settings:
         msg_window_days=int(_env("MSG_WINDOW_DAYS", "3")),
         reviewers=_env("REVIEWERS", "admins"),
         confirm_actions=_bool(_env("CONFIRM_ACTIONS", "true")),
+        reject_templates=_templates(reasons if reasons is not None else t(language, "default_reject_templates")),
     )

@@ -65,15 +65,36 @@ async def scenario():
     post = await wait_for(lambda e: is_send(e, "sendMessage", CHANNEL, "确认测试 1"), since=n)
     check("Confirm publish → published to the channel", post)
 
-    # 4. 拒绝：第一下只出确认面板，确认后才拒绝并通知投稿人
+    # 4. 拒绝（三次点击）：拒绝 → 选理由 → 确认。默认理由随 LANGUAGE
     n = len(log); lt.cb("r:reject:2:0", REVIEW, ADMIN)
     kb = await markup_edit(c2, n)
+    b = buttons(kb) if kb else {}
+    check("Reject → reason panel (default reasons + No reason + Back)",
+          b.get("重复投稿") == "r:reason:2:1" and b.get("不附理由") == "r:reason:2:0" and b.get("« 返回") == "r:back:2:0"
+          and len(b) == 6, b)
+
+    n = len(log); lt.cb("r:reason:2:0", REVIEW, ADMIN)  # 不附理由 → 确认按钮上不带理由
+    kb = await markup_edit(c2, n)
+    check("No reason → plain confirm button", kb and buttons(kb).get("❌ 确认拒绝") == "r:reject_ok:2:0",
+          kb and buttons(kb))
+    n = len(log); lt.cb("r:back:2:0", REVIEW, ADMIN)
+    await wait_for(lambda e: e["method"] == "editMessageText"
+                   and str(e["params"].get("message_id")) == str(c2["result"]["message_id"]), since=n)
+
+    n = len(log); lt.cb("r:reject:2:0", REVIEW, ADMIN)
+    await markup_edit(c2, n)
+    n = len(log); lt.cb("r:reason:2:1", REVIEW, ADMIN)
+    kb = await markup_edit(c2, n)
     told = await wait_for(lambda e: is_send(e, "sendMessage", USER, "未通过"), timeout=1, since=n)
-    check("Reject → confirm panel, submitter not told yet",
-          kb and buttons(kb).get("❌ 确认拒绝") == "r:reject_ok:2:0" and not told, kb and buttons(kb))
-    n = len(log); lt.cb("r:reject_ok:2:0", REVIEW, ADMIN)
+    check("Pick a reason → confirm button shows it, submitter not told yet",
+          kb and buttons(kb).get("❌ 确认拒绝：重复投稿") == "r:reject_ok:2:1" and not told, kb and buttons(kb))
+    n = len(log); lt.cb("r:reject_ok:2:1", REVIEW, ADMIN)
     told = await wait_for(lambda e: is_send(e, "sendMessage", USER, "未通过"), since=n)
-    check("Confirm reject → rejected, submitter notified", told)
+    ctrl = await wait_for(lambda e: e["method"] == "editMessageText"
+                          and str(e["params"].get("message_id")) == str(c2["result"]["message_id"]), since=n)
+    check("Confirm → rejected; reason sent to submitter and shown on the control message",
+          told and "重复投稿" in told["params"]["text"] and ctrl and "重复投稿" in ctrl["params"]["text"],
+          told and told["params"]["text"])
 
     # 5. 封禁：第一下只出确认面板，确认后才封禁（并拒绝其未处理来稿）
     n = len(log); lt.cb("r:ban:3:0", REVIEW, ADMIN)

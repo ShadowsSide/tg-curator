@@ -71,9 +71,17 @@ def build_router(settings: Settings) -> Router:
         who = cq.from_user
         lang = core.lang
 
+        # 拒绝：先选理由（REJECT_TEMPLATES）；选好后当作“拒绝”继续往下走（确认面板或直接拒绝）
+        if action == "reject" and settings.reject_templates:
+            await core.show_reject_reasons(sid)
+            await cq.answer(t(lang, "toast_pick_reason"))
+            return
+        if action == "reason":
+            action = "reject"
+
         # 发布 / 拒绝 / 封禁：先显示确认面板，点“确认”（<动作>_ok）才真正执行
         if action in CONFIRMABLE and settings.confirm_actions:
-            await core.show_confirm(sid, action)
+            await core.show_confirm(sid, action, callback_data.v)
             await cq.answer(t(lang, "toast_confirm"))
             return
         action = action.removesuffix(CONFIRMED)
@@ -114,8 +122,11 @@ def build_router(settings: Settings) -> Router:
             err = await core.unschedule(sid)
             await cq.answer(err.text(lang) if err else t(lang, "toast_unscheduled"))
         elif action == "reject":
-            err = await core.reject(sid, who)
-            await cq.answer(err.text(lang) if err else t(lang, "toast_rejected"), show_alert=bool(err))
+            reason = settings.reject_template(callback_data.v)
+            err = await core.reject(sid, who, reason)
+            # 按钮提示最多 200 字符，理由是用户配置的，可能很长
+            ok = t(lang, "toast_rejected_with", reason=reason[:150]) if reason else t(lang, "toast_rejected")
+            await cq.answer(err.text(lang) if err else ok, show_alert=bool(err))
         elif action == "ban":
             sub = await core.get_submission(sid)
             if not sub:

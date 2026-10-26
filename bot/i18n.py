@@ -45,6 +45,10 @@ T: dict[str, dict[str, str]] = {
     "status_changed": {"zh": "状态已变化，请刷新", "en": "The status has changed, please refresh"},
     "default_sign": {"zh": "投稿人：{name}", "en": "Submitted by {name}"},
     "default_anon": {"zh": "匿名投稿", "en": "Anonymous submission"},
+    "default_reject_templates": {
+        "zh": "重复投稿|与频道主题不符|内容质量不足|含广告或推广",
+        "en": "Duplicate|Off-topic|Low quality|Advertising",
+    },
     "topic_anon": {"zh": "匿名", "en": "anonymous"},
 
     # ---------- 内容类型 ----------
@@ -262,6 +266,8 @@ T: dict[str, dict[str, str]] = {
     "btn_back": {"zh": "« 返回", "en": "« Back"},
     "btn_confirm_pub": {"zh": "✅ 确认发布", "en": "✅ Confirm publish"},
     "btn_confirm_reject": {"zh": "❌ 确认拒绝", "en": "❌ Confirm reject"},
+    "btn_confirm_with": {"zh": "{label}：{detail}", "en": "{label}: {detail}"},
+    "btn_no_reason": {"zh": "不附理由", "en": "No reason"},
     "btn_confirm_ban": {"zh": "🚫 确认封禁（同时拒绝其所有未处理来稿）",
                         "en": "🚫 Confirm ban (also rejects all their open submissions)"},
 
@@ -269,6 +275,11 @@ T: dict[str, dict[str, str]] = {
     "toast_state_locked": {"zh": "当前状态不能修改", "en": "Can't change this in the current state"},
     "toast_spoiler": {"zh": "剧透遮罩：{state}", "en": "Spoiler: {state}"},
     "toast_silent": {"zh": "静音发送：{state}", "en": "Silent: {state}"},
+    "toast_pick_reason": {
+        "zh": "选择拒绝理由（自定义理由请回复 /no 理由）",
+        "en": "Pick a reason (for your own, reply with /no reason)",
+    },
+    "toast_rejected_with": {"zh": "已拒绝：{reason}", "en": "Rejected: {reason}"},
     "toast_confirm": {"zh": "请再点一次确认，或返回", "en": "Tap again to confirm, or go back"},
     "toast_publishing": {"zh": "发布中…", "en": "Publishing…"},
     "toast_retrying": {"zh": "重试中…", "en": "Retrying…"},

@@ -32,6 +32,8 @@ class UserCB(CallbackData, prefix="u"):
 class ReviewCB(CallbackData, prefix="r"):
     a: str  # spoiler / silent / pub / sched / preset / custom / back / unsched / reject / ban / retry
     #         pub_ok / reject_ok / ban_ok：确认面板上的“确认”，见 CONFIRMABLE
+    #         reason：拒绝理由面板上选了一项
+    # v：preset = 定时的时间戳；reason / reject / reject_ok = 第几个拒绝理由（从 1 开始，0 = 不附理由）
     sid: int
     v: int = 0
 
@@ -96,8 +98,20 @@ def schedule_kb(sid: int, presets: tuple[str, ...], tz: ZoneInfo, lang: str) -> 
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
-def confirm_kb(sid: int, action: str, lang: str) -> InlineKeyboardMarkup:
+def confirm_kb(sid: int, action: str, lang: str, v: int = 0, detail: str | None = None) -> InlineKeyboardMarkup:
+    """二次确认面板。v 原样带到确认按钮上；detail 显示在确认按钮里（例如拒绝理由）。"""
+    label = t(lang, f"btn_confirm_{action}")
+    if detail:
+        label = t(lang, "btn_confirm_with", label=label, detail=detail)
     return InlineKeyboardMarkup(inline_keyboard=[
-        [_rb(t(lang, f"btn_confirm_{action}"), action + CONFIRMED, sid, style=CONFIRMABLE[action])],
+        [_rb(label, action + CONFIRMED, sid, v, style=CONFIRMABLE[action])],
         [_rb(t(lang, "btn_back"), "back", sid)],
     ])
+
+
+def reasons_kb(sid: int, reasons: tuple[str, ...], lang: str) -> InlineKeyboardMarkup:
+    """拒绝理由面板：每个理由一个按钮（v = 第几个，从 1 开始），再加“不附理由”和“返回”。"""
+    buttons = [_rb(r, "reason", sid, i) for i, r in enumerate(reasons, 1)]
+    rows = [buttons[i : i + 2] for i in range(0, len(buttons), 2)]
+    rows.append([_rb(t(lang, "btn_no_reason"), "reason", sid, 0), _rb(t(lang, "btn_back"), "back", sid)])
+    return InlineKeyboardMarkup(inline_keyboard=rows)

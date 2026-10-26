@@ -30,6 +30,7 @@ Built with Python 3.12 + [aiogram 3](https://github.com/aiogram/aiogram) + SQLit
 - Each submission gets a preview in the review group (exactly what the channel will show), followed by a control message with colored buttons
 - Publish now · Schedule · Reject · Ban submitter
 - Publishing options: 🙈 **spoiler** (blur the media) and 🔕 **silent** (subscribers get a notification without sound)
+- Pick a common reject reason with one tap (`REJECT_TEMPLATES`)
 - `/edit` to change a post, `/no reason` to reject, `/ban reason` to ban. Banning also rejects every open submission from that user
 - Safe against accidental taps: Publish now, Reject and Ban need a second tap to confirm (`CONFIRM_ACTIONS`)
 - Safe against double actions: if two admins press "Publish" at the same time, the post is still published only once
@@ -127,6 +128,7 @@ Everything is configured in `.env`. See [`.env.example`](.env.example) for a ful
 | `USER_TOPICS` | `false` | Topic mode in private chats: enable topic mode for the bot in @BotFather first |
 | `REVIEWERS` | `admins` | Who can review: `admins` = review group admins and owner; `all` = every member; or user IDs, combinable, e.g. `admins,123456`. Bots never count as reviewers |
 | `CONFIRM_ACTIONS` | `true` | Publish now, Reject and Ban need a second tap to confirm |
+| `REJECT_TEMPLATES` | 4 default reasons, depends on `LANGUAGE` | Reasons offered after tapping Reject, separated by `\|`, e.g. `Duplicate\|Ads`; set it to empty to skip the reason panel |
 | `MSG_WINDOW_DAYS` | `3` | `/msg`: days after a submission is published or rejected during which messaging stays open; always open during review |
 | `LEAVE_UNKNOWN_CHATS` | `true` | Leave any other group or channel the bot is added to; `false` stays but never responds. The publishing channel and its linked discussion group (detected at startup) are always kept |
 | `TZ` | `Asia/Shanghai` | Time zone for scheduling and for what counts as "today" in stats |
@@ -166,6 +168,8 @@ Everything is configured in `.env`. See [`.env.example`](.env.example) for a ful
 Buttons on the control message: **✅ Publish now**, **⏰ Schedule**, **❌ Reject**, **🚫 Ban submitter**, plus the **🙈 Spoiler** and **🔕 Silent** toggles.
 
 To avoid accidental taps, **Publish now, Reject and Ban** first switch to “Confirm / Back” buttons and only act on the second tap (turn off with `CONFIRM_ACTIONS=false`). Scheduling, retrying and the `/no` and `/ban` commands need no confirmation.
+
+**❌ Reject** first asks for a reason (`REJECT_TEMPLATES`; defaults: Duplicate, Off-topic, Low quality, Advertising; or “No reason”). The confirm button shows the chosen reason, and the reason is sent to the submitter. For a reason of your own, use `/no reason`.
 
 Use the commands below by **replying** to a submission's preview or control message (with review-group topics on, just send them inside the submission's topic). The bot never shows submission numbers, and no command needs one:
 

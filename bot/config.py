@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from zoneinfo import ZoneInfo
 
 from .i18n import LANGS, t
+from .spam import SpamRules
 
 
 def _env(name: str, default: str = "", *, required: bool = False) -> str:
@@ -60,6 +61,9 @@ class Settings:
     msg_window_days: int  # /msg 沟通：审核结束（发布/拒绝）后还能沟通的天数
     reviewers: str  # 谁可以审核：admins（默认）/ all / 用户 ID，可组合，见 permissions.py
     reject_templates: tuple[str, ...]  # 点“拒绝”后可选的理由；为空则不显示理由面板
+    spam_rules: SpamRules  # 关键词黑名单、链接上限，见 spam.py
+    spam_action: str  # 命中时：flag = 照常提交但在控制消息上标记；block = 拦下不让提交
+    new_user_cooldown_min: int  # 还没有稿件发布过的投稿人，两次投稿之间至少间隔几分钟；0 = 不限
 
     def reject_template(self, index: int) -> str | None:
         """理由面板上的第 index 个理由（从 1 开始）；0 或超出范围 = 不附理由。"""
@@ -115,4 +119,7 @@ def load_settings() -> Settings:
         msg_window_days=int(_env("MSG_WINDOW_DAYS", "3")),
         reviewers=_env("REVIEWERS", "admins"),
         reject_templates=_templates(reasons if reasons is not None else t(language, "default_reject_templates")),
+        spam_rules=SpamRules.parse(_env("SPAM_KEYWORDS"), int(_env("MAX_LINKS", "0")), _env("LINK_WHITELIST")),
+        spam_action=_lang(_env("SPAM_ACTION", "flag"), ("flag", "block"), "SPAM_ACTION"),
+        new_user_cooldown_min=max(int(_env("NEW_USER_COOLDOWN_MINUTES", "0")), 0),
     )

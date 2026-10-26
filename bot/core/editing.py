@@ -1,6 +1,7 @@
 """修改稿件（管理员 / 投稿人共用）：/edit、Telegram 自带编辑，格式由 entities 原样保留。"""
 from __future__ import annotations
 
+from .. import spam
 from ..db import OPEN_STATES, Submission
 from ..entities import u16len
 from ..errors import Notice, notice
@@ -61,6 +62,7 @@ class EditingMixin(CoreBase):
         ok = await self.db.update_if(
             sub.id, allowed, items=items, original_items=sub.original_items or sub.items,
             edited_by=editor, edited_at=now_ts(),
+            spam_flags=spam.check(items, self.s.spam_rules) or None,  # 改稿后可能加了广告链接，重新检查
         )
         if not ok:
             return notice("edit_race")

@@ -217,6 +217,11 @@ def control_text(sub: Submission, user: User | None, tz: ZoneInfo, post_url: str
     lines.append(t(lang, "ctrl_silent", state=("🔕 " if sub.silent else "") + on_off(lang, sub.silent)))
     if sub.msg_count:
         lines.append(t(lang, "ctrl_msgs", n=sub.msg_count))
+    for hit in sub.spam_flags or []:
+        if hit["k"] == "keyword":
+            lines.append(t(lang, "ctrl_spam_keyword", word=html.escape(hit["word"])))
+        elif hit["k"] == "links":
+            lines.append(t(lang, "ctrl_spam_links", n=hit["n"], max=hit["max"]))
 
     by = html.escape(sub.reviewer_name or "")
     status = sub.status

@@ -18,6 +18,7 @@
 - 投稿人可以选择**署名**或**匿名**；无论选哪种，管理员都能看到真实投稿人
 - **格式原样保留**：超链接、粗体、引用、剧透文字、代码、日期时间、emoji 等格式全部保留，发布到频道时不会走样
 - 投稿人在审核结果出来之前可以**修改稿件**：直接用 Telegram 自带的“编辑”，或者**回复**自己的投稿发送 `/edit`
+- **防垃圾**（可选）：关键词黑名单、链接数量上限（白名单域名不计）、新用户投稿冷却。命中时默认在控制消息上标记 ⚠️ 疑似垃圾，交给审核员判断；也可以直接拦下
 
 **审核员与投稿人沟通**
 - 双方都用 `/msg 内容`，回复对应的投稿或消息发送，由机器人转达。投稿人看到的发送者统一是“审核员”，双方都看不到对方账号
@@ -132,6 +133,11 @@ docker compose cp bot:/app/data/bot.db ./backup-$(date +%F).db   # 备份数据�
 | `SIGN_TEMPLATE` | 随 `LANGUAGE`：`投稿人：{name}` / `Submitted by {name}` | 署名落款，`{name}` 会替换成投稿人链接 |
 | `ANON_SIGNATURE` | 随 `LANGUAGE`：`匿名投稿` / `Anonymous submission` | 匿名落款，设为空则不加落款 |
 | `MAX_PENDING_PER_USER` | `5` | 每人同时最多保留几条未处理投稿 |
+| `SPAM_KEYWORDS` | 空 | 关键词黑名单，逗号分隔，不区分大小写；同时检查文字和链接地址 |
+| `MAX_LINKS` | `0` | 每条投稿最多几个链接，`0` 不限；`LINK_WHITELIST` 里的域名不计 |
+| `LINK_WHITELIST` | 空 | 不计入链接上限的域名，逗号分隔，子域名也算，如 `t.me,github.com` |
+| `SPAM_ACTION` | `flag` | 命中关键词或链接上限时：`flag` 照常提交并在控制消息上标记；`block` 拦下，投稿人修改后可重新提交 |
+| `NEW_USER_COOLDOWN_MINUTES` | `0` | 还没有稿件发布过的投稿人，两次提交之间至少间隔几分钟；`0` 不限 |
 | `ALBUM_DELAY` | `1.5` | 收集相册时等待的秒数 |
 | `SCHEDULE_PRESETS` | `09:00,12:00,18:00,21:00` | 定时面板里的快捷时间点 |
 | `DEFAULT_SILENT` | `false` | 新投稿是否默认静音发送 |
@@ -249,6 +255,7 @@ bot/
   errors.py       业务层返回的提示代码（显示时再翻译）
   guard.py        只处理私聊和审核群，自动退出其他群
   permissions.py  审核员权限（REVIEWERS）
+  spam.py         投稿防垃圾：关键词、链接上限
   ratelimit.py    被限流时自动等待重试
   keyboards.py    彩色内联按钮
   album.py        相册收集

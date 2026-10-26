@@ -112,6 +112,18 @@ T: dict[str, dict[str, str]] = {
     "btn_anon": {"zh": "🕶 匿名投稿", "en": "🕶 Anonymous"},
     "btn_cancel": {"zh": "取消", "en": "Cancel"},
     "invalid_sub": {"zh": "无效的投稿", "en": "Invalid submission"},
+    "spam_blocked_keyword": {
+        "zh": "🚫 投稿内容包含不允许的词语，请修改后重新选择投稿方式。",
+        "en": "🚫 Your submission contains words that aren't allowed. Edit it and choose a mode again.",
+    },
+    "spam_blocked_links": {
+        "zh": "🚫 投稿里的链接太多（最多 {max} 个），请修改后重新选择投稿方式。",
+        "en": "🚫 Too many links in your submission (at most {max}). Edit it and choose a mode again.",
+    },
+    "cooldown": {
+        "zh": "⏳ 投稿太频繁了，请 {m} 分钟后再提交。",
+        "en": "⏳ You're submitting too often. Please try again in {m} min.",
+    },
     "already_handled": {"zh": "这条投稿已经处理过了", "en": "This submission has already been handled"},
     "cannot_cancel": {"zh": "这条投稿已经提交，无法取消", "en": "This submission was already sent and can't be cancelled"},
     "cancelled": {"zh": "已取消。", "en": "Cancelled."},
@@ -418,6 +430,8 @@ T: dict[str, dict[str, str]] = {
         "en": "To answer the submitter, reply to this message starting with <code>/msg</code>.",
     },
     "ctrl_msgs": {"zh": "💬 沟通 {n} 条", "en": "💬 Messages: {n}"},
+    "ctrl_spam_keyword": {"zh": "⚠️ 疑似垃圾：含关键词「{word}」", "en": "⚠️ Possible spam: contains “{word}”"},
+    "ctrl_spam_links": {"zh": "⚠️ 疑似垃圾：{n} 个链接（上限 {max}）", "en": "⚠️ Possible spam: {n} links (limit {max})"},
 
     # ---------- 统计 ----------
     "stats": {

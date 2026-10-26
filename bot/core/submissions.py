@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from aiogram.types import Message, User as TgUser
 
+from .. import spam
 from ..errors import Notice, notice
 from ..i18n import t
 from ..keyboards import control_kb, user_choice_kb
@@ -69,12 +70,31 @@ class SubmissionsMixin(CoreBase):
         sub = await self.db.get(sid)
         if not sub or sub.user_id != user_id:
             return notice("invalid_sub")
-        if not await self.db.transition(sid, ("draft",), "pending", anonymous=int(anonymous), submitted_at=now_ts()):
+        err = await self._cooldown(user_id)
+        if err:
+            return err
+        hits = spam.check(sub.items, self.s.spam_rules)
+        if hits and self.s.spam_action == "block":
+            # 不告诉投稿人命中了哪个关键词，免得照着绕过；草稿保留，改了内容可以重新提交
+            return notice("spam_blocked_" + hits[0]["k"], **({"max": hits[0]["max"]} if "max" in hits[0] else {}))
+        if not await self.db.transition(sid, ("draft",), "pending", anonymous=int(anonymous), submitted_at=now_ts(),
+                                        spam_flags=hits or None):
             return notice("already_handled")
         await self._send_to_review(sid)
         await self.sync_topics(sid, review_is_fresh=True)
         await self.refresh_stats()
         return None
+
+    async def _cooldown(self, user_id: int) -> Notice | None:
+        """新用户冷却：还没有稿件发布过的投稿人，距上次提交不足 NEW_USER_COOLDOWN_MINUTES 分钟就不能再提交。"""
+        minutes = self.s.new_user_cooldown_min
+        if not minutes:
+            return None
+        summary = await self.db.user_summary(user_id)
+        if summary["published"] or not summary["last_at"]:
+            return None
+        wait = summary["last_at"] + minutes * 60 - now_ts()
+        return notice("cooldown", m=-(-wait // 60)) if wait > 0 else None  # 向上取整到分钟
 
     async def cancel_draft(self, sid: int, user_id: int) -> Notice | None:
         sub = await self.db.get(sid)

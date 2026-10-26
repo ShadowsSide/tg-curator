@@ -20,6 +20,7 @@ Built with Python 3.12 + [aiogram 3](https://github.com/aiogram/aiogram) + SQLit
 - Submitters choose to post **signed** (with their name) or **anonymously**. Either way, admins can always see who sent it
 - **Formatting is kept exactly as sent**: links, bold, quotes, spoiler text, code, date/time and emoji all come through to the channel unchanged
 - Submitters can **edit their post** until it has been reviewed, either with Telegram's built-in "Edit" or by **replying** to it with `/edit`
+- **Spam checks** (optional): keyword blacklist, a link limit (whitelisted domains don't count) and a cooldown for new submitters. By default a hit only puts a ⚠️ Possible spam note on the control message for reviewers to judge; it can also block the submission
 
 **Reviewer ↔ submitter messaging**
 - Both sides use `/msg message` as a reply to the relevant submission or message, and the bot relays it. Submitters always see the sender as “Reviewer”; neither side sees the other's account
@@ -134,6 +135,11 @@ Everything is configured in `.env`. See [`.env.example`](.env.example) for a ful
 | `SIGN_TEMPLATE` | depends on `LANGUAGE`: `Submitted by {name}` / `投稿人：{name}` | Signature for signed posts; `{name}` becomes a link to the submitter |
 | `ANON_SIGNATURE` | depends on `LANGUAGE`: `Anonymous submission` / `匿名投稿` | Signature for anonymous posts; set it to empty for none |
 | `MAX_PENDING_PER_USER` | `5` | Maximum open submissions per user at a time |
+| `SPAM_KEYWORDS` | empty | Keyword blacklist, comma-separated, case-insensitive; checks both the text and link addresses |
+| `MAX_LINKS` | `0` | Maximum links per submission, `0` = no limit; domains in `LINK_WHITELIST` don't count |
+| `LINK_WHITELIST` | empty | Domains that don't count toward the link limit, comma-separated, subdomains included, e.g. `t.me,github.com` |
+| `SPAM_ACTION` | `flag` | On a keyword or link-limit hit: `flag` = submit as usual and mark the control message; `block` = refuse it, the submitter can edit and resubmit |
+| `NEW_USER_COOLDOWN_MINUTES` | `0` | Submitters with nothing published yet must wait this many minutes between submissions; `0` = no limit |
 | `ALBUM_DELAY` | `1.5` | Seconds to wait while collecting the parts of an album |
 | `SCHEDULE_PRESETS` | `09:00,12:00,18:00,21:00` | Quick time buttons in the schedule panel |
 | `DEFAULT_SILENT` | `false` | Whether new submissions are published silently by default |
@@ -251,6 +257,7 @@ bot/
   errors.py       notice codes returned by the business logic (translated when shown)
   guard.py        only handle private chats and the review group; leave other groups
   permissions.py  reviewer permissions (REVIEWERS)
+  spam.py         spam checks: keywords, link limit
   ratelimit.py    automatic waiting and retrying when rate-limited
   keyboards.py    colored inline buttons
   album.py        album collection

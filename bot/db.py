@@ -108,7 +108,10 @@ MIGRATIONS = [
     ("submissions", "user_topic_id", "ALTER TABLE submissions ADD COLUMN user_topic_id INTEGER"),
     ("submissions", "topic_status", "ALTER TABLE submissions ADD COLUMN topic_status TEXT"),
     ("submissions", "msg_count", "ALTER TABLE submissions ADD COLUMN msg_count INTEGER NOT NULL DEFAULT 0"),
+    ("submissions", "spam_flags", "ALTER TABLE submissions ADD COLUMN spam_flags TEXT"),
 ]
+
+JSON_COLUMNS = ("items", "original_items", "spam_flags")  # 存成 JSON 文本的列
 
 OPEN_STATES = ("pending", "scheduled", "failed")  # 已提交、尚未发布或拒绝
 SUBMITTER_EDITABLE = ("draft", "pending")  # 投稿人自己能修改的状态：审核结果出来之前
@@ -159,6 +162,7 @@ class Submission:
     topic_status: str | None  # 话题名称上次同步时的状态，避免重复改名
     msg_count: int  # /msg 沟通的条数
     error: str | None
+    spam_flags: list[dict[str, Any]] | None = None  # 防垃圾检查的命中项，见 spam.py；没命中为 None
 
     @property
     def spoilerable(self) -> bool:
@@ -169,10 +173,16 @@ class Submission:
         data = dict(row)
         data["items"] = json.loads(data["items"])
         data["original_items"] = json.loads(data["original_items"]) if data["original_items"] else None
+        data["spam_flags"] = json.loads(data["spam_flags"]) if data.get("spam_flags") else None
         data["anonymous"] = bool(data["anonymous"])
         data["spoiler"] = bool(data["spoiler"])
         data["silent"] = bool(data["silent"])
         return cls(**data)
+
+
+def _encode(fields: dict[str, Any]) -> dict[str, Any]:
+    return {k: json.dumps(v, ensure_ascii=False) if k in JSON_COLUMNS and isinstance(v, list) else v
+            for k, v in fields.items()}
 
 
 class DB:
@@ -261,18 +271,14 @@ class DB:
         return Submission.from_row(row) if row else None
 
     async def update(self, sid: int, **fields: Any) -> None:
-        for key in ("items", "original_items"):
-            if isinstance(fields.get(key), list):
-                fields[key] = json.dumps(fields[key], ensure_ascii=False)
+        fields = _encode(fields)
         cols = ", ".join(f"{k}=?" for k in fields)
         await self._exec(f"UPDATE submissions SET {cols} WHERE id=?", (*fields.values(), sid))
 
     async def update_if(self, sid: int, states: Iterable[str], **fields: Any) -> bool:
         """只在状态仍属于 states 时更新（防止修改和发布/审核同时发生）。"""
         states = tuple(states)
-        for key in ("items", "original_items"):
-            if isinstance(fields.get(key), list):
-                fields[key] = json.dumps(fields[key], ensure_ascii=False)
+        fields = _encode(fields)
         cols = ", ".join(f"{k}=?" for k in fields)
         marks = ", ".join("?" * len(states))
         return await self._exec(
@@ -340,7 +346,7 @@ class DB:
     async def transition(self, sid: int, from_states: Iterable[str], to_state: str, **fields: Any) -> bool:
         """原子地把状态从 from_states 之一改成 to_state；状态不符时返回 False（防并发重复操作）。"""
         from_states = tuple(from_states)
-        fields["status"] = to_state
+        fields = {**_encode(fields), "status": to_state}
         cols = ", ".join(f"{k}=?" for k in fields)
         marks = ", ".join("?" * len(from_states))
         changed = await self._exec(

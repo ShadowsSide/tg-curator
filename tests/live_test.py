@@ -211,6 +211,24 @@ def styles(e):
     return {b["text"]: b.get("style") for row in kb for b in row}
 
 
+def buttons(e):
+    """按钮文字 → callback_data。"""
+    kb = (e["params"].get("reply_markup") or {}).get("inline_keyboard", [])
+    return {b["text"]: b["callback_data"] for row in kb for b in row}
+
+
+PROMPTS = ("请选择投稿方式", "How would you like")  # “选择投稿方式”提示：中文客户端 / 其他客户端
+
+
+async def submit(text, sid, who=USER):
+    """投稿人发一条文字投稿并选“署名”。返回审核群里控制消息的 sendMessage 记录（没进审核群时为 None）。
+    其他测试文件共用；本文件的场景里另有一个带额外检查的同名局部函数。"""
+    n = len(log); pm(text, who=who)
+    await wait_for(lambda e: any(is_send(e, "sendMessage", who, p) for p in PROMPTS), since=n)
+    n = len(log); cb(f"u:sign:{sid}", who, who)
+    return await wait_for(lambda e: is_send(e, "sendMessage", REVIEW, CTRL), since=n)
+
+
 async def scenario():
     e = await wait_for(lambda e: e["method"] == "setMyCommands" and e["params"].get("language_code") == "en", 15, since=0)
     check("bot started; command menus registered per language", e and any(

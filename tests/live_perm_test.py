@@ -11,7 +11,7 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import live_test as lt  # noqa: E402
-from live_test import ADMIN, CHANNEL, CTRL, REVIEW, USER, check, is_send, log, now, wait_for  # noqa: E402
+from live_test import ADMIN, CHANNEL, REVIEW, USER, check, is_send, log, now, submit, wait_for  # noqa: E402
 
 from bot.permissions import ReviewerPolicy  # noqa: E402
 
@@ -37,13 +37,6 @@ def group_cb(data, who, message_id):
     lt.push(callback_query={"id": str(lt.uid[0]), "chat_instance": "x", "data": data,
                             "from": {"id": who, "is_bot": who in (ADMIN_BOT, ANON_ADMIN), "first_name": f"U{who}"},
                             "message": {"message_id": message_id, "date": now(), "chat": lt.chat(REVIEW)}})
-
-
-async def submit(text, sid):
-    n = len(log); lt.pm(text)
-    await wait_for(lambda e: is_send(e, "sendMessage", USER, "请选择投稿方式"), since=n)
-    n = len(log); lt.cb(f"u:sign:{sid}", USER, USER)
-    return await wait_for(lambda e: is_send(e, "sendMessage", REVIEW, CTRL), since=n)
 
 
 async def scenario():

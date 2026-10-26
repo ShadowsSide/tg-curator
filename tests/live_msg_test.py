@@ -9,7 +9,7 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import live_test as lt  # noqa: E402
-from live_test import ADMIN, BOB, CTRL, REVIEW, USER, check, gm, is_send, log, now, pm, wait_for  # noqa: E402
+from live_test import ADMIN, BOB, REVIEW, USER, check, gm, is_send, log, now, pm, submit, wait_for  # noqa: E402
 
 
 def reply_to(chat_id, message_id, by_bot=True):
@@ -18,20 +18,11 @@ def reply_to(chat_id, message_id, by_bot=True):
     return {"message_id": message_id, "date": now(), "chat": lt.chat(chat_id), "from": sender}
 
 
-async def submit(text, sid, who):
-    n = len(log); pm(text, who=who)
-    prompt = await wait_for(lambda e: is_send(e, "sendMessage", who, "请选择投稿方式")
-                            or is_send(e, "sendMessage", who, "How would you like"), since=n)
-    n = len(log); lt.cb(f"u:sign:{sid}", who, who)
-    ctrl = await wait_for(lambda e: is_send(e, "sendMessage", REVIEW, CTRL), since=n)
-    return prompt, ctrl
-
-
 async def scenario():
     await wait_for(lambda e: e["method"] == "setMyCommands", 15, since=0)
 
     # 英文客户端的投稿人：看到的是 “Reviewer”，审核群里仍是中文
-    prompt, ctrl = await submit("english user post", 1, BOB)
+    ctrl = await submit("english user post", 1, BOB)
     n = len(log); gm("/msg please add a source", reply_to=ctrl["result"]["message_id"])
     e = await wait_for(lambda e: is_send(e, "sendMessage", BOB, "please add a source"), since=n)
     check("English submitter sees the reviewer as “Reviewer”", e and e["params"]["text"].startswith("💬 Reviewer:"))
@@ -53,7 +44,7 @@ async def scenario():
     check("after the window closes, submitter /msg is refused (in English)", e)
 
     # 被封禁的投稿人不能再发 /msg；审核员仍可以给他发消息（例如解释原因）
-    prompt2, ctrl2 = await submit("会被封禁的人", 2, USER)
+    ctrl2 = await submit("会被封禁的人", 2, USER)
     n = len(log); gm("/msg 先问一下", reply_to=ctrl2["result"]["message_id"])
     relay2 = (await wait_for(lambda e: is_send(e, "sendMessage", USER, "先问一下"), since=n))["result"]["message_id"]
     n = len(log); lt.push(message={

@@ -9,24 +9,12 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import live_test as lt  # noqa: E402
-from live_test import ADMIN, CTRL, REVIEW, USER, check, is_send, log, wait_for  # noqa: E402
-
-
-async def submit(text, sid):
-    n = len(log); lt.pm(text)
-    await wait_for(lambda e: is_send(e, "sendMessage", USER, "请选择投稿方式"), since=n)
-    n = len(log); lt.cb(f"u:sign:{sid}", USER, USER)
-    return await wait_for(lambda e: is_send(e, "sendMessage", REVIEW, CTRL), since=n)
-
-
-def buttons(e):
-    kb = (e["params"].get("reply_markup") or {}).get("inline_keyboard", [])
-    return {b["text"]: b["callback_data"] for row in kb for b in row}
+from live_test import ADMIN, REVIEW, USER, buttons, check, is_send, log, submit, wait_for  # noqa: E402
 
 
 async def scenario():
     await wait_for(lambda e: e["method"] == "setMyCommands", 15, since=0)
-    c1 = await submit("理由测试 1", 1)
+    await submit("理由测试 1", 1)
     await submit("理由测试 2", 2)
 
     # 1. 自定义理由出现在面板上

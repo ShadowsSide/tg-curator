@@ -78,7 +78,8 @@ class Settings:
         return hour >= start or hour < end
 
 
-def _lang(value: str, allowed: tuple[str, ...], name: str) -> str:
+def _choice(value: str, allowed: tuple[str, ...], name: str) -> str:
+    """取值必须是 allowed 之一（不区分大小写），否则启动时报错。"""
     value = value.lower()
     if value not in allowed:
         raise RuntimeError(f"{name} 只能是 {' / '.join(allowed)}，当前是 {value!r}")
@@ -86,7 +87,7 @@ def _lang(value: str, allowed: tuple[str, ...], name: str) -> str:
 
 
 def load_settings() -> Settings:
-    language = _lang(_env("LANGUAGE", "zh"), LANGS, "LANGUAGE")
+    language = _choice(_env("LANGUAGE", "zh"), LANGS, "LANGUAGE")
     # 落款没配置时用对应语言的默认值；配置成空字符串表示不要落款
     sign = os.environ.get("SIGN_TEMPLATE")
     anon = os.environ.get("ANON_SIGNATURE")
@@ -112,7 +113,7 @@ def load_settings() -> Settings:
         proxy=_env("PROXY"),
         api_url=_env("TELEGRAM_API_URL"),
         language=language,
-        user_language=_lang(_env("USER_LANGUAGE", "auto"), ("auto", *LANGS), "USER_LANGUAGE"),
+        user_language=_choice(_env("USER_LANGUAGE", "auto"), ("auto", *LANGS), "USER_LANGUAGE"),
         review_topics=_bool(_env("REVIEW_TOPICS", "false")),
         user_topics=_bool(_env("USER_TOPICS", "false")),
         leave_unknown_chats=_bool(_env("LEAVE_UNKNOWN_CHATS", "true")),
@@ -120,6 +121,6 @@ def load_settings() -> Settings:
         reviewers=_env("REVIEWERS", "admins"),
         reject_templates=_templates(reasons if reasons is not None else t(language, "default_reject_templates")),
         spam_rules=SpamRules.parse(_env("SPAM_KEYWORDS"), int(_env("MAX_LINKS", "0")), _env("LINK_WHITELIST")),
-        spam_action=_lang(_env("SPAM_ACTION", "flag"), ("flag", "block"), "SPAM_ACTION"),
+        spam_action=_choice(_env("SPAM_ACTION", "flag"), ("flag", "block"), "SPAM_ACTION"),
         new_user_cooldown_min=max(int(_env("NEW_USER_COOLDOWN_MINUTES", "0")), 0),
     )

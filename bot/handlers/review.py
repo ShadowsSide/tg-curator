@@ -71,7 +71,7 @@ def build_router(settings: Settings) -> Router:
         who = cq.from_user
         lang = core.lang
 
-        # 拒绝：先选理由（REJECT_TEMPLATES）；选好后当作“拒绝”继续往下走（确认面板或直接拒绝）
+        # 拒绝：先选理由（REJECT_TEMPLATES）；选好后当作“拒绝”继续往下走到确认面板。两段的顺序不能调换
         if action == "reject" and settings.reject_templates:
             await core.show_reject_reasons(sid)
             await cq.answer(t(lang, "toast_pick_reason"))
@@ -80,7 +80,7 @@ def build_router(settings: Settings) -> Router:
             action = "reject"
 
         # 发布 / 拒绝 / 封禁：先显示确认面板，点“确认”（<动作>_ok）才真正执行
-        if action in CONFIRMABLE and settings.confirm_actions:
+        if action in CONFIRMABLE:
             await core.show_confirm(sid, action, callback_data.v)
             await cq.answer(t(lang, "toast_confirm"))
             return

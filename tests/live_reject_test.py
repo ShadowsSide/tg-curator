@@ -1,7 +1,7 @@
-"""拒绝理由模板测试：自定义 REJECT_TEMPLATES，并关闭二次确认（CONFIRM_ACTIONS=false）。
+"""拒绝理由模板测试：自定义 REJECT_TEMPLATES。
 
 用法（项目根目录下）：python tests/live_reject_test.py
-默认理由 + 二次确认的组合由 live_confirm_test.py 覆盖。复用 live_test.py 的模拟 Bot API 服务器。约 8 秒。
+默认理由由 live_confirm_test.py 覆盖。复用 live_test.py 的模拟 Bot API 服务器。约 8 秒。
 """
 import asyncio
 import os
@@ -36,17 +36,23 @@ async def scenario():
           kb and buttons(kb) == {"图片模糊": "r:reason:1:1", "已有类似内容": "r:reason:1:2",
                                  "不附理由": "r:reason:1:0", "« 返回": "r:back:1:0"}, kb and buttons(kb))
 
-    # 2. 不要确认：选了理由直接拒绝（两次点击），理由发给投稿人
+    # 2. 选理由 → 确认：理由发给投稿人，按钮提示里也有
     n = len(log); lt.cb("r:reason:1:2", REVIEW, ADMIN)
+    kb = await wait_for(lambda e: e["method"] == "editMessageReplyMarkup", since=n)
+    check("custom reason → confirm button shows it",
+          kb and buttons(kb).get("❌ 确认拒绝：已有类似内容") == "r:reject_ok:1:2", kb and buttons(kb))
+    n = len(log); lt.cb("r:reject_ok:1:2", REVIEW, ADMIN)
     told = await wait_for(lambda e: is_send(e, "sendMessage", USER, "已有类似内容"), since=n)
-    confirm = [e for e in log[n:] if e["method"] == "editMessageReplyMarkup"]
     toast = await wait_for(lambda e: e["method"] == "answerCallbackQuery" and "已有类似内容" in e["params"].get("text", ""),
                            since=n)
-    check("CONFIRM_ACTIONS=false: picking a reason rejects right away with that reason",
-          told and not confirm and toast, told and told["params"]["text"])
+    check("confirm → rejected with that reason", told and toast, told and told["params"]["text"])
 
-    # 3. 理由序号超出范围（比如改少了理由后点旧按钮）：照样拒绝，不附理由，不报错
+    # 3. 理由序号超出范围（比如改少了理由后点旧按钮）：照样能确认拒绝，不附理由，不报错
     n = len(log); lt.cb("r:reason:2:9", REVIEW, ADMIN)
+    kb = await wait_for(lambda e: e["method"] == "editMessageReplyMarkup", since=n)
+    check("out-of-range reason index → plain confirm button", kb and buttons(kb).get("❌ 确认拒绝") == "r:reject_ok:2:9",
+          kb and buttons(kb))
+    n = len(log); lt.cb("r:reject_ok:2:9", REVIEW, ADMIN)
     told = await wait_for(lambda e: is_send(e, "sendMessage", USER, "未通过"), since=n)
     check("out-of-range reason index → rejected without a reason", told and "理由" not in told["params"]["text"],
           told and told["params"]["text"])
@@ -59,5 +65,4 @@ async def scenario():
 
 
 if __name__ == "__main__":
-    asyncio.run(lt.main(scenario, {"REJECT_TEMPLATES": "图片模糊|已有类似内容", "CONFIRM_ACTIONS": "false",
-                                   "REMINDER_INTERVAL_MINUTES": "0"}))
+    asyncio.run(lt.main(scenario, {"REJECT_TEMPLATES": "图片模糊|已有类似内容", "REMINDER_INTERVAL_MINUTES": "0"}))

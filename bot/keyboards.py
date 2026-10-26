@@ -19,7 +19,7 @@ from .timeutil import next_occurrence
 # 不支持按钮颜色的旧版客户端会忽略 style，按默认样式显示。
 GREEN, BLUE, RED = ButtonStyle.SUCCESS, ButtonStyle.PRIMARY, ButtonStyle.DANGER
 
-# 需要二次确认的操作（CONFIRM_ACTIONS）：点按钮先显示确认面板，确认按钮的动作是 "<动作>_ok"
+# 需要二次确认的操作：点按钮先显示确认面板，确认按钮的动作是 "<动作>_ok"
 CONFIRMABLE = {"pub": GREEN, "reject": RED, "ban": RED}
 CONFIRMED = "_ok"
 

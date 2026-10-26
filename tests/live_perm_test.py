@@ -2,7 +2,7 @@
 
 用法（项目根目录下）：python tests/live_perm_test.py
 以 REVIEWERS=admins,55 运行：管理员 7 和指定用户 55 可以审核，普通成员 99 和机器人不行。
-同时关闭二次确认和拒绝理由（CONFIRM_ACTIONS=false、REJECT_TEMPLATES=），验证和以前一样点一下就执行。约 10 秒。
+同时关闭拒绝理由（REJECT_TEMPLATES=），验证点“拒绝”直接出确认面板。约 10 秒。
 """
 import asyncio
 import os
@@ -81,10 +81,10 @@ async def scenario():
 
     # 管理员：可以审核；身份查询有缓存，不会每次都请求
     n = len(log); group_cb("r:silent:2:0", ADMIN, ctrl2); group_cb("r:spoiler:2:0", ADMIN, ctrl2)
-    group_cb("r:pub:2:0", ADMIN, ctrl2)
+    group_cb("r:pub_ok:2:0", ADMIN, ctrl2)
     post = await wait_for(lambda e: is_send(e, "sendMessage", CHANNEL, "权限测试二"), since=n)
     lookups = [x for x in log if x["method"] == "getChatMember" and str(x["params"]["user_id"]) == str(ADMIN)]
-    check("CONFIRM_ACTIONS=false: one tap publishes; admin lookup cached (one getChatMember for many actions)", post and len(lookups) == 1,
+    check("admin can review; admin lookup cached (one getChatMember for many actions)", post and len(lookups) == 1,
           len(lookups))
 
     # 以群身份匿名发言的管理员
@@ -106,13 +106,18 @@ async def scenario():
                            timeout=1, since=n)
     check("a bot that is a group admin is not a reviewer (button and command denied)", alert and denied and not acted)
 
-    # REJECT_TEMPLATES 为空 + 不要确认：和以前一样，点一下“拒绝”直接拒绝，不出理由面板
+    # REJECT_TEMPLATES 为空：点“拒绝”不出理由面板，直接出确认面板，确认后不附理由拒绝
     c5 = await submit("权限测试五", 5)
     n = len(log); group_cb("r:reject:5:0", ADMIN, c5["result"]["message_id"])
+    kb = await wait_for(lambda e: e["method"] == "editMessageReplyMarkup", since=n)
+    confirm = [b["callback_data"] for row in (kb["params"]["reply_markup"]["inline_keyboard"] if kb else []) for b in row]
+    told = await wait_for(lambda e: is_send(e, "sendMessage", USER, "未通过"), timeout=1, since=n)
+    check("no REJECT_TEMPLATES: Reject → confirm panel straight away (no reason panel)",
+          confirm == ["r:reject_ok:5:0", "r:back:5:0"] and not told, confirm)
+    n = len(log); group_cb("r:reject_ok:5:0", ADMIN, c5["result"]["message_id"])
     told = await wait_for(lambda e: is_send(e, "sendMessage", USER, "未通过"), since=n)
-    panel = [e for e in log[n:] if e["method"] == "editMessageReplyMarkup"]
-    check("no REJECT_TEMPLATES + CONFIRM_ACTIONS=false: one tap rejects, no reason panel", told and not panel)
+    check("confirm → rejected without a reason", told and "理由" not in told["params"]["text"])
 
 
 if __name__ == "__main__":
-    asyncio.run(lt.main(scenario, {"REVIEWERS": "admins,55", "CONFIRM_ACTIONS": "false", "REJECT_TEMPLATES": "", "REMINDER_INTERVAL_MINUTES": "0"}))
+    asyncio.run(lt.main(scenario, {"REVIEWERS": "admins,55", "REJECT_TEMPLATES": "", "REMINDER_INTERVAL_MINUTES": "0"}))

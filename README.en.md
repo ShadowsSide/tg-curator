@@ -32,7 +32,7 @@ Built with Python 3.12 + [aiogram 3](https://github.com/aiogram/aiogram) + SQLit
 - Publishing options: 🙈 **spoiler** (blur the media) and 🔕 **silent** (subscribers get a notification without sound)
 - Pick a common reject reason with one tap (`REJECT_TEMPLATES`)
 - `/edit` to change a post, `/no reason` to reject, `/ban reason` to ban. Banning also rejects every open submission from that user
-- Safe against accidental taps: Publish now, Reject and Ban need a second tap to confirm (`CONFIRM_ACTIONS`)
+- Safe against accidental taps: Publish now, Reject and Ban need a second tap to confirm
 - Safe against double actions: if two admins press "Publish" at the same time, the post is still published only once
 - **Only answers in private chats and the review group**: it never replies in other groups, and leaves any other group or channel it's added to. The publishing channel and its linked discussion group are whitelisted and never left
 
@@ -127,7 +127,6 @@ Everything is configured in `.env`. See [`.env.example`](.env.example) for a ful
 | `REVIEW_TOPICS` | `false` | Topic mode in the review group: the group needs topics enabled, and the bot must be an admin allowed to manage topics |
 | `USER_TOPICS` | `false` | Topic mode in private chats: enable topic mode for the bot in @BotFather first |
 | `REVIEWERS` | `admins` | Who can review: `admins` = review group admins and owner; `all` = every member; or user IDs, combinable, e.g. `admins,123456`. Bots never count as reviewers |
-| `CONFIRM_ACTIONS` | `true` | Publish now, Reject and Ban need a second tap to confirm |
 | `REJECT_TEMPLATES` | 4 default reasons, depends on `LANGUAGE` | Reasons offered after tapping Reject, separated by `\|`, e.g. `Duplicate\|Ads`; set it to empty to skip the reason panel |
 | `MSG_WINDOW_DAYS` | `3` | `/msg`: days after a submission is published or rejected during which messaging stays open; always open during review |
 | `LEAVE_UNKNOWN_CHATS` | `true` | Leave any other group or channel the bot is added to; `false` stays but never responds. The publishing channel and its linked discussion group (detected at startup) are always kept |
@@ -167,7 +166,7 @@ Everything is configured in `.env`. See [`.env.example`](.env.example) for a ful
 
 Buttons on the control message: **✅ Publish now**, **⏰ Schedule**, **❌ Reject**, **🚫 Ban submitter**, plus the **🙈 Spoiler** and **🔕 Silent** toggles.
 
-To avoid accidental taps, **Publish now, Reject and Ban** first switch to “Confirm / Back” buttons and only act on the second tap (turn off with `CONFIRM_ACTIONS=false`). Scheduling, retrying and the `/no` and `/ban` commands need no confirmation.
+To avoid accidental taps, **Publish now, Reject and Ban** first switch to “Confirm / Back” buttons and only act on the second tap. Scheduling, retrying and the `/no` and `/ban` commands need no confirmation.
 
 **❌ Reject** first asks for a reason (`REJECT_TEMPLATES`; defaults: Duplicate, Off-topic, Low quality, Advertising; or “No reason”). The confirm button shows the chosen reason, and the reason is sent to the submitter. For a reason of your own, use `/no reason`.
 

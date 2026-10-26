@@ -59,7 +59,6 @@ class Settings:
     leave_unknown_chats: bool  # 被拉进私聊/审核群/发布频道以外的聊天时自动退出
     msg_window_days: int  # /msg 沟通：审核结束（发布/拒绝）后还能沟通的天数
     reviewers: str  # 谁可以审核：admins（默认）/ all / 用户 ID，可组合，见 permissions.py
-    confirm_actions: bool  # 发布、拒绝、封禁按钮需要再点一次确认，防止误触
     reject_templates: tuple[str, ...]  # 点“拒绝”后可选的理由；为空则不显示理由面板
 
     def reject_template(self, index: int) -> str | None:
@@ -115,6 +114,5 @@ def load_settings() -> Settings:
         leave_unknown_chats=_bool(_env("LEAVE_UNKNOWN_CHATS", "true")),
         msg_window_days=int(_env("MSG_WINDOW_DAYS", "3")),
         reviewers=_env("REVIEWERS", "admins"),
-        confirm_actions=_bool(_env("CONFIRM_ACTIONS", "true")),
         reject_templates=_templates(reasons if reasons is not None else t(language, "default_reject_templates")),
     )

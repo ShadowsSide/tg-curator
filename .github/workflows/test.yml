@@ -1,0 +1,42 @@
+# 每个 PR 和推送到 main 时运行全部测试（单元测试 + 端到端测试）。
+# 端到端测试用本地模拟的 Bot API 服务器运行真实的机器人进程，不需要 token、密钥或外网。约 4 分钟。
+name: test
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"  # 和 Dockerfile 的基础镜像一致
+          cache: pip
+
+      - run: pip install -r requirements.txt
+
+      - name: Compile
+        run: python -m compileall -q bot tests
+
+      # 每个测试文件单独运行（各自是独立脚本），全部跑完后再汇总失败的文件
+      - name: Run tests
+        run: |
+          failed=""
+          for f in tests/test_*.py tests/live_*.py; do
+            echo "::group::$f"
+            python "$f" || failed="$failed $f"
+            echo "::endgroup::"
+          done
+          if [ -n "$failed" ]; then
+            echo "::error::Failed:$failed"
+            exit 1
+          fi

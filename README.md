@@ -257,6 +257,8 @@ DB_PATH=./data/bot.db .venv/bin/python -m bot
 .venv/bin/python tests/live_spam_block_test.py  # 端到端测试：防垃圾拦截模式（约 10 秒）
 ```
 
+每个 PR 和推送到 `main` 时，GitHub Actions（`.github/workflows/test.yml`）会自动运行以上全部测试。
+
 ### 项目结构
 
 ```

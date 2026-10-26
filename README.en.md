@@ -259,6 +259,8 @@ The tests need no token and no network access:
 .venv/bin/python tests/live_spam_block_test.py  # end-to-end: spam block mode (~10 seconds)
 ```
 
+GitHub Actions (`.github/workflows/test.yml`) runs all of these on every pull request and every push to `main`.
+
 ### Project layout
 
 ```

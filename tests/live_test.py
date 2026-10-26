@@ -44,6 +44,7 @@ MOCK = {"review_is_forum": False, "bot_topics": False,
         # 审核群管理员（getChatMember 返回 creator），其他人返回普通成员
         "admins": {7}}
 next_topic = [7000]
+markups: dict = {}  # (chat_id, message_id) → 当前按钮：和 Telegram 一样，按钮没变时编辑会报 “message is not modified”
 
 
 def make_msg(chat_id, thread_id=None):
@@ -93,6 +94,16 @@ async def handle(request: web.Request):
         log.append({"method": method, "params": params, "result": None, "error": True, "t": time.time()})
         return web.json_response({"ok": False, "error_code": 400,
                                   "description": "Bad Request: custom emoji can't be used in this chat"}, status=400)
+
+    if m in ("editmessagereplymarkup", "editmessagetext"):
+        key = (str(params.get("chat_id")), str(params.get("message_id")))
+        if m == "editmessagereplymarkup" and markups.get(key) == params.get("reply_markup"):
+            log.append({"method": method, "params": params, "result": None, "error": True, "t": time.time()})
+            return web.json_response({"ok": False, "error_code": 400, "description":
+                                      "Bad Request: message is not modified: specified new message content and reply "
+                                      "markup are exactly the same as a current content and reply markup of the message"},
+                                     status=400)
+        markups[key] = params.get("reply_markup")
 
     thread = params.get("message_thread_id")
     if m == "getme":
@@ -266,7 +277,7 @@ async def scenario():
     e = await wait_for(lambda e: e["method"] == "editMessageText" and "静音发送：🔕 开" in e["params"].get("text", "")
                        and "剧透遮罩：🙈 开" in e["params"].get("text", ""), since=n)
     check("spoiler + silent toggled", e)
-    n = len(log); cb("r:pub:2:0", REVIEW, ADMIN)
+    n = len(log); cb("r:pub_ok:2:0", REVIEW, ADMIN)
     e = await wait_for(lambda e: is_send(e, "sendMediaGroup", CHANNEL), since=n)
     ok = e and all(m.get("has_spoiler") for m in e["params"]["media"]) and str(e["params"].get("disable_notification")).lower() == "true"
     check("published to channel with spoiler + silent (real HTTP payload)", ok,
@@ -334,7 +345,7 @@ async def scenario():
     check("review preview keeps all entities incl. custom emoji + date_time",
           pv and set(norm(rich_ents)) <= set(norm(pv["params"].get("entities"))) and "parse_mode" not in pv["params"],
           pv and pv["params"].get("entities"))
-    n = len(log); cb("r:pub:5:0", REVIEW, ADMIN)
+    n = len(log); cb("r:pub_ok:5:0", REVIEW, ADMIN)
     rejected = await wait_for(lambda e: e.get("error") and str(e["params"].get("chat_id")) == str(CHANNEL), since=n)
     pub = await wait_for(lambda e: is_send(e, "sendMessage", CHANNEL, "热门"), since=n)
     sig_text = "投稿人：Alice"
@@ -382,7 +393,7 @@ async def scenario():
                        since=n)
     check("/edit without text echoes current caption with formatting", e and norm(e["params"].get("entities")) == norm(shifted))
 
-    n = len(log); cb("r:pub:6:0", REVIEW, ADMIN)
+    n = len(log); cb("r:pub_ok:6:0", REVIEW, ADMIN)
     pub6 = await wait_for(lambda e: is_send(e, "sendPhoto", CHANNEL), since=n)
     p6 = pub6["params"] if pub6 else {}
     check("edited photo published: new caption, formatting, caption-above, spoiler",
@@ -453,7 +464,7 @@ async def scenario():
     check("replying with just /edit echoes current content", e)
 
     # 7f. 发布后再改 → 拒绝
-    n = len(log); cb("r:pub:7:0", REVIEW, ADMIN)
+    n = len(log); cb("r:pub_ok:7:0", REVIEW, ADMIN)
     await wait_for(lambda e: is_send(e, "sendMessage", CHANNEL, "2024年总结"), since=n)
     n = len(log); pm_edit(src, "发布后偷偷改")
     e = await wait_for(lambda e: is_send(e, "sendMessage", USER, "已经发布，不能修改"), since=n)

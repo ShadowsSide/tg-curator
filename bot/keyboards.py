@@ -19,6 +19,10 @@ from .timeutil import next_occurrence
 # 不支持按钮颜色的旧版客户端会忽略 style，按默认样式显示。
 GREEN, BLUE, RED = ButtonStyle.SUCCESS, ButtonStyle.PRIMARY, ButtonStyle.DANGER
 
+# 需要二次确认的操作（CONFIRM_ACTIONS）：点按钮先显示确认面板，确认按钮的动作是 "<动作>_ok"
+CONFIRMABLE = {"pub": GREEN, "reject": RED, "ban": RED}
+CONFIRMED = "_ok"
+
 
 class UserCB(CallbackData, prefix="u"):
     a: str  # sign / anon / cancel
@@ -27,6 +31,7 @@ class UserCB(CallbackData, prefix="u"):
 
 class ReviewCB(CallbackData, prefix="r"):
     a: str  # spoiler / silent / pub / sched / preset / custom / back / unsched / reject / ban / retry
+    #         pub_ok / reject_ok / ban_ok：确认面板上的“确认”，见 CONFIRMABLE
     sid: int
     v: int = 0
 
@@ -89,3 +94,10 @@ def schedule_kb(sid: int, presets: tuple[str, ...], tz: ZoneInfo, lang: str) -> 
     rows = [buttons[i : i + 3] for i in range(0, len(buttons), 3)]
     rows.append([_rb(t(lang, "btn_custom_time"), "custom", sid), _rb(t(lang, "btn_back"), "back", sid)])
     return InlineKeyboardMarkup(inline_keyboard=rows)
+
+
+def confirm_kb(sid: int, action: str, lang: str) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [_rb(t(lang, f"btn_confirm_{action}"), action + CONFIRMED, sid, style=CONFIRMABLE[action])],
+        [_rb(t(lang, "btn_back"), "back", sid)],
+    ])

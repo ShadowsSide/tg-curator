@@ -57,15 +57,17 @@ class ReviewerCheck:
         self._cache: dict[int, tuple[bool, float]] = {}
         self._inflight: dict[int, asyncio.Task] = {}  # 同一个人同时多次操作时，只查询一次
 
-    async def allowed(self, bot: Bot, user_id: int, sender_chat_id: int | None = None) -> bool:
+    async def allowed(self, bot: Bot, user_id: int, sender_chat_id: int | None = None, is_bot: bool = False) -> bool:
         p = self.policy
+        # 以群身份匿名发言的只能是这个群的管理员（这时 from_user 是 Telegram 的匿名管理员机器人，要先于下面的判断）
+        if sender_chat_id == self.review_chat_id:
+            return p.everyone or p.admins
+        if is_bot:  # 机器人不算审核员
+            return False
         if p.everyone or user_id in p.user_ids:
             return True
         if not p.admins:
             return False
-        # 以群身份匿名发言的只能是这个群的管理员
-        if sender_chat_id == self.review_chat_id:
-            return True
         return await self._is_admin(bot, user_id)
 
     async def _is_admin(self, bot: Bot, user_id: int) -> bool:
@@ -105,7 +107,8 @@ class ReviewerOnly(BaseMiddleware):
     ) -> Any:
         user = getattr(event, "from_user", None)
         sender_chat = getattr(event, "sender_chat", None)
-        if user and await self.check.allowed(data["bot"], user.id, sender_chat.id if sender_chat else None):
+        if user and await self.check.allowed(data["bot"], user.id, sender_chat.id if sender_chat else None,
+                                             is_bot=user.is_bot):
             return await handler(event, data)
 
         denied = t(self.lang, "no_permission")

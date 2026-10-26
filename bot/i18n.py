@@ -260,11 +260,16 @@ T: dict[str, dict[str, str]] = {
     "btn_plus_hours": {"zh": "+{n} 小时", "en": "+{n}h"},
     "btn_custom_time": {"zh": "✏️ 自定义时间", "en": "✏️ Custom time"},
     "btn_back": {"zh": "« 返回", "en": "« Back"},
+    "btn_confirm_pub": {"zh": "✅ 确认发布", "en": "✅ Confirm publish"},
+    "btn_confirm_reject": {"zh": "❌ 确认拒绝", "en": "❌ Confirm reject"},
+    "btn_confirm_ban": {"zh": "🚫 确认封禁（同时拒绝其所有未处理来稿）",
+                        "en": "🚫 Confirm ban (also rejects all their open submissions)"},
 
     # ---------- 审核：按钮反馈 ----------
     "toast_state_locked": {"zh": "当前状态不能修改", "en": "Can't change this in the current state"},
     "toast_spoiler": {"zh": "剧透遮罩：{state}", "en": "Spoiler: {state}"},
     "toast_silent": {"zh": "静音发送：{state}", "en": "Silent: {state}"},
+    "toast_confirm": {"zh": "请再点一次确认，或返回", "en": "Tap again to confirm, or go back"},
     "toast_publishing": {"zh": "发布中…", "en": "Publishing…"},
     "toast_retrying": {"zh": "重试中…", "en": "Retrying…"},
     "toast_scheduled": {"zh": "已定时：{when}", "en": "Scheduled: {when}"},

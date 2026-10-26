@@ -14,7 +14,7 @@ from ..config import Settings
 from ..core import NO_PREVIEW, Core, explicit_reply, mention, topic_of
 from ..permissions import ReviewerCheck, ReviewerOnly, ReviewerPolicy
 from ..i18n import t
-from ..keyboards import ReviewCB
+from ..keyboards import CONFIRMABLE, CONFIRMED, ReviewCB
 from ..render import dump_link_preview, message_item, user_link
 from ..timeutil import parse_time
 
@@ -70,6 +70,13 @@ def build_router(settings: Settings) -> Router:
         sid, action = callback_data.sid, callback_data.a
         who = cq.from_user
         lang = core.lang
+
+        # 发布 / 拒绝 / 封禁：先显示确认面板，点“确认”（<动作>_ok）才真正执行
+        if action in CONFIRMABLE and settings.confirm_actions:
+            await core.show_confirm(sid, action)
+            await cq.answer(t(lang, "toast_confirm"))
+            return
+        action = action.removesuffix(CONFIRMED)
 
         if action == "spoiler":
             await cq.answer((await core.toggle_spoiler(sid)).text(lang))

@@ -127,7 +127,7 @@ async def scenario():
     check("submitter /msg reply → arrives in the review topic", a and int(a["params"]["message_thread_id"]) == t_r2)
 
     # ---------- 6. 在话题里点发布 → 发到频道，通知进投稿人话题，审核话题 ✅ 并关闭 ----------
-    n = len(log); topic_cb("r:pub:2:0", REVIEW, ADMIN, ctrl2["result"]["message_id"], t_r2)
+    n = len(log); topic_cb("r:pub_ok:2:0", REVIEW, ADMIN, ctrl2["result"]["message_id"], t_r2)
     post = await wait_for(lambda e: is_send(e, "sendMessage", CHANNEL, "管理员定稿"), since=n)
     note = await wait_for(lambda e: is_send(e, "sendMessage", USER, "已发布到频道"), since=n)
     done = await wait_for(lambda e: is_call(e, "editForumTopic", REVIEW) and e["params"].get("name", "").startswith("✅"), since=n)

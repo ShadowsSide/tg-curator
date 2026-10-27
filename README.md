@@ -230,7 +230,7 @@ Telegram 不允许把 GIF 放进相册，所以每个 GIF 会单独成为一条�
 需要 Python 3.10 以上版本。
 
 ```bash
-python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
+python3 -m venv .venv && .venv/bin/pip install -r requirements.txt -r requirements-dev.txt
 cp .env.example .env && mkdir -p data
 set -a; source .env; set +a
 DB_PATH=./data/bot.db .venv/bin/python -m bot
@@ -258,7 +258,11 @@ DB_PATH=./data/bot.db .venv/bin/python -m bot
 .venv/bin/python tests/live_spam_block_test.py  # 端到端测试：防垃圾拦截模式（约 10 秒）
 ```
 
-每个 PR 和推送到 `main` 时，GitHub Actions（`.github/workflows/test.yml`）会自动运行以上全部测试。
+每个 PR 和推送到 `main` 时，GitHub Actions（`.github/workflows/test.yml`）会先用 pyflakes 检查代码（未定义的名字、没用到的 import 和变量等），再运行以上全部测试。本地检查：
+
+```bash
+.venv/bin/python -m pyflakes bot tests
+```
 
 ### 项目结构
 

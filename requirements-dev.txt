@@ -1,0 +1,2 @@
+# 只用于开发和 CI，不装进 Docker 镜像
+pyflakes==4.0.3

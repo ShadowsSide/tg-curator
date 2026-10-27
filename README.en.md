@@ -232,7 +232,7 @@ Telegram doesn't allow GIFs in albums, so each GIF becomes its own submission.
 Requires Python 3.10 or newer.
 
 ```bash
-python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
+python3 -m venv .venv && .venv/bin/pip install -r requirements.txt -r requirements-dev.txt
 cp .env.example .env && mkdir -p data
 set -a; source .env; set +a
 DB_PATH=./data/bot.db .venv/bin/python -m bot
@@ -260,7 +260,11 @@ The tests need no token and no network access:
 .venv/bin/python tests/live_spam_block_test.py  # end-to-end: spam block mode (~10 seconds)
 ```
 
-GitHub Actions (`.github/workflows/test.yml`) runs all of these on every pull request and every push to `main`.
+GitHub Actions (`.github/workflows/test.yml`) first checks the code with pyflakes (undefined names, unused imports and variables, …), then runs all of these on every pull request and every push to `main`. To check locally:
+
+```bash
+.venv/bin/python -m pyflakes bot tests
+```
 
 ### Project layout
 

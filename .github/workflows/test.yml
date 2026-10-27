@@ -1,4 +1,4 @@
-# 每个 PR 和推送到 main 时运行全部测试（单元测试 + 端到端测试）。
+# 每个 PR 和推送到 main 时检查代码（pyflakes）并运行全部测试（单元测试 + 端到端测试）。
 # 端到端测试用本地模拟的 Bot API 服务器运行真实的机器人进程，不需要 token、密钥或外网。约 4 分钟。
 name: test
 
@@ -22,10 +22,14 @@ jobs:
           python-version: "3.12"  # 和 Dockerfile 的基础镜像一致
           cache: pip
 
-      - run: pip install -r requirements.txt
+      - run: pip install -r requirements.txt -r requirements-dev.txt
 
       - name: Compile
         run: python -m compileall -q bot tests
+
+      # 不运行代码，只找明显的错误：未定义的名字、没用到的 import 和变量等（不管代码风格）
+      - name: Lint
+        run: python -m pyflakes bot tests
 
       # 每个测试文件单独运行（各自是独立脚本），全部跑完后再汇总失败的文件
       - name: Run tests

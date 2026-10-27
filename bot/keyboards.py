@@ -24,6 +24,22 @@ CONFIRMABLE = {"pub": GREEN, "reject": RED, "ban": RED}
 CONFIRMED = "_ok"
 
 
+def route(action: str, v: int, has_reasons: bool) -> tuple[str, str, int]:
+    """审核按钮的多步流程：这次点击是先出面板，还是真正执行。返回 (步骤, 动作, v)：
+      ("reasons", "reject", 0)  点“拒绝”且配置了 REJECT_TEMPLATES：先出理由面板
+      ("confirm", 动作, v)       发布 / 拒绝 / 封禁：出确认面板，v（拒绝理由）原样带到确认按钮
+      ("run", 动作, v)           真正执行；确认按钮的 "<动作>_ok" 已去掉后缀
+    判断顺序有讲究：理由面板上选的 "reason" 要先变成 "reject" 再进确认，所以理由判断在确认之前。
+    """
+    if action == "reject" and has_reasons:
+        return "reasons", action, 0
+    if action == "reason":  # 理由面板上选了一项（配置被清空后点旧面板也一样处理）
+        action = "reject"
+    if action in CONFIRMABLE:
+        return "confirm", action, v
+    return "run", action.removesuffix(CONFIRMED), v
+
+
 class UserCB(CallbackData, prefix="u"):
     a: str  # sign / anon / cancel
     sid: int

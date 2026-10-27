@@ -14,7 +14,7 @@ from ..config import Settings
 from ..core import NO_PREVIEW, Core, explicit_reply, mention, topic_of
 from ..permissions import ReviewerCheck, ReviewerOnly, ReviewerPolicy
 from ..i18n import t
-from ..keyboards import CONFIRMABLE, CONFIRMED, ReviewCB
+from ..keyboards import ReviewCB, route
 from ..render import dump_link_preview, message_item, user_link
 from ..timeutil import parse_time
 
@@ -67,24 +67,20 @@ def build_router(settings: Settings) -> Router:
 
     @router.callback_query(ReviewCB.filter())
     async def on_button(cq: CallbackQuery, callback_data: ReviewCB, core: Core, state: FSMContext) -> None:
-        sid, action = callback_data.sid, callback_data.a
+        sid = callback_data.sid
         who = cq.from_user
         lang = core.lang
 
-        # 拒绝：先选理由（REJECT_TEMPLATES）；选好后当作“拒绝”继续往下走到确认面板。两段的顺序不能调换
-        if action == "reject" and settings.reject_templates:
+        # 拒绝先选理由、发布 / 拒绝 / 封禁先确认（见 keyboards.route）；走到最后才真正执行
+        step, action, v = route(callback_data.a, callback_data.v, bool(settings.reject_templates))
+        if step == "reasons":
             await core.show_reject_reasons(sid)
             await cq.answer(t(lang, "toast_pick_reason"))
             return
-        if action == "reason":
-            action = "reject"
-
-        # 发布 / 拒绝 / 封禁：先显示确认面板，点“确认”（<动作>_ok）才真正执行
-        if action in CONFIRMABLE:
-            await core.show_confirm(sid, action, callback_data.v)
+        if step == "confirm":
+            await core.show_confirm(sid, action, v)
             await cq.answer(t(lang, "toast_confirm"))
             return
-        action = action.removesuffix(CONFIRMED)
 
         if action == "spoiler":
             await cq.answer((await core.toggle_spoiler(sid)).text(lang))
@@ -107,8 +103,8 @@ def build_router(settings: Settings) -> Router:
             await core.refresh_control(sid)
             await cq.answer()
         elif action == "preset":
-            err = await core.schedule(sid, callback_data.v, who)
-            await cq.answer(err.text(lang) if err else t(lang, "toast_scheduled", when=core.fmt(callback_data.v)),
+            err = await core.schedule(sid, v, who)
+            await cq.answer(err.text(lang) if err else t(lang, "toast_scheduled", when=core.fmt(v)),
                             show_alert=bool(err))
         elif action == "custom":
             prompt = await cq.message.reply(  # 回复在控制消息下面，看得出是哪条投稿
@@ -122,7 +118,7 @@ def build_router(settings: Settings) -> Router:
             err = await core.unschedule(sid)
             await cq.answer(err.text(lang) if err else t(lang, "toast_unscheduled"))
         elif action == "reject":
-            reason = settings.reject_template(callback_data.v)
+            reason = settings.reject_template(v)
             err = await core.reject(sid, who, reason)
             # 按钮提示最多 200 字符，理由是用户配置的，可能很长
             ok = t(lang, "toast_rejected_with", reason=reason[:150]) if reason else t(lang, "toast_rejected")

@@ -253,6 +253,7 @@ DB_PATH=./data/bot.db .venv/bin/python -m bot
 .venv/bin/python tests/live_perm_test.py    # 端到端测试：审核员权限（约 20 秒）
 .venv/bin/python tests/live_confirm_test.py   # 端到端测试：二次确认、默认拒绝理由（约 15 秒）
 .venv/bin/python tests/live_reject_test.py    # 端到端测试：自定义拒绝理由（约 10 秒）
+.venv/bin/python tests/live_buttons_test.py   # 端到端测试：重试发布、取消定时（约 10 秒）
 .venv/bin/python tests/live_spam_test.py      # 端到端测试：防垃圾标记、改稿重新检查、新用户冷却（约 10 秒）
 .venv/bin/python tests/live_spam_block_test.py  # 端到端测试：防垃圾拦截模式（约 10 秒）
 ```

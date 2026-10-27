@@ -41,6 +41,8 @@ def chat(cid):
 MOCK = {"review_is_forum": False, "bot_topics": False,
         # 限流注入："方法名:chat_id" → 依次返回的 retry_after 秒数列表，每次调用消耗一个
         "flood": {},
+        # 失败注入："方法名:chat_id" → 依次返回的错误描述列表（HTTP 400），每次调用消耗一个
+        "fail": {},
         # 审核群管理员（getChatMember 返回 creator），其他人返回普通成员
         "admins": {7}}
 next_topic = [7000]
@@ -77,6 +79,11 @@ async def handle(request: web.Request):
                     "t": time.time()})
         return web.json_response({"ok": False, "error_code": 429, "parameters": {"retry_after": retry_after},
                                   "description": f"Too Many Requests: retry after {retry_after}"}, status=429)
+    fail = MOCK["fail"].get(f"{method}:{params.get('chat_id')}")
+    if fail:
+        description = fail.pop(0)
+        log.append({"method": method, "params": params, "result": None, "error": True, "t": time.time()})
+        return web.json_response({"ok": False, "error_code": 400, "description": description}, status=400)
     if m == "getupdates":
         offset = int(params.get("offset") or 0)
         timeout = min(float(params.get("timeout") or 0), 2)
@@ -555,7 +562,22 @@ async def scenario():
     check("reminder loop posted stats on its own", e, e and e["params"]["text"].replace("\n", " | "))
 
 
-async def main(scenario_fn=None, extra_env=None):
+def unexpected_errors(lines, allowed=()):
+    """机器人日志里的错误。allowed：预期中的错误（ERROR 行里含这些文字），这条错误和它后面的堆栈都不算。"""
+    bad, expected = [], False
+    for line in lines:
+        if " ERROR " in line or " CRITICAL " in line:
+            expected = any(a in line for a in allowed)
+            if not expected:
+                bad.append(line)
+        elif line[:1].isdigit():  # 新的一条日志（以时间开头）：之前那条错误的堆栈结束了
+            expected = False
+        elif "Traceback" in line and not expected:
+            bad.append(line)
+    return bad
+
+
+async def main(scenario_fn=None, extra_env=None, allowed_errors=()):
     scenario_fn = scenario_fn or scenario
     app = web.Application()
     app.router.add_route("*", "/bot{token}/{method}", handle)
@@ -598,7 +620,7 @@ async def main(scenario_fn=None, extra_env=None):
     numbered = [x for x in shown if re.search(r"#\d", x)]
     check("no submission numbers shown to submitters or reviewers", not numbered, numbered[:3])
 
-    bad = [l for l in bot_log if "Traceback" in l or " ERROR " in l or " CRITICAL " in l]
+    bad = unexpected_errors(bot_log, allowed_errors)
     check("no errors in bot process log", not bad, "\n".join(bad[:10]))
     print("\n--- bot log (last 12 lines) ---")
     print("\n".join(l for l in bot_log if "Update id=" not in l)[-6000:])

@@ -255,6 +255,7 @@ The tests need no token and no network access:
 .venv/bin/python tests/live_perm_test.py    # end-to-end: reviewer permissions (~20 seconds)
 .venv/bin/python tests/live_confirm_test.py   # end-to-end: confirmation, default reject reasons (~15 seconds)
 .venv/bin/python tests/live_reject_test.py    # end-to-end: custom reject reasons (~10 seconds)
+.venv/bin/python tests/live_buttons_test.py   # end-to-end: Retry and Unschedule buttons (~10 seconds)
 .venv/bin/python tests/live_spam_test.py      # end-to-end: spam flags, re-check on edit, new-user cooldown (~10 seconds)
 .venv/bin/python tests/live_spam_block_test.py  # end-to-end: spam block mode (~10 seconds)
 ```

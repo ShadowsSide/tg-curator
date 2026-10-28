@@ -236,6 +236,19 @@ T: dict[str, dict[str, str]] = {
         "zh": "投稿状态刚刚发生了变化，修改未生效",
         "en": "The submission's status just changed, so the edit was not applied",
     },
+    "media_only_photo_video": {"zh": "只能添加图片或视频", "en": "Only photos and videos can be added"},
+    "media_mixed_types": {
+        "zh": "这条投稿里有文件、音频、语音或 GIF，不能和图片视频放在一起，请重新投稿",
+        "en": "This submission has a file, audio, voice message or GIF, which can't be combined with photos or videos. Please submit again",
+    },
+    "media_too_many": {"zh": "一条投稿最多 {max} 个图片或视频", "en": "A submission can have at most {max} photos or videos"},
+    "media_bad_index": {
+        "zh": "没有第 {n} 个，这条投稿共有 {count} 个图片或视频",
+        "en": "There's no item {n}; this submission has {count} photo(s) or video(s)",
+    },
+    "media_none": {"zh": "这是文字投稿，没有可以替换或删除的图片视频", "en": "This is a text submission; there's no photo or video to replace or remove"},
+    "media_replace_one": {"zh": "替换时一次只能发一个图片或视频", "en": "Send exactly one photo or video to replace with"},
+    "media_last_one": {"zh": "不能删除最后一个图片或视频", "en": "The last photo or video can't be removed"},
     "type_change": {
         "zh": "不能把文字投稿改成媒体投稿（或反过来），请重新投稿",
         "en": "A text submission can't become a media submission (or the other way round). Please submit again",

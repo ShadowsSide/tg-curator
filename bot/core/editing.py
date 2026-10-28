@@ -1,7 +1,7 @@
 """修改稿件（管理员 / 投稿人共用）：/edit、Telegram 自带编辑，格式由 entities 原样保留。"""
 from __future__ import annotations
 
-from .. import spam
+from .. import media, spam
 from ..db import OPEN_STATES, Submission
 from ..entities import u16len
 from ..errors import Notice, notice
@@ -38,9 +38,34 @@ class EditingMixin(CoreBase):
         if err:
             return err
         items = [dict(it) for it in sub.items]
-        if (items[index]["type"] == "text") != (new_item["type"] == "text"):
+        old = items[index]
+        if old["type"] in media.MEDIA_TYPES and new_item["type"] == "text":
+            # 纯文字投稿用 /add 加过图：原来那条文字消息现在是第一个媒体的说明，编辑它就是改说明
+            items[index] = {**old, "text": new_item["text"], "entities": new_item["entities"]}
+        elif (old["type"] == "text") != (new_item["type"] == "text"):
             return notice("type_change")
-        items[index] = new_item
+        else:
+            items[index] = new_item
+        return await self._save_edit(sub, items, editor, allowed)
+
+    async def change_media(self, sid: int, op: str, index: int, new_items: list[dict], editor: str,
+                           allowed: tuple[str, ...], by_submitter: bool) -> Notice | None:
+        """/add、/replace、/remove：新增 / 替换 / 删除图片和视频，规则见 media.py。
+        审核员发的媒体不记 msg_id：那是审核群里的消息编号，会和投稿人私聊里的编号混淆（投稿人“编辑”时按它找稿件）。"""
+        sub = await self.db.get(sid)
+        err = self._check_editable(sub, sid, allowed)
+        if err:
+            return err
+        if not by_submitter:
+            new_items = [{k: v for k, v in it.items() if k != "msg_id"} for it in new_items]
+        if op == "add":
+            items, err = media.add(sub.items, new_items)
+        elif op == "replace":
+            items, err = media.replace(sub.items, index, new_items)
+        else:
+            items, err = media.remove(sub.items, index)
+        if err:
+            return err
         return await self._save_edit(sub, items, editor, allowed)
 
     @staticmethod

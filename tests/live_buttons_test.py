@@ -1,4 +1,4 @@
-"""其余审核按钮：🔁 重试发布、↩️ 取消定时（不需要二次确认）。
+"""其余审核按钮：🔁 重试发布、↩️ 取消定时（不需要二次确认；取消定时会通知投稿人）。
 
 用法（项目根目录下）：python tests/live_buttons_test.py
 发布失败用模拟服务器的失败注入（MOCK["fail"]）制造。复用 live_test.py 的模拟 Bot API 服务器。约 8 秒。
@@ -9,13 +9,24 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import live_test as lt  # noqa: E402
-from live_test import ADMIN, CHANNEL, REVIEW, buttons, check, is_send, log, submit, wait_for  # noqa: E402
+from live_test import ADMIN, CHANNEL, REVIEW, USER, buttons, check, is_send, log, submit, wait_for  # noqa: E402
 
 
 def control_edit(ctrl, since, contains):
     mid = str(ctrl["result"]["message_id"])
     return wait_for(lambda e: e["method"] == "editMessageText" and str(e["params"].get("message_id")) == mid
                     and contains in e["params"]["text"], since=since)
+
+
+async def schedule(ctrl, sid):
+    """定时发布 → 选第一个快捷时间。返回 (控制消息的更新, 投稿人收到的“将于…发布”通知)。"""
+    n = len(log); lt.cb(f"r:sched:{sid}:0", REVIEW, ADMIN)
+    picker = await wait_for(lambda e: e["method"] == "editMessageReplyMarkup", since=n)
+    preset = next(v for v in buttons(picker).values() if v.startswith("r:preset:"))
+    n = len(log); lt.cb(preset, REVIEW, ADMIN)
+    scheduled = await control_edit(ctrl, n, "定时")
+    told = await wait_for(lambda e: is_send(e, "sendMessage", USER, "将于"), since=n)
+    return scheduled, told
 
 
 def posts(since, text):
@@ -49,14 +60,11 @@ async def scenario():
     check("Retry on an already-published submission → 'status changed', nothing posted twice",
           told and not posts(n, "按钮测试 1"))
 
-    # 4. 定时 → 取消定时：回到待审核，按钮恢复成“立即发布 / 定时发布”
-    n = len(log); lt.cb("r:sched:2:0", REVIEW, ADMIN)
-    picker = await wait_for(lambda e: e["method"] == "editMessageReplyMarkup", since=n)
-    preset = next(v for v in buttons(picker).values() if v.startswith("r:preset:"))
-    n = len(log); lt.cb(preset, REVIEW, ADMIN)
-    scheduled = await control_edit(c2, n, "定时")
-    check("scheduled → Unschedule button shown",
-          scheduled and buttons(scheduled).get("↩️ 取消定时") == "r:unsched:2:0", scheduled and buttons(scheduled))
+    # 4. 定时 → 取消定时：回到待审核，按钮恢复成“立即发布 / 定时发布”；投稿人先收到发布时间，取消后收到撤回通知
+    scheduled, told = await schedule(c2, 2)
+    check("scheduled → Unschedule button shown, submitter told the time",
+          scheduled and buttons(scheduled).get("↩️ 取消定时") == "r:unsched:2:0" and told,
+          scheduled and buttons(scheduled))
     n = len(log); lt.cb("r:unsched:2:0", REVIEW, ADMIN)
     pending = await control_edit(c2, n, "待审核")
     toast = await wait_for(lambda e: e["method"] == "answerCallbackQuery" and "已取消定时" in e["params"].get("text", ""),
@@ -64,12 +72,21 @@ async def scenario():
     check("Unschedule → back to pending, Publish / Schedule buttons back, no confirm needed",
           pending and toast and "✅ 立即发布" in buttons(pending) and "⏰ 定时发布" in buttons(pending),
           pending and buttons(pending))
+    told = await wait_for(lambda e: is_send(e, "sendMessage", USER, "原定的发布时间已取消"), since=n)
+    check("Unschedule → submitter notified, as a reply to their submission",
+          told and told["params"].get("reply_parameters", {}).get("message_id"), told and told["params"])
 
-    # 5. 已经是待审核的再点“取消定时”（旧按钮）：提示状态已变化
+    # 5. 已经是待审核的再点“取消定时”（旧按钮）：提示状态已变化，不会再通知投稿人
     n = len(log); lt.cb("r:unsched:2:0", REVIEW, ADMIN)
     toast = await wait_for(lambda e: e["method"] == "answerCallbackQuery" and "状态已变化" in e["params"].get("text", ""),
                            since=n)
-    check("Unschedule on a pending submission → 'status changed'", toast)
+    await asyncio.sleep(0.5)
+    again = [e for e in log[n:] if is_send(e, "sendMessage", USER)]
+    check("Unschedule on a pending submission → 'status changed', submitter not notified again", toast and not again)
+
+    # 6. 重新定时：投稿人再次收到发布时间
+    scheduled, told = await schedule(c2, 2)
+    check("rescheduled after Unschedule → submitter told the new time again", scheduled and told)
 
 
 if __name__ == "__main__":

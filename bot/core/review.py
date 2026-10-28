@@ -110,6 +110,8 @@ class ReviewMixin(CoreBase):
         )
         if not ok:
             return notice("status_changed")
+        # 定时时告诉过投稿人发布时间，取消了也要告诉他，免得一直等着那个时间
+        await self.notify(await self.db.get(sid), "notify_unscheduled")
         await self.refresh_control(sid)
         await self.refresh_stats()
         return None

@@ -176,6 +176,10 @@ T: dict[str, dict[str, str]] = {
         "zh": '✅ 你的投稿已通过审核，将于 {when} 发布。',
         "en": '✅ Your submission was approved and will be published {when}.',
     },
+    "notify_rescheduled": {
+        "zh": '🕒 你的投稿发布时间已改为 {when}。',
+        "en": '🕒 Your submission will now be published {when}.',
+    },
     "notify_unscheduled": {
         "zh": '⏳ 你的投稿原定的发布时间已取消，重新回到审核中，有结果后会再通知你。',
         "en": "⏳ The planned publishing time for your submission was cancelled. It's back in review; "

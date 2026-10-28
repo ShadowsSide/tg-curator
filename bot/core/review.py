@@ -92,13 +92,15 @@ class ReviewMixin(CoreBase):
         sub = await self.db.get(sid)
         if not sub:
             return notice("sub_not_found", sid=sid)
-        was_pending = sub.status == "pending"
+        # 通知投稿人：第一次定时告诉他发布时间；改时间（已定时 → 另一个时间）告诉他新时间
+        key = ("notify_scheduled" if sub.status == "pending"
+               else "notify_rescheduled" if sub.status == "scheduled" and sub.scheduled_at != ts else None)
         fields = self._review_fields(sub, reviewer, "approved")
         if not await self.db.transition(sid, ("pending", "scheduled", "failed"), "scheduled",
                                         scheduled_at=ts, error=None, **fields):
             return notice("status_changed")
-        if was_pending:
-            await self.notify(sub, "notify_scheduled", sid=sid, when=self.fmt(ts, await self.user_lang(sub.user_id)))
+        if key:
+            await self.notify(sub, key, sid=sid, when=self.fmt(ts, await self.user_lang(sub.user_id)))
         await self.refresh_control(sid)
         await self.refresh_stats()
         return None

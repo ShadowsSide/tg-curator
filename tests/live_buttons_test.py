@@ -1,4 +1,4 @@
-"""其余审核按钮：🔁 重试发布、↩️ 取消定时（不需要二次确认；取消定时会通知投稿人）。
+"""其余审核按钮：🔁 重试发布、↩️ 取消定时（不需要二次确认；取消定时、改时间都会通知投稿人）。
 
 用法（项目根目录下）：python tests/live_buttons_test.py
 发布失败用模拟服务器的失败注入（MOCK["fail"]）制造。复用 live_test.py 的模拟 Bot API 服务器。约 8 秒。
@@ -87,6 +87,20 @@ async def scenario():
     # 6. 重新定时：投稿人再次收到发布时间
     scheduled, told = await schedule(c2, 2)
     check("rescheduled after Unschedule → submitter told the new time again", scheduled and told)
+
+    # 7. 已定时的“改时间”：换成另一个时间 → 投稿人收到新时间；选回同一个时间 → 不通知
+    n = len(log); lt.cb("r:sched:2:0", REVIEW, ADMIN)
+    picker = await wait_for(lambda e: e["method"] == "editMessageReplyMarkup", since=n)
+    presets = [v for v in buttons(picker).values() if v.startswith("r:preset:")]
+    n = len(log); lt.cb(presets[1], REVIEW, ADMIN)  # 第一个快捷时间刚才已经用过，换第二个
+    changed = await wait_for(lambda e: is_send(e, "sendMessage", USER, "发布时间已改为"), since=n)
+    first = [e for e in log[n:] if is_send(e, "sendMessage", USER, "已通过审核")]
+    check("Reschedule to a different time → submitter told the new time (not the first-approval text)",
+          changed and not first, changed and changed["params"]["text"])
+    n = len(log); lt.cb(presets[1], REVIEW, ADMIN)
+    await wait_for(lambda e: e["method"] == "answerCallbackQuery", since=n)
+    await asyncio.sleep(0.5)
+    check("Reschedule to the same time → no notification", not [e for e in log[n:] if is_send(e, "sendMessage", USER)])
 
 
 if __name__ == "__main__":

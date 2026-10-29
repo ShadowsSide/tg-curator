@@ -3,26 +3,37 @@ from __future__ import annotations
 import html
 
 from aiogram import F, Router
-from aiogram.exceptions import TelegramAPIError
+from aiogram.dispatcher.event.bases import SkipHandler
 from aiogram.filters import Command, CommandObject
-from aiogram.fsm.context import FSMContext
-from aiogram.fsm.state import State, StatesGroup
-from aiogram.types import CallbackQuery, ForceReply, Message
+from aiogram.types import CallbackQuery, Message
 
 from .. import entities as ent
 from ..config import Settings
-from ..core import NO_PREVIEW, Core, explicit_reply, mention, topic_of
+from ..core import NO_PREVIEW, Core, explicit_reply
+from ..db import Prompt
+from ..errors import Notice, notice
 from ..permissions import ReviewerCheck, ReviewerOnly, ReviewerPolicy
 from ..i18n import t
-from ..keyboards import ReviewCB
-from ..render import dump_link_preview, message_item, user_link
+from ..keyboards import ReviewCB, route
+from ..render import dump_link_preview, extract_item, message_item, user_link
 from ..timeutil import parse_time
 
 MAX_REASON = 500
+# 回复提示时这些错误可以改了再回复一次，提示保留；其他错误（比如投稿已被别人处理）提示作废
+RETRYABLE = ("prompt_text_needed", "custom_time_bad", "time_past", "too_long", "text_empty",
+             "media_only_photo_video", "media_replace_one", "media_too_many")
+REVIEWER_MEDIA = ("pending",)  # 审核员只能在待审核时改媒体
 
 
-class ScheduleInput(StatesGroup):
-    waiting = State()
+# 按钮 → 提示的种类；FOLD 里的按钮来自面板（理由面板、媒体面板），发提示时把控制消息恢复原样
+PROMPT_KIND = {"custom": "time", "edit": "edit", "msg": "msg", "creason": "reason", "madd": "madd", "mrep": "mrep"}
+FOLD = ("creason", "madd", "mrep")
+
+
+def _is_owner(m: Message, prompt: Prompt) -> bool:
+    """这条消息是不是点按钮的那个人发的。匿名管理员（以群的身份发言）看不出是谁，一律算数。"""
+    anonymous_admin = m.sender_chat is not None and m.sender_chat.id == m.chat.id
+    return m.from_user.id == prompt.user_id or anonymous_admin
 
 
 def _user_id_arg(command: CommandObject) -> int | None:
@@ -44,13 +55,9 @@ def _split_user(args: str) -> tuple[int | None, str | None]:
 
 
 async def _replied_sid(m: Message, core: Core) -> int | None:
-    """命令针对的投稿：回复了投稿消息就用它；话题模式下，在投稿的话题里直接发命令也行。"""
+    """命令针对的投稿：回复的那条投稿消息（预览、控制消息、转来的留言）。"""
     reply = explicit_reply(m)
-    if reply:
-        return await core.sid_for_review_message(reply.message_id)
-    if topic_of(m):
-        return await core.sid_for_review_topic(topic_of(m))
-    return None
+    return await core.sid_for_review_message(reply.message_id) if reply else None
 
 
 def build_router(settings: Settings) -> Router:
@@ -66,10 +73,21 @@ def build_router(settings: Settings) -> Router:
     # ---------- 控制按钮 ----------
 
     @router.callback_query(ReviewCB.filter())
-    async def on_button(cq: CallbackQuery, callback_data: ReviewCB, core: Core, state: FSMContext) -> None:
-        sid, action = callback_data.sid, callback_data.a
+    async def on_button(cq: CallbackQuery, callback_data: ReviewCB, core: Core) -> None:
+        sid = callback_data.sid
         who = cq.from_user
         lang = core.lang
+
+        # 拒绝先选理由、发布 / 拒绝 / 封禁先确认（见 keyboards.route）；走到最后才真正执行
+        step, action, v = route(callback_data.a, callback_data.v, bool(settings.reject_templates))
+        if step == "reasons":
+            await core.show_reject_reasons(sid)
+            await cq.answer(t(lang, "toast_pick_reason"))
+            return
+        if step == "confirm":
+            await core.show_confirm(sid, action, v)
+            await cq.answer(t(lang, "toast_confirm"))
+            return
 
         if action == "spoiler":
             await cq.answer((await core.toggle_spoiler(sid)).text(lang))
@@ -92,23 +110,31 @@ def build_router(settings: Settings) -> Router:
             await core.refresh_control(sid)
             await cq.answer()
         elif action == "preset":
-            err = await core.schedule(sid, callback_data.v, who)
-            await cq.answer(err.text(lang) if err else t(lang, "toast_scheduled", when=core.fmt(callback_data.v)),
+            err = await core.schedule(sid, v, who)
+            await cq.answer(err.text(lang) if err else t(lang, "toast_scheduled", when=core.fmt(v)),
                             show_alert=bool(err))
-        elif action == "custom":
-            prompt = await cq.message.reply(  # 回复在控制消息下面，看得出是哪条投稿
-                t(lang, "custom_time_prompt", who=mention(who), sid=sid),
-                reply_markup=ForceReply(selective=True, input_field_placeholder="20:30"),
-            )
-            await state.set_state(ScheduleInput.waiting)
-            await state.update_data(sid=sid, prompt_id=prompt.message_id)
+        elif action in PROMPT_KIND:  # 发一条提示，审核员回复它（见 on_prompt_reply）
+            if action in FOLD:
+                await core.refresh_control(sid)
+            await core.ask(sid, PROMPT_KIND[action], who, cq.message.message_id, v)
             await cq.answer()
+        elif action == "media":
+            err = await core.show_media_panel(sid)
+            await cq.answer(err.text(lang) if err else None, show_alert=bool(err))
+        elif action == "mrm":
+            err = await core.change_media(sid, "remove", v, [], who.full_name, REVIEWER_MEDIA, by_submitter=False)
+            if err:
+                await core.refresh_control(sid)  # 收起确认面板
+            await cq.answer(err.text(lang) if err else t(lang, "toast_media_removed", n=v), show_alert=bool(err))
         elif action == "unsched":
             err = await core.unschedule(sid)
             await cq.answer(err.text(lang) if err else t(lang, "toast_unscheduled"))
         elif action == "reject":
-            err = await core.reject(sid, who)
-            await cq.answer(err.text(lang) if err else t(lang, "toast_rejected"), show_alert=bool(err))
+            reason = settings.reject_template(v)
+            err = await core.reject(sid, who, reason)
+            # 按钮提示最多 200 字符，理由是用户配置的，可能很长
+            ok = t(lang, "toast_rejected_with", reason=reason[:150]) if reason else t(lang, "toast_rejected")
+            await cq.answer(err.text(lang) if err else ok, show_alert=bool(err))
         elif action == "ban":
             sub = await core.get_submission(sid)
             if not sub:
@@ -118,6 +144,89 @@ def build_router(settings: Settings) -> Router:
             await cq.answer(t(lang, "toast_banned", n=len(rejected)))
         else:
             await cq.answer()
+
+    # ---------- 回复提示 ----------
+
+    @router.message(F.reply_to_message)
+    async def on_prompt_reply(m: Message, core: Core) -> None:
+        """回复了机器人的提示（“请回复本消息……”）。不是提示、不是点按钮的那个人、或者发的是命令，就交给后面的处理函数。"""
+        reply = explicit_reply(m)
+        prompt = await core.get_prompt(m.chat.id, reply.message_id) if reply else None
+        if not prompt or not _is_owner(m, prompt) or (m.text or "").startswith("/"):
+            raise SkipHandler
+        if prompt.kind in ("madd", "mrep"):
+            if m.media_group_id:  # 回复的是相册：收齐所有项再一起处理
+                core.albums.add(m, lambda messages: _answer_media(prompt, messages, core))
+            else:
+                await _answer_media(prompt, [m], core)
+            return
+        await _finish(prompt, m, core, *await _answer_prompt(prompt, m, core))
+
+    @router.message(F.media_group_id)
+    async def album_rest(m: Message, core: Core) -> None:
+        """相册里没带回复的其余项（如果有）：并进正在收集的那个相册。"""
+        if not core.albums.join(m):
+            raise SkipHandler
+
+    async def _finish(prompt: Prompt, m: Message, core: Core, err: Notice | None, done: str) -> None:
+        """回复提示的结果：成功就删掉提示；出错时能改了再试的保留提示，其他的作废。"""
+        if err:
+            await m.reply(err.text(core.lang))
+            if err.key not in RETRYABLE:
+                await core.finish_prompt(prompt)
+            return
+        await core.finish_prompt(prompt)
+        await m.reply(done)
+
+    async def _answer_media(prompt: Prompt, messages: list[Message], core: Core) -> None:
+        """回复了“添加 / 替换”的提示：发来的图片视频（可以是相册）加进投稿或换掉第 arg 个。"""
+        first = messages[0]
+        items = [extract_item(x) for x in messages]
+        if any(it is None or it["type"] == "text" for it in items):
+            err = notice("media_only_photo_video")
+        else:
+            op = "add" if prompt.kind == "madd" else "replace"
+            err = await core.change_media(prompt.sid, op, prompt.arg, items, first.from_user.full_name,
+                                          REVIEWER_MEDIA, by_submitter=False)
+        await _finish(prompt, first, core, err, t(core.lang, "admin_edited"))
+
+    async def _answer_prompt(prompt: Prompt, m: Message, core: Core) -> tuple[Notice | None, str]:
+        """按提示的种类执行，返回 (错误, 成功时的回复)。"""
+        sid, lang, who = prompt.sid, core.lang, m.from_user
+        body = m.text or m.caption or ""
+        entities = ent.dump(m.entities or m.caption_entities)
+        if prompt.kind == "msg":
+            item = message_item(m, body, entities)
+            if item is None:  # 空消息或不支持的类型（比如投票）
+                return notice("prompt_text_needed"), ""
+            return await core.relay_to_user(sid, who, item), t(lang, "msg_sent_to_user")
+        if not body.strip():
+            return notice("prompt_text_needed"), ""
+        if prompt.kind == "time":
+            ts = parse_time(body, settings.tz)
+            if ts is None:
+                return notice("custom_time_bad"), ""
+            return await core.schedule(sid, ts, who), t(lang, "custom_time_done", when=core.fmt(ts))
+        if prompt.kind == "edit":
+            err = await core.edit(sid, who.full_name, body, entities, dump_link_preview(m.link_preview_options))
+            return err, t(lang, "admin_edited")
+        reason = _clean_reason(body)
+        return (await core.reject(sid, who, reason),
+                t(lang, "rejected_reply") + t(lang, "reason_line", reason=html.escape(reason)))
+
+    @router.message(Command("cancel"))
+    async def cancel_cmd(m: Message, core: Core) -> None:
+        """放弃等待回复的提示：回复某条提示发送就只放弃它，直接发送放弃自己在审核群里所有的提示。
+        只能放弃自己的（匿名管理员除外），和回复提示的规则一样。"""
+        reply = explicit_reply(m)
+        prompt = await core.get_prompt(m.chat.id, reply.message_id) if reply else None
+        if prompt:
+            prompts = [prompt] if _is_owner(m, prompt) else []
+        else:
+            prompts = await core.prompts_of(m.chat.id, m.from_user.id)
+        for p in prompts:
+            await core.cancel_prompt(p)
+        await m.reply(t(core.lang, "prompt_cancelled" if prompts else "prompt_none"))
 
     # ---------- 命令 ----------
 
@@ -182,7 +291,7 @@ def build_router(settings: Settings) -> Router:
 
     @router.message(Command("msg"))
     async def msg_cmd(m: Message, core: Core) -> None:
-        """审核员给投稿人发消息：回复投稿（或在投稿的话题里）发送 /msg 内容。"""
+        """审核员给投稿人发消息：回复投稿发送 /msg 内容。"""
         body, entities = ent.strip_command(m.text or m.caption or "", ent.dump(m.entities or m.caption_entities))
         sid = await _replied_sid(m, core)
         if sid is None:
@@ -232,41 +341,6 @@ def build_router(settings: Settings) -> Router:
             await m.reply(t(core.lang, "not_banned", uid=uid))
             return
         await m.reply(t(core.lang, "unbanned_reply", uid=uid))
-
-    # ---------- 自定义定时：等待管理员回复时间 ----------
-
-    @router.message(ScheduleInput.waiting, F.text)
-    async def on_time_input(m: Message, state: FSMContext, core: Core) -> None:
-        data = await state.get_data()
-        sid, prompt_id = data["sid"], data.get("prompt_id")
-
-        # 只接受对提示消息的回复，避免把群里其他聊天当成时间
-        if not m.reply_to_message or m.reply_to_message.message_id != prompt_id:
-            return
-
-        if m.text.strip().lower() in ("取消", "cancel"):
-            await state.clear()
-            await m.reply(t(core.lang, "custom_time_cancelled"))
-            return
-
-        ts = parse_time(m.text, settings.tz)
-        if ts is None:
-            await m.reply(t(core.lang, "custom_time_bad"))
-            return
-
-        err = await core.schedule(sid, ts, m.from_user)
-        if err:
-            await m.reply(err.text(core.lang))
-            if err.key != "time_past":  # 时间已过：保留状态，让管理员重新输入
-                await state.clear()
-            return
-
-        await state.clear()
-        await m.reply(t(core.lang, "custom_time_done", sid=sid, when=core.fmt(ts)))
-        try:
-            await m.bot.delete_message(m.chat.id, prompt_id)
-        except TelegramAPIError:
-            pass
 
     @router.message(F.reply_to_message)
     async def plain_reply(m: Message, core: Core) -> None:

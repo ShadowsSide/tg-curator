@@ -10,14 +10,7 @@ import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import live_test as lt  # noqa: E402
-from live_test import ADMIN, CHANNEL, CTRL, REVIEW, USER, check, is_send, log, wait_for  # noqa: E402
-
-
-async def submit(text, sid):
-    n = len(log); lt.pm(text)
-    await wait_for(lambda e: is_send(e, "sendMessage", USER, "请选择投稿方式"), since=n)
-    n = len(log); lt.cb(f"u:sign:{sid}", USER, USER)
-    return await wait_for(lambda e: is_send(e, "sendMessage", REVIEW, CTRL), since=n)
+from live_test import ADMIN, CHANNEL, REVIEW, check, is_send, log, submit, wait_for  # noqa: E402
 
 
 def floods(since, method, chat):
@@ -31,7 +24,7 @@ async def scenario():
 
     # 1. 发布到频道时被短暂限流 → 自动等待后重试成功，不会标记为失败
     lt.MOCK["flood"][f"sendMessage:{CHANNEL}"] = [2]
-    n = len(log); t0 = time.time(); lt.cb("r:pub:1:0", REVIEW, ADMIN)
+    n = len(log); t0 = time.time(); lt.cb("r:pub_ok:1:0", REVIEW, ADMIN)
     post = await wait_for(lambda e: is_send(e, "sendMessage", CHANNEL, "限流测试 1"), timeout=15, since=n)
     failed = [e for e in log[n:] if e["method"] == "editMessageText" and "发布失败" in e["params"].get("text", "")]
     check("short 429 on publish → waits ~2s, retries, post goes out, not marked failed",
@@ -40,7 +33,7 @@ async def scenario():
 
     # 2. 被限流太久（超过原地等待上限）→ 改为稍后自动发布，状态是“已定时”而不是“发布失败”
     lt.MOCK["flood"][f"sendMessage:{CHANNEL}"] = [120]
-    n = len(log); lt.cb("r:pub:2:0", REVIEW, ADMIN)
+    n = len(log); lt.cb("r:pub_ok:2:0", REVIEW, ADMIN)
     msg = await wait_for(lambda e: is_send(e, "sendMessage", REVIEW, "限流"), since=n)
     ctrl_sched = await wait_for(lambda e: e["method"] == "editMessageText"
                                 and str(e["params"].get("message_id")) == str(ctrls[1]["result"]["message_id"])

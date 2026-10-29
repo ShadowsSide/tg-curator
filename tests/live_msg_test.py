@@ -1,4 +1,5 @@
-"""/msg 沟通的边界情况：沟通窗口关闭、被封禁的用户、英文客户端看到的身份标签。
+"""/msg 沟通的边界情况：沟通窗口关闭、被封禁的用户、英文客户端看到的身份标签；
+投稿人直接回复审核员的消息（不写 /msg）也按同样的规则转达。
 
 用法（项目根目录下）：python tests/live_msg_test.py
 以 MSG_WINDOW_DAYS=0 运行（审核结束后立即关闭沟通），复用 live_test.py 的模拟 Bot API 服务器。约 10 秒。
@@ -9,7 +10,7 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import live_test as lt  # noqa: E402
-from live_test import ADMIN, BOB, CTRL, REVIEW, USER, check, gm, is_send, log, now, pm, wait_for  # noqa: E402
+from live_test import ADMIN, BOB, REVIEW, USER, check, gm, is_send, log, now, pm, submit, wait_for  # noqa: E402
 
 
 def reply_to(chat_id, message_id, by_bot=True):
@@ -18,20 +19,11 @@ def reply_to(chat_id, message_id, by_bot=True):
     return {"message_id": message_id, "date": now(), "chat": lt.chat(chat_id), "from": sender}
 
 
-async def submit(text, sid, who):
-    n = len(log); pm(text, who=who)
-    prompt = await wait_for(lambda e: is_send(e, "sendMessage", who, "请选择投稿方式")
-                            or is_send(e, "sendMessage", who, "How would you like"), since=n)
-    n = len(log); lt.cb(f"u:sign:{sid}", who, who)
-    ctrl = await wait_for(lambda e: is_send(e, "sendMessage", REVIEW, CTRL), since=n)
-    return prompt, ctrl
-
-
 async def scenario():
     await wait_for(lambda e: e["method"] == "setMyCommands", 15, since=0)
 
     # 英文客户端的投稿人：看到的是 “Reviewer”，审核群里仍是中文
-    prompt, ctrl = await submit("english user post", 1, BOB)
+    ctrl = await submit("english user post", 1, BOB)
     n = len(log); gm("/msg please add a source", reply_to=ctrl["result"]["message_id"])
     e = await wait_for(lambda e: is_send(e, "sendMessage", BOB, "please add a source"), since=n)
     check("English submitter sees the reviewer as “Reviewer”", e and e["params"]["text"].startswith("💬 Reviewer:"))
@@ -39,6 +31,16 @@ async def scenario():
     n = len(log); pm("/msg here it is", who=BOB, reply_to_message=reply_to(BOB, relay))
     e = await wait_for(lambda e: is_send(e, "sendMessage", REVIEW, "here it is"), since=n)
     check("review group label stays in the review language", e and e["params"]["text"].startswith("💬 投稿人："))
+    n = len(log); pm(None, who=BOB, reply_to_message=reply_to(BOB, relay), caption="the source",
+                     photo=[{"file_id": "SRC", "file_unique_id": "SRC", "width": 1, "height": 1}])
+    e = await wait_for(lambda e: is_send(e, "sendPhoto", REVIEW, "the source"), since=n)
+    check("plain reply with a photo → relayed as a photo", e and e["params"]["photo"] == "SRC")
+    n = len(log); pm(None, who=BOB, reply_to_message=reply_to(BOB, relay),
+                     sticker={"file_id": "S", "file_unique_id": "S", "type": "regular", "width": 1, "height": 1,
+                              "is_animated": False, "is_video": False})
+    e = await wait_for(lambda e: is_send(e, "sendMessage", BOB, "isn't supported"), since=n)
+    leaked = [x for x in log[n:] if str(x["params"].get("chat_id")) == str(REVIEW)]
+    check("plain reply with a sticker → told it can't be sent, nothing relayed", e and not leaked)
 
     # 审核结束 → MSG_WINDOW_DAYS=0 时立即关闭沟通（双方都提示已关闭）
     n = len(log); gm("/no 不合适", reply_to=ctrl["result"]["message_id"])
@@ -51,9 +53,13 @@ async def scenario():
     n = len(log); pm("/msg can I still talk?", who=BOB, reply_to_message=reply_to(BOB, relay))
     e = await wait_for(lambda e: is_send(e, "sendMessage", BOB, "messaging is closed"), since=n)
     check("after the window closes, submitter /msg is refused (in English)", e)
+    n = len(log); pm("and without /msg?", who=BOB, reply_to_message=reply_to(BOB, relay))
+    e = await wait_for(lambda e: is_send(e, "sendMessage", BOB, "messaging is closed"), since=n)
+    leaked = await wait_for(lambda e: is_send(e, "sendMessage", REVIEW, "without /msg"), timeout=0.5, since=n)
+    check("after the window closes, a plain reply is refused too", e and not leaked)
 
     # 被封禁的投稿人不能再发 /msg；审核员仍可以给他发消息（例如解释原因）
-    prompt2, ctrl2 = await submit("会被封禁的人", 2, USER)
+    ctrl2 = await submit("会被封禁的人", 2, USER)
     n = len(log); gm("/msg 先问一下", reply_to=ctrl2["result"]["message_id"])
     relay2 = (await wait_for(lambda e: is_send(e, "sendMessage", USER, "先问一下"), since=n))["result"]["message_id"]
     n = len(log); lt.push(message={
@@ -66,6 +72,10 @@ async def scenario():
     e = await wait_for(lambda e: is_send(e, "sendMessage", USER, "你已被禁止投稿"), since=n)
     leaked = await wait_for(lambda e: is_send(e, "sendMessage", REVIEW, "为什么封我"), timeout=0.5, since=n)
     check("banned submitter cannot /msg", e and not leaked)
+    n = len(log); pm("不写命令直接回复", reply_to_message=reply_to(USER, relay2))
+    e = await wait_for(lambda e: is_send(e, "sendMessage", USER, "你已被禁止投稿"), since=n)
+    leaked = await wait_for(lambda e: is_send(e, "sendMessage", REVIEW, "不写命令直接回复"), timeout=0.5, since=n)
+    check("banned submitter's plain reply isn't relayed either", e and not leaked)
 
 
 if __name__ == "__main__":

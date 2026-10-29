@@ -38,20 +38,18 @@ def chat(cid):
     return {"id": cid, "type": "private" if cid > 0 else ("channel" if cid == CHANNEL else "supergroup")}
 
 
-MOCK = {"review_is_forum": False, "bot_topics": False,
-        # 限流注入："方法名:chat_id" → 依次返回的 retry_after 秒数列表，每次调用消耗一个
+MOCK = {# 限流注入："方法名:chat_id" → 依次返回的 retry_after 秒数列表，每次调用消耗一个
         "flood": {},
+        # 失败注入："方法名:chat_id" → 依次返回的错误描述列表（HTTP 400），每次调用消耗一个
+        "fail": {},
         # 审核群管理员（getChatMember 返回 creator），其他人返回普通成员
         "admins": {7}}
-next_topic = [7000]
+markups: dict = {}  # (chat_id, message_id) → 当前按钮：和 Telegram 一样，按钮没变时编辑会报 “message is not modified”
 
 
-def make_msg(chat_id, thread_id=None):
+def make_msg(chat_id):
     mid[0] += 1
-    msg = {"message_id": mid[0], "date": now(), "chat": chat(int(chat_id))}
-    if thread_id:
-        msg.update(message_thread_id=int(thread_id), is_topic_message=True)
-    return msg
+    return {"message_id": mid[0], "date": now(), "chat": chat(int(chat_id))}
 
 
 async def handle(request: web.Request):
@@ -76,6 +74,11 @@ async def handle(request: web.Request):
                     "t": time.time()})
         return web.json_response({"ok": False, "error_code": 429, "parameters": {"retry_after": retry_after},
                                   "description": f"Too Many Requests: retry after {retry_after}"}, status=429)
+    fail = MOCK["fail"].get(f"{method}:{params.get('chat_id')}")
+    if fail:
+        description = fail.pop(0)
+        log.append({"method": method, "params": params, "result": None, "error": True, "t": time.time()})
+        return web.json_response({"ok": False, "error_code": 400, "description": description}, status=400)
     if m == "getupdates":
         offset = int(params.get("offset") or 0)
         timeout = min(float(params.get("timeout") or 0), 2)
@@ -94,16 +97,24 @@ async def handle(request: web.Request):
         return web.json_response({"ok": False, "error_code": 400,
                                   "description": "Bad Request: custom emoji can't be used in this chat"}, status=400)
 
-    thread = params.get("message_thread_id")
+    if m in ("editmessagereplymarkup", "editmessagetext"):
+        key = (str(params.get("chat_id")), str(params.get("message_id")))
+        if m == "editmessagereplymarkup" and markups.get(key) == params.get("reply_markup"):
+            log.append({"method": method, "params": params, "result": None, "error": True, "t": time.time()})
+            return web.json_response({"ok": False, "error_code": 400, "description":
+                                      "Bad Request: message is not modified: specified new message content and reply "
+                                      "markup are exactly the same as a current content and reply markup of the message"},
+                                     status=400)
+        markups[key] = params.get("reply_markup")
+
     if m == "getme":
-        result = {"id": 1, "is_bot": True, "first_name": "TestBot", "username": "test_bot",
-                  "has_topics_enabled": MOCK["bot_topics"]}
+        result = {"id": 1, "is_bot": True, "first_name": "TestBot", "username": "test_bot"}
     elif m == "getchat":
         info = {"accent_color_id": 0, "max_reaction_count": 11,
                 "accepted_gift_types": {k: False for k in ("unlimited_gifts", "limited_gifts", "unique_gifts",
                                                            "premium_subscription", "gifts_from_channels")}}
         if str(params.get("chat_id")) == str(REVIEW):
-            result = {**chat(REVIEW), "title": "Review", "is_forum": MOCK["review_is_forum"], **info}
+            result = {**chat(REVIEW), "title": "Review", **info}
         else:
             result = {**chat(CHANNEL), "title": "Test Channel", "username": "testchan", "linked_chat_id": LINKED, **info}
     elif m == "getchatmember":
@@ -111,15 +122,12 @@ async def handle(request: web.Request):
         member_user = {"id": uid_, "is_bot": False, "first_name": f"U{uid_}"}
         result = ({"status": "creator", "user": member_user, "is_anonymous": False} if uid_ in MOCK["admins"]
                   else {"status": "member", "user": member_user})
-    elif m == "createforumtopic":
-        next_topic[0] += 1
-        result = {"message_thread_id": next_topic[0], "name": params["name"], "icon_color": int(params.get("icon_color", 0))}
     elif m == "copymessages":
-        result = [{"message_id": make_msg(params["chat_id"], thread)["message_id"]} for _ in params["message_ids"]]
+        result = [{"message_id": make_msg(params["chat_id"])["message_id"]} for _ in params["message_ids"]]
     elif m == "sendmediagroup":
-        result = [make_msg(params["chat_id"], thread) for _ in params["media"]]
+        result = [make_msg(params["chat_id"]) for _ in params["media"]]
     elif m.startswith("send"):
-        result = make_msg(params["chat_id"], thread)
+        result = make_msg(params["chat_id"])
     else:
         result = True
     log.append({"method": method, "params": params, "result": result, "t": time.time()})
@@ -200,6 +208,24 @@ def styles(e):
     return {b["text"]: b.get("style") for row in kb for b in row}
 
 
+def buttons(e):
+    """按钮文字 → callback_data。"""
+    kb = (e["params"].get("reply_markup") or {}).get("inline_keyboard", [])
+    return {b["text"]: b["callback_data"] for row in kb for b in row}
+
+
+PROMPTS = ("请选择投稿方式", "How would you like")  # “选择投稿方式”提示：中文客户端 / 其他客户端
+
+
+async def submit(text, sid, who=USER):
+    """投稿人发一条文字投稿并选“署名”。返回审核群里控制消息的 sendMessage 记录（没进审核群时为 None）。
+    其他测试文件共用；本文件的场景里另有一个带额外检查的同名局部函数。"""
+    n = len(log); pm(text, who=who)
+    await wait_for(lambda e: any(is_send(e, "sendMessage", who, p) for p in PROMPTS), since=n)
+    n = len(log); cb(f"u:sign:{sid}", who, who)
+    return await wait_for(lambda e: is_send(e, "sendMessage", REVIEW, CTRL), since=n)
+
+
 async def scenario():
     e = await wait_for(lambda e: e["method"] == "setMyCommands" and e["params"].get("language_code") == "en", 15, since=0)
     check("bot started; command menus registered per language", e and any(
@@ -266,7 +292,7 @@ async def scenario():
     e = await wait_for(lambda e: e["method"] == "editMessageText" and "静音发送：🔕 开" in e["params"].get("text", "")
                        and "剧透遮罩：🙈 开" in e["params"].get("text", ""), since=n)
     check("spoiler + silent toggled", e)
-    n = len(log); cb("r:pub:2:0", REVIEW, ADMIN)
+    n = len(log); cb("r:pub_ok:2:0", REVIEW, ADMIN)
     e = await wait_for(lambda e: is_send(e, "sendMediaGroup", CHANNEL), since=n)
     ok = e and all(m.get("has_spoiler") for m in e["params"]["media"]) and str(e["params"].get("disable_notification")).lower() == "true"
     check("published to channel with spoiler + silent (real HTTP payload)", ok,
@@ -334,7 +360,7 @@ async def scenario():
     check("review preview keeps all entities incl. custom emoji + date_time",
           pv and set(norm(rich_ents)) <= set(norm(pv["params"].get("entities"))) and "parse_mode" not in pv["params"],
           pv and pv["params"].get("entities"))
-    n = len(log); cb("r:pub:5:0", REVIEW, ADMIN)
+    n = len(log); cb("r:pub_ok:5:0", REVIEW, ADMIN)
     rejected = await wait_for(lambda e: e.get("error") and str(e["params"].get("chat_id")) == str(CHANNEL), since=n)
     pub = await wait_for(lambda e: is_send(e, "sendMessage", CHANNEL, "热门"), since=n)
     sig_text = "投稿人：Alice"
@@ -382,7 +408,7 @@ async def scenario():
                        since=n)
     check("/edit without text echoes current caption with formatting", e and norm(e["params"].get("entities")) == norm(shifted))
 
-    n = len(log); cb("r:pub:6:0", REVIEW, ADMIN)
+    n = len(log); cb("r:pub_ok:6:0", REVIEW, ADMIN)
     pub6 = await wait_for(lambda e: is_send(e, "sendPhoto", CHANNEL), since=n)
     p6 = pub6["params"] if pub6 else {}
     check("edited photo published: new caption, formatting, caption-above, spoiler",
@@ -453,7 +479,7 @@ async def scenario():
     check("replying with just /edit echoes current content", e)
 
     # 7f. 发布后再改 → 拒绝
-    n = len(log); cb("r:pub:7:0", REVIEW, ADMIN)
+    n = len(log); cb("r:pub_ok:7:0", REVIEW, ADMIN)
     await wait_for(lambda e: is_send(e, "sendMessage", CHANNEL, "2024年总结"), since=n)
     n = len(log); pm_edit(src, "发布后偷偷改")
     e = await wait_for(lambda e: is_send(e, "sendMessage", USER, "已经发布，不能修改"), since=n)
@@ -492,9 +518,11 @@ async def scenario():
 
     relay_id = to_user["result"]["message_id"]
     n = len(log); pm("直接回复不带命令", reply_to_message=reply_to(relay_id, by_bot=True))
-    hint = await wait_for(lambda e: is_send(e, "sendMessage", USER, "<code>/msg</code>"), since=n)
+    relayed = await wait_for(lambda e: is_send(e, "sendMessage", REVIEW, "直接回复不带命令"), since=n)
+    ok = await wait_for(lambda e: is_send(e, "sendMessage", USER, "已发送给审核员"), since=n)
     new_sub = await wait_for(lambda e: is_send(e, "sendMessage", USER, "请选择投稿方式"), timeout=0.5, since=n)
-    check("submitter plain reply to reviewer → hint, not treated as a new submission", hint and not new_sub)
+    check("submitter plain reply to reviewer → relayed to reviewers (no /msg needed), not a new submission",
+          relayed and "投稿人" in relayed["params"]["text"] and ok and not new_sub)
 
     n = len(log); pm("/msg 出处是官网", reply_to_message=reply_to(relay_id, by_bot=True))
     to_rev = await wait_for(lambda e: is_send(e, "sendMessage", REVIEW, "出处是官网"), since=n)
@@ -526,7 +554,22 @@ async def scenario():
     check("reminder loop posted stats on its own", e, e and e["params"]["text"].replace("\n", " | "))
 
 
-async def main(scenario_fn=None, extra_env=None):
+def unexpected_errors(lines, allowed=()):
+    """机器人日志里的错误。allowed：预期中的错误（ERROR 行里含这些文字），这条错误和它后面的堆栈都不算。"""
+    bad, expected = [], False
+    for line in lines:
+        if " ERROR " in line or " CRITICAL " in line:
+            expected = any(a in line for a in allowed)
+            if not expected:
+                bad.append(line)
+        elif line[:1].isdigit():  # 新的一条日志（以时间开头）：之前那条错误的堆栈结束了
+            expected = False
+        elif "Traceback" in line and not expected:
+            bad.append(line)
+    return bad
+
+
+async def main(scenario_fn=None, extra_env=None, allowed_errors=()):
     scenario_fn = scenario_fn or scenario
     app = web.Application()
     app.router.add_route("*", "/bot{token}/{method}", handle)
@@ -569,7 +612,7 @@ async def main(scenario_fn=None, extra_env=None):
     numbered = [x for x in shown if re.search(r"#\d", x)]
     check("no submission numbers shown to submitters or reviewers", not numbered, numbered[:3])
 
-    bad = [l for l in bot_log if "Traceback" in l or " ERROR " in l or " CRITICAL " in l]
+    bad = unexpected_errors(bot_log, allowed_errors)
     check("no errors in bot process log", not bad, "\n".join(bad[:10]))
     print("\n--- bot log (last 12 lines) ---")
     print("\n".join(l for l in bot_log if "Update id=" not in l)[-6000:])

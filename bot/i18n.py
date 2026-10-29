@@ -45,7 +45,10 @@ T: dict[str, dict[str, str]] = {
     "status_changed": {"zh": "状态已变化，请刷新", "en": "The status has changed, please refresh"},
     "default_sign": {"zh": "投稿人：{name}", "en": "Submitted by {name}"},
     "default_anon": {"zh": "匿名投稿", "en": "Anonymous submission"},
-    "topic_anon": {"zh": "匿名", "en": "anonymous"},
+    "default_reject_templates": {
+        "zh": "重复投稿|与频道主题不符|内容质量不足|含广告或推广",
+        "en": "Duplicate|Off-topic|Low quality|Advertising",
+    },
 
     # ---------- 内容类型 ----------
     "type_text": {"zh": "文字", "en": "text"},
@@ -64,8 +67,9 @@ T: dict[str, dict[str, str]] = {
             "发送后选择 <b>署名</b> 或 <b>匿名</b>，审核通过后会发布到频道，结果会通知你。\n\n"
             "<b>修改投稿</b>（审核结果出来之前都可以改）：\n"
             "· 直接用 Telegram 的“编辑”修改你发出的那条消息，机器人会自动同步（换图也可以）\n"
-            "· 或者<b>回复</b>你的投稿，发送 <code>/edit 新内容</code>；回复时只发 /edit 会把当前内容发给你，方便复制修改\n\n"
-            "<b>和审核员沟通</b>：回复审核员的消息或你的投稿，发送 <code>/msg 内容</code>\n\n"
+            "· 或者<b>回复</b>你的投稿，发送 <code>/edit 新内容</code>；回复时只发 /edit 会把当前内容发给你，方便复制修改\n"
+            "· 要加图：<b>回复</b>你的投稿发图片或视频，选“加到这条投稿”；要删图：点投稿下面的“删除图片 / 视频”\n\n"
+            "<b>和审核员沟通</b>：直接<b>回复</b>审核员发来的消息即可；也可以回复你的投稿，发送 <code>/msg 内容</code>\n\n"
             "/me 查看我的投稿统计"
         ),
         "en": (
@@ -76,9 +80,11 @@ T: dict[str, dict[str, str]] = {
             "<b>Editing</b> (possible until the review is done):\n"
             "· Use Telegram's “Edit” on the message you sent; the bot syncs it automatically (you can even swap the image)\n"
             "· Or <b>reply</b> to your submission with <code>/edit new content</code>; replying with just /edit sends "
-            "you the current content so you can copy and change it\n\n"
-            "<b>Talking to the reviewers</b>: reply to their message or your submission with "
-            "<code>/msg message</code>\n\n"
+            "you the current content so you can copy and change it\n"
+            "· To add photos, <b>reply</b> to your submission with them and choose “Add to that submission”; "
+            "to remove one, tap “Remove a photo / video” under your submission\n\n"
+            "<b>Talking to the reviewers</b>: just <b>reply</b> to the reviewer's message; or reply to your submission "
+            "with <code>/msg message</code>\n\n"
             "/me shows your submission stats"
         ),
     },
@@ -106,8 +112,21 @@ T: dict[str, dict[str, str]] = {
     },
     "btn_sign": {"zh": "👤 署名投稿", "en": "👤 Signed"},
     "btn_anon": {"zh": "🕶 匿名投稿", "en": "🕶 Anonymous"},
+    "btn_last": {"zh": "{label}（上次）", "en": "{label} (last time)"},
     "btn_cancel": {"zh": "取消", "en": "Cancel"},
     "invalid_sub": {"zh": "无效的投稿", "en": "Invalid submission"},
+    "spam_blocked_keyword": {
+        "zh": "🚫 投稿内容包含不允许的词语，请修改后重新选择投稿方式。",
+        "en": "🚫 Your submission contains words that aren't allowed. Edit it and choose a mode again.",
+    },
+    "spam_blocked_links": {
+        "zh": "🚫 投稿里的链接太多（最多 {max} 个），请修改后重新选择投稿方式。",
+        "en": "🚫 Too many links in your submission (at most {max}). Edit it and choose a mode again.",
+    },
+    "cooldown": {
+        "zh": "⏳ 投稿太频繁了，请 {m} 分钟后再提交。",
+        "en": "⏳ You're submitting too often. Please try again in {m} min.",
+    },
     "already_handled": {"zh": "这条投稿已经处理过了", "en": "This submission has already been handled"},
     "cannot_cancel": {"zh": "这条投稿已经提交，无法取消", "en": "This submission was already sent and can't be cancelled"},
     "cancelled": {"zh": "已取消。", "en": "Cancelled."},
@@ -118,6 +137,21 @@ T: dict[str, dict[str, str]] = {
         "en": "✅ Submitted {mode}.\nWe'll let you know the review result.",
     },
     "submitted_toast": {"zh": "已提交", "en": "Submitted"},
+    "choose_or_merge": {
+        "zh": "\n\n也可以把这些图片视频<b>加到你回复的那条投稿</b>里。",
+        "en": "\n\nOr <b>add these photos/videos to the submission you replied to</b>.",
+    },
+    "btn_merge": {"zh": "➕ 加到这条投稿", "en": "➕ Add to that submission"},
+    "merged": {
+        "zh": "➕ 已加到你之前的投稿里。",
+        "en": "➕ Added to your earlier submission.",
+    },
+    "merged_toast": {"zh": "已添加", "en": "Added"},
+    "btn_user_media": {"zh": "🗑 删除图片 / 视频", "en": "🗑 Remove a photo / video"},
+    "media_locked": {
+        "zh": "审核已经开始或结束，不能再修改图片视频了。",
+        "en": "The review has already started or ended, so photos and videos can't be changed any more.",
+    },
     "draft_expired": {
         "zh": "已过期，如需投稿请重新发送。",
         "en": "This has expired. Please send it again if you'd still like to submit it.",
@@ -159,6 +193,15 @@ T: dict[str, dict[str, str]] = {
     "notify_scheduled": {
         "zh": '✅ 你的投稿已通过审核，将于 {when} 发布。',
         "en": '✅ Your submission was approved and will be published {when}.',
+    },
+    "notify_rescheduled": {
+        "zh": '🕒 你的投稿发布时间已改为 {when}。',
+        "en": '🕒 Your submission will now be published {when}.',
+    },
+    "notify_unscheduled": {
+        "zh": '⏳ 你的投稿原定的发布时间已取消，重新回到审核中，有结果后会再通知你。',
+        "en": "⏳ The planned publishing time for your submission was cancelled. It's back in review; "
+              "you'll be notified once there's a decision.",
     },
     "notify_rejected": {
         "zh": '😢 你的投稿未通过审核。',
@@ -211,6 +254,25 @@ T: dict[str, dict[str, str]] = {
         "zh": "投稿状态刚刚发生了变化，修改未生效",
         "en": "The submission's status just changed, so the edit was not applied",
     },
+    "media_only_photo_video": {"zh": "只能添加图片或视频", "en": "Only photos and videos can be added"},
+    "media_mixed_types": {
+        "zh": "这条投稿里有文件、音频、语音或 GIF，不能和图片视频放在一起，请重新投稿",
+        "en": "This submission has a file, audio, voice message or GIF, which can't be combined with photos or videos. Please submit again",
+    },
+    "media_too_many": {"zh": "一条投稿最多 {max} 个图片或视频", "en": "A submission can have at most {max} photos or videos"},
+    "media_bad_index": {
+        "zh": "没有第 {n} 个，这条投稿共有 {count} 个图片或视频",
+        "en": "There's no item {n}; this submission has {count} photo(s) or video(s)",
+    },
+    "media_none": {"zh": "这是文字投稿，没有可以替换或删除的图片视频", "en": "This is a text submission; there's no photo or video to replace or remove"},
+    "media_replace_one": {"zh": "替换时一次只能发一个图片或视频", "en": "Send exactly one photo or video to replace with"},
+    "media_last_one": {"zh": "不能删除最后一个图片或视频", "en": "The last photo or video can't be removed"},
+    "media_not_pending": {
+        "zh": "只有待审核的投稿能修改图片视频（已定时的请先取消定时）",
+        "en": "Photos and videos can only be changed while the submission is pending (unschedule it first)",
+    },
+    "media_nth": {"zh": "第 {n} 个", "en": "no. {n}"},
+    "toast_media_removed": {"zh": "已删除第 {n} 个", "en": "Removed no. {n}"},
     "type_change": {
         "zh": "不能把文字投稿改成媒体投稿（或反过来），请重新投稿",
         "en": "A text submission can't become a media submission (or the other way round). Please submit again",
@@ -260,11 +322,31 @@ T: dict[str, dict[str, str]] = {
     "btn_plus_hours": {"zh": "+{n} 小时", "en": "+{n}h"},
     "btn_custom_time": {"zh": "✏️ 自定义时间", "en": "✏️ Custom time"},
     "btn_back": {"zh": "« 返回", "en": "« Back"},
+    "btn_confirm_pub": {"zh": "✅ 确认发布", "en": "✅ Confirm publish"},
+    "btn_confirm_reject": {"zh": "❌ 确认拒绝", "en": "❌ Confirm reject"},
+    "btn_confirm_with": {"zh": "{label}：{detail}", "en": "{label}: {detail}"},
+    "btn_no_reason": {"zh": "不附理由", "en": "No reason"},
+    "btn_custom_reason": {"zh": "✏️ 自定义理由", "en": "✏️ Custom reason"},
+    "btn_edit": {"zh": "✏️ 修改", "en": "✏️ Edit"},
+    "btn_media": {"zh": "🖼 媒体", "en": "🖼 Media"},
+    "btn_media_add": {"zh": "➕ 添加图片 / 视频", "en": "➕ Add photo / video"},
+    "btn_media_rep": {"zh": "🔁 换第 {n} 个", "en": "🔁 Replace {n}"},
+    "btn_media_rm": {"zh": "🗑 删第 {n} 个", "en": "🗑 Remove {n}"},
+    "btn_confirm_mrm": {"zh": "🗑 确认删除", "en": "🗑 Confirm remove"},
+    "btn_msg": {"zh": "💬 联系投稿人", "en": "💬 Message submitter"},
+    "btn_confirm_ban": {"zh": "🚫 确认封禁（同时拒绝其所有未处理来稿）",
+                        "en": "🚫 Confirm ban (also rejects all their open submissions)"},
 
     # ---------- 审核：按钮反馈 ----------
     "toast_state_locked": {"zh": "当前状态不能修改", "en": "Can't change this in the current state"},
     "toast_spoiler": {"zh": "剧透遮罩：{state}", "en": "Spoiler: {state}"},
     "toast_silent": {"zh": "静音发送：{state}", "en": "Silent: {state}"},
+    "toast_pick_reason": {
+        "zh": "选择拒绝理由（自定义理由请回复 /no 理由）",
+        "en": "Pick a reason (for your own, reply with /no reason)",
+    },
+    "toast_rejected_with": {"zh": "已拒绝：{reason}", "en": "Rejected: {reason}"},
+    "toast_confirm": {"zh": "请再点一次确认，或返回", "en": "Tap again to confirm, or go back"},
     "toast_publishing": {"zh": "发布中…", "en": "Publishing…"},
     "toast_retrying": {"zh": "重试中…", "en": "Retrying…"},
     "toast_scheduled": {"zh": "已定时：{when}", "en": "Scheduled: {when}"},
@@ -298,12 +380,39 @@ T: dict[str, dict[str, str]] = {
     },
     "ban_default_reason": {"zh": "投稿人已被封禁", "en": "The submitter was banned"},
 
-    # ---------- 审核：自定义时间 ----------
-    "custom_time_prompt": {
-        "zh": '{who} 请<b>回复本消息</b>输入发布时间：\n<code>20:30</code> · <code>10-20 09:00</code> · <code>2026-10-20 09:00</code> · <code>+90m</code> · <code>+2h</code>\n回复「取消」放弃。',
-        "en": '{who} please <b>reply to this message</b> with a publish time:\n<code>20:30</code> · <code>10-20 09:00</code> · <code>2026-10-20 09:00</code> · <code>+90m</code> · <code>+2h</code>\nReply “cancel” to give up.',
+    # ---------- 审核：等待回复的提示（点按钮后“请回复本消息……”） ----------
+    "prompt_time": {
+        "zh": '{who} 请<b>回复本消息</b>输入发布时间：\n<code>20:30</code> · <code>10-20 09:00</code> · <code>2026-10-20 09:00</code> · <code>+90m</code> · <code>+2h</code>\n发送 /cancel 放弃。',
+        "en": '{who} please <b>reply to this message</b> with a publish time:\n<code>20:30</code> · <code>10-20 09:00</code> · <code>2026-10-20 09:00</code> · <code>+90m</code> · <code>+2h</code>\nSend /cancel to give up.',
     },
-    "custom_time_cancelled": {"zh": "已取消自定义定时。", "en": "Custom scheduling cancelled."},
+    "prompt_edit": {
+        "zh": '{who} 请<b>回复本消息</b>发送修改后的正文或说明文字，格式原样保留。上面是当前内容，可以复制后修改。\n发送 /cancel 放弃。',
+        "en": '{who} please <b>reply to this message</b> with the new text or caption; formatting is kept. '
+              'The current content is above, copy it and change it.\nSend /cancel to give up.',
+    },
+    "prompt_msg": {
+        "zh": '{who} 请<b>回复本消息</b>发送要转给投稿人的内容（文字、图片、文件都可以），投稿人看到的是“审核员”。\n发送 /cancel 放弃。',
+        "en": '{who} please <b>reply to this message</b> with what to send to the submitter (text, a photo or a file). '
+              'They will see it as from “Reviewer”.\nSend /cancel to give up.',
+    },
+    "prompt_reason": {
+        "zh": '{who} 请<b>回复本消息</b>写拒绝理由，发送后立即拒绝，理由会发给投稿人。\n发送 /cancel 放弃。',
+        "en": '{who} please <b>reply to this message</b> with the reason. The submission is rejected as soon as you '
+              'send it, and the reason goes to the submitter.\nSend /cancel to give up.',
+    },
+    "prompt_madd": {
+        "zh": '{who} 请<b>回复本消息</b>发送要添加的图片或视频，可以一次发一组（相册）。一条投稿最多 10 个。\n发送 /cancel 放弃。',
+        "en": '{who} please <b>reply to this message</b> with the photos or videos to add; an album works too. '
+              'At most 10 per submission.\nSend /cancel to give up.',
+    },
+    "prompt_mrep": {
+        "zh": '{who} 请<b>回复本消息</b>发送一张图片或一个视频，换掉第 {n} 个（说明文字保留）。\n发送 /cancel 放弃。',
+        "en": '{who} please <b>reply to this message</b> with one photo or video to replace no. {n} '
+              '(its caption is kept).\nSend /cancel to give up.',
+    },
+    "prompt_cancelled": {"zh": "已取消。", "en": "Cancelled."},
+    "prompt_none": {"zh": "没有等你回复的操作。", "en": "Nothing is waiting for your reply."},
+    "prompt_text_needed": {"zh": "请发送文字。", "en": "Please send text."},
     "custom_time_bad": {
         "zh": "看不懂这个时间 🤔 例如 <code>20:30</code>、<code>10-20 09:00</code>、<code>+2h</code>",
         "en": "I can't read that time 🤔 Try <code>20:30</code>, <code>10-20 09:00</code> or <code>+2h</code>",
@@ -315,8 +424,8 @@ T: dict[str, dict[str, str]] = {
 
     # ---------- 审核：命令 ----------
     "review_help": {
-        "zh": '🛠 <b>审核群命令</b>\n/stats 发送最新审核统计\n/queue 定时发布队列\n/active [天数] 投稿人活跃度排行（默认 30 天）\n/user &lt;用户ID&gt; 查看某位投稿人\n\n<b>处理投稿</b>（回复投稿的预览或控制消息使用；开启话题模式时，在投稿的话题里直接发送即可）\n/edit 新内容 —— 替换正文或说明文字，格式原样保留\n/edit —— 不带内容：把当前文字（含格式）发出来，方便复制后修改\n/msg 内容 —— 发消息给投稿人（以“审核员”身份），投稿人也可以用 /msg 回复\n/no [理由] —— 拒绝，理由会发给投稿人\n/ban [理由] —— 封禁投稿人，并自动拒绝其所有未处理来稿\n\n<b>按用户处理</b>\n/ban &lt;用户ID&gt; [理由] · /unban &lt;用户ID&gt;',
-        "en": "🛠 <b>Review group commands</b>\n/stats post the latest review summary\n/queue scheduled posts\n/active [days] contributor ranking (default 30 days)\n/user &lt;user ID&gt; show one contributor\n\n<b>Handling a submission</b> (reply to its preview or control message; with topic mode on, just send it inside the submission's topic)\n/edit new content — replace the text or caption, keeping formatting\n/edit — on its own: show the current text with formatting so you can copy it\n/msg message — message the submitter (shown as “Reviewer”); they can answer with /msg too\n/no [reason] — reject; the reason is sent to the submitter\n/ban [reason] — ban the submitter and reject all their open submissions\n\n<b>By user</b>\n/ban &lt;user ID&gt; [reason] · /unban &lt;user ID&gt;",
+        "zh": '🛠 <b>审核群命令</b>\n/stats 发送最新审核统计\n/queue 定时发布队列\n/active [天数] 投稿人活跃度排行（默认 30 天）\n/user &lt;用户ID&gt; 查看某位投稿人\n\n<b>处理投稿</b>（控制消息上的 ✏️ 修改、💬 联系投稿人 按钮作用相同；命令要回复投稿的预览或控制消息使用）\n/edit 新内容 —— 替换正文或说明文字，格式原样保留\n/edit —— 不带内容：把当前文字（含格式）发出来，方便复制后修改\n/msg 内容 —— 发消息给投稿人（以“审核员”身份），投稿人直接回复就能答复\n/no [理由] —— 拒绝，理由会发给投稿人\n/ban [理由] —— 封禁投稿人，并自动拒绝其所有未处理来稿\n/cancel —— 放弃正在等你回复的操作（点了 修改、联系投稿人 等按钮后）\n\n<b>按用户处理</b>\n/ban &lt;用户ID&gt; [理由] · /unban &lt;用户ID&gt;',
+        "en": "🛠 <b>Review group commands</b>\n/stats post the latest review summary\n/queue scheduled posts\n/active [days] contributor ranking (default 30 days)\n/user &lt;user ID&gt; show one contributor\n\n<b>Handling a submission</b> (the ✏️ Edit and 💬 Message submitter buttons do the same; reply to the submission's preview or control message to use a command)\n/edit new content — replace the text or caption, keeping formatting\n/edit — on its own: show the current text with formatting so you can copy it\n/msg message — message the submitter (shown as “Reviewer”); they answer by simply replying\n/no [reason] — reject; the reason is sent to the submitter\n/ban [reason] — ban the submitter and reject all their open submissions\n/cancel — drop what's waiting for your reply (after tapping Edit, Message submitter and so on)\n\n<b>By user</b>\n/ban &lt;user ID&gt; [reason] · /unban &lt;user ID&gt;",
     },
     "no_permission": {"zh": "⛔ 你没有审核权限", "en": "⛔ You don't have reviewer permission"},
     "reply_to_submission": {
@@ -370,13 +479,14 @@ T: dict[str, dict[str, str]] = {
     "msg_sent_to_user": {"zh": "✅ 已发送给投稿人", "en": "✅ Sent to the submitter"},
     "msg_sent_to_review": {"zh": "✅ 已发送给审核员", "en": "✅ Sent to the reviewers"},
     "msg_usage_admin": {
-        "zh": "用法：回复投稿的预览或控制消息（话题模式下在投稿的话题里），发送 <code>/msg 内容</code>",
-        "en": "Usage: reply to a submission's preview or control message (or post inside its topic) with "
+        "zh": "用法：回复投稿的预览或控制消息，发送 <code>/msg 内容</code>",
+        "en": "Usage: reply to a submission's preview or control message with "
               "<code>/msg message</code>",
     },
     "msg_usage_user": {
-        "zh": "请<b>回复</b>审核员的消息或你的投稿，发送 <code>/msg 内容</code>。",
-        "en": "Please <b>reply</b> to the reviewer's message or your submission with <code>/msg message</code>.",
+        "zh": "请<b>回复</b>审核员的消息或你的投稿，发送 <code>/msg 内容</code>（回复审核员的消息时不写 /msg 也可以）。",
+        "en": "Please <b>reply</b> to the reviewer's message or your submission with <code>/msg message</code> "
+              "(when replying to the reviewer, /msg is optional).",
     },
     "msg_empty": {"zh": "请在 /msg 后面写上要说的话。", "en": "Please write your message after /msg."},
     "msg_not_submitted": {
@@ -392,16 +502,14 @@ T: dict[str, dict[str, str]] = {
         "en": "⚠️ Couldn't reach the submitter (they may have blocked the bot): {error}",
     },
     "msg_failed": {"zh": "⚠️ 发送失败：{error}", "en": "⚠️ Failed to send: {error}"},
-    "msg_hint_user": {
-        "zh": "要回复审核员，请回复这条消息并以 <code>/msg</code> 开头，例如 <code>/msg 好的，我马上补充</code>。",
-        "en": "To answer the reviewer, reply to their message starting with <code>/msg</code>, e.g. "
-              "<code>/msg OK, I'll add it</code>.",
-    },
     "msg_hint_admin": {
-        "zh": "要回复投稿人，请回复这条消息并以 <code>/msg</code> 开头。",
-        "en": "To answer the submitter, reply to this message starting with <code>/msg</code>.",
+        "zh": "要回复投稿人，请回复这条消息并以 <code>/msg</code> 开头，或者点控制消息上的 💬 联系投稿人。",
+        "en": "To answer the submitter, reply to this message starting with <code>/msg</code>, "
+              "or tap 💬 Message submitter on the control message.",
     },
     "ctrl_msgs": {"zh": "💬 沟通 {n} 条", "en": "💬 Messages: {n}"},
+    "ctrl_spam_keyword": {"zh": "⚠️ 疑似垃圾：含关键词「{word}」", "en": "⚠️ Possible spam: contains “{word}”"},
+    "ctrl_spam_links": {"zh": "⚠️ 疑似垃圾：{n} 个链接（上限 {max}）", "en": "⚠️ Possible spam: {n} links (limit {max})"},
 
     # ---------- 统计 ----------
     "stats": {
@@ -449,10 +557,11 @@ REVIEW_COMMANDS = {
     "zh": [("stats", "审核统计"), ("queue", "定时发布队列"), ("active", "投稿人活跃度"),
            ("edit", "修改稿件（回复投稿）新内容"), ("msg", "给投稿人发消息（回复投稿）内容"),
            ("no", "拒绝投稿（回复投稿）[理由]"),
-           ("ban", "封禁投稿人并拒绝其来稿 [理由]"), ("unban", "解除封禁"), ("user", "查看投稿人"), ("help", "命令说明")],
+           ("ban", "封禁投稿人并拒绝其来稿 [理由]"), ("unban", "解除封禁"), ("user", "查看投稿人"),
+           ("cancel", "放弃正在等你回复的操作"), ("help", "命令说明")],
     "en": [("stats", "Review summary"), ("queue", "Scheduled posts"), ("active", "Contributor activity"),
            ("edit", "Edit a submission (reply to it) new content"), ("msg", "Message the submitter (reply) text"),
            ("no", "Reject a submission (reply to it) [reason]"),
            ("ban", "Ban the submitter and reject their posts [reason]"), ("unban", "Lift a ban"),
-           ("user", "Show a contributor"), ("help", "Command help")],
+           ("user", "Show a contributor"), ("cancel", "Drop what's waiting for your reply"), ("help", "Command help")],
 }

@@ -56,11 +56,10 @@ CREATE TABLE IF NOT EXISTS submissions (
     original_items TEXT,
     edited_by      TEXT,
     edited_at      INTEGER,
-    review_topic_id INTEGER,
-    user_topic_id  INTEGER,
-    topic_status   TEXT,
     msg_count      INTEGER NOT NULL DEFAULT 0,
-    error          TEXT
+    error          TEXT,
+    edit_preview   TEXT,
+    merge_to       INTEGER
 );
 
 CREATE INDEX IF NOT EXISTS idx_sub_status ON submissions(status, scheduled_at);
@@ -87,6 +86,19 @@ CREATE TABLE IF NOT EXISTS conversations (
 CREATE INDEX IF NOT EXISTS idx_conv_sid  ON conversations(sid);
 CREATE INDEX IF NOT EXISTS idx_conv_user ON conversations(user_msg_id);
 
+-- 等待回复的提示消息（点了“修改”“联系投稿人”等按钮后，机器人发出的“请回复本消息……”）
+CREATE TABLE IF NOT EXISTS prompts (
+    chat_id    INTEGER NOT NULL,
+    message_id INTEGER NOT NULL,      -- 提示消息
+    kind       TEXT    NOT NULL,      -- 等什么：time / edit / msg / reason / madd / mrep，见 handlers/review.py
+    sid        INTEGER NOT NULL,
+    arg        INTEGER NOT NULL DEFAULT 0,  -- 附加参数：mrep = 替换第几个媒体
+    user_id    INTEGER NOT NULL,      -- 点按钮的人；只有他的回复算数
+    cleanup    TEXT,                  -- 完成后一起删掉的其他消息（JSON 列表），例如“修改”时发出的当前内容
+    created_at INTEGER NOT NULL,
+    PRIMARY KEY (chat_id, message_id)
+);
+
 CREATE TABLE IF NOT EXISTS kv (
     key   TEXT PRIMARY KEY,
     value TEXT
@@ -104,11 +116,21 @@ MIGRATIONS = [
     ("submissions", "edited_by", "ALTER TABLE submissions ADD COLUMN edited_by TEXT"),
     ("submissions", "edited_at", "ALTER TABLE submissions ADD COLUMN edited_at INTEGER"),
     ("users", "lang", "ALTER TABLE users ADD COLUMN lang TEXT"),
-    ("submissions", "review_topic_id", "ALTER TABLE submissions ADD COLUMN review_topic_id INTEGER"),
-    ("submissions", "user_topic_id", "ALTER TABLE submissions ADD COLUMN user_topic_id INTEGER"),
-    ("submissions", "topic_status", "ALTER TABLE submissions ADD COLUMN topic_status TEXT"),
     ("submissions", "msg_count", "ALTER TABLE submissions ADD COLUMN msg_count INTEGER NOT NULL DEFAULT 0"),
+    ("submissions", "spam_flags", "ALTER TABLE submissions ADD COLUMN spam_flags TEXT"),
+    ("submissions", "edit_preview", "ALTER TABLE submissions ADD COLUMN edit_preview TEXT"),
+    ("submissions", "merge_to", "ALTER TABLE submissions ADD COLUMN merge_to INTEGER"),
+    ("prompts", "arg", "ALTER TABLE prompts ADD COLUMN arg INTEGER NOT NULL DEFAULT 0"),
 ]
+
+# 已移除功能留下的列：旧库里有就删掉 (表, 列)
+DROPPED_COLUMNS = [
+    ("submissions", "review_topic_id"),  # 话题模式
+    ("submissions", "user_topic_id"),
+    ("submissions", "topic_status"),
+]
+
+JSON_COLUMNS = ("items", "original_items", "spam_flags", "edit_preview")  # 存成 JSON 文本的列
 
 OPEN_STATES = ("pending", "scheduled", "failed")  # 已提交、尚未发布或拒绝
 SUBMITTER_EDITABLE = ("draft", "pending")  # 投稿人自己能修改的状态：审核结果出来之前
@@ -154,11 +176,11 @@ class Submission:
     original_items: list[dict[str, Any]] | None  # 第一次 /edit 前的原稿
     edited_by: str | None
     edited_at: int | None
-    review_topic_id: int | None  # 话题模式：审核群里这条投稿的话题
-    user_topic_id: int | None  # 话题模式：投稿人私聊里这条投稿的话题
-    topic_status: str | None  # 话题名称上次同步时的状态，避免重复改名
     msg_count: int  # /msg 沟通的条数
     error: str | None
+    spam_flags: list[dict[str, Any]] | None = None  # 防垃圾检查的命中项，见 spam.py；没命中为 None
+    edit_preview: list[int] | None = None  # 审核群里最新一份修改后预览的消息（改稿时删掉上一份）
+    merge_to: int | None = None  # 草稿：投稿人回复旧投稿发的图片，可以“加到”这条投稿里
 
     @property
     def spoilerable(self) -> bool:
@@ -169,10 +191,35 @@ class Submission:
         data = dict(row)
         data["items"] = json.loads(data["items"])
         data["original_items"] = json.loads(data["original_items"]) if data["original_items"] else None
+        data["spam_flags"] = json.loads(data["spam_flags"]) if data.get("spam_flags") else None
+        data["edit_preview"] = json.loads(data["edit_preview"]) if data.get("edit_preview") else None
         data["anonymous"] = bool(data["anonymous"])
         data["spoiler"] = bool(data["spoiler"])
         data["silent"] = bool(data["silent"])
         return cls(**data)
+
+
+@dataclass
+class Prompt:
+    chat_id: int
+    message_id: int
+    kind: str
+    sid: int
+    user_id: int
+    cleanup: list[int]
+    created_at: int
+    arg: int = 0
+
+    @classmethod
+    def from_row(cls, row: aiosqlite.Row) -> "Prompt":
+        data = dict(row)
+        data["cleanup"] = json.loads(data["cleanup"]) if data["cleanup"] else []
+        return cls(**data)
+
+
+def _encode(fields: dict[str, Any]) -> dict[str, Any]:
+    return {k: json.dumps(v, ensure_ascii=False) if k in JSON_COLUMNS and isinstance(v, list) else v
+            for k, v in fields.items()}
 
 
 class DB:
@@ -188,6 +235,10 @@ class DB:
             columns = {r[1] for r in await self._all(f"PRAGMA table_info({table})")}
             if column not in columns:
                 await self.conn.execute(ddl)
+        for table, column in DROPPED_COLUMNS:
+            columns = {r[1] for r in await self._all(f"PRAGMA table_info({table})")}
+            if column in columns:
+                await self.conn.execute(f"ALTER TABLE {table} DROP COLUMN {column}")  # SQLite 3.35+
         await self.conn.commit()
 
     async def close(self) -> None:
@@ -261,18 +312,14 @@ class DB:
         return Submission.from_row(row) if row else None
 
     async def update(self, sid: int, **fields: Any) -> None:
-        for key in ("items", "original_items"):
-            if isinstance(fields.get(key), list):
-                fields[key] = json.dumps(fields[key], ensure_ascii=False)
+        fields = _encode(fields)
         cols = ", ".join(f"{k}=?" for k in fields)
         await self._exec(f"UPDATE submissions SET {cols} WHERE id=?", (*fields.values(), sid))
 
     async def update_if(self, sid: int, states: Iterable[str], **fields: Any) -> bool:
         """只在状态仍属于 states 时更新（防止修改和发布/审核同时发生）。"""
         states = tuple(states)
-        for key in ("items", "original_items"):
-            if isinstance(fields.get(key), list):
-                fields[key] = json.dumps(fields[key], ensure_ascii=False)
+        fields = _encode(fields)
         cols = ", ".join(f"{k}=?" for k in fields)
         marks = ", ".join("?" * len(states))
         return await self._exec(
@@ -281,11 +328,13 @@ class DB:
 
     async def find_by_user_message(self, user_id: int, message_id: int) -> tuple[int, int | None] | None:
         """用户私聊里的某条消息属于哪条投稿：
-        - 是投稿内容本身 → (投稿编号, 第几项)
+        - 是投稿内容本身 → (投稿编号, 第几项)。同一条消息可能在两条投稿里（图片“加到”了旧投稿，
+          新建的草稿随即作废），优先取没作废的那条
         - 是机器人的“请选择投稿方式 / 已提交”提示 → (投稿编号, None)"""
         row = await self._one(
             """SELECT s.id, CAST(j.key AS INTEGER) FROM submissions s, json_each(s.items) j
-               WHERE s.user_id=? AND json_extract(j.value, '$.msg_id')=? ORDER BY s.id DESC LIMIT 1""",
+               WHERE s.user_id=? AND json_extract(j.value, '$.msg_id')=?
+               ORDER BY s.status='cancelled', s.id DESC LIMIT 1""",
             (user_id, message_id),
         )
         if row:
@@ -327,20 +376,10 @@ class DB:
         await self.conn.execute("UPDATE submissions SET msg_count = msg_count + 1 WHERE id=?", (sid,))
         await self.conn.commit()
 
-    async def sid_by_review_topic(self, thread_id: int) -> int | None:
-        row = await self._one("SELECT id FROM submissions WHERE review_topic_id=? ORDER BY id DESC LIMIT 1", (thread_id,))
-        return row[0] if row else None
-
-    async def sid_by_user_topic(self, user_id: int, thread_id: int) -> int | None:
-        row = await self._one(
-            "SELECT id FROM submissions WHERE user_id=? AND user_topic_id=? ORDER BY id DESC LIMIT 1", (user_id, thread_id)
-        )
-        return row[0] if row else None
-
     async def transition(self, sid: int, from_states: Iterable[str], to_state: str, **fields: Any) -> bool:
         """原子地把状态从 from_states 之一改成 to_state；状态不符时返回 False（防并发重复操作）。"""
         from_states = tuple(from_states)
-        fields["status"] = to_state
+        fields = {**_encode(fields), "status": to_state}
         cols = ", ".join(f"{k}=?" for k in fields)
         marks = ", ".join("?" * len(from_states))
         changed = await self._exec(
@@ -363,6 +402,10 @@ class DB:
         await self.conn.executemany(
             "INSERT OR REPLACE INTO review_messages(message_id, sid) VALUES(?, ?)", [(m, sid) for m in message_ids]
         )
+        await self.conn.commit()
+
+    async def unlink_review_messages(self, message_ids: Iterable[int]) -> None:
+        await self.conn.executemany("DELETE FROM review_messages WHERE message_id=?", [(m,) for m in message_ids])
         await self.conn.commit()
 
     async def sid_by_review_message(self, message_id: int) -> int | None:
@@ -455,6 +498,37 @@ class DB:
             (user_id,),
         )
         return {k: (row[k] or 0) if k not in ("first_at", "last_at") else row[k] for k in row.keys()}
+
+    async def last_choice(self, user_id: int) -> bool | None:
+        """投稿人上一次提交时选的是不是匿名；还没提交过返回 None。"""
+        row = await self._one(
+            "SELECT anonymous FROM submissions WHERE user_id=? AND submitted_at IS NOT NULL "
+            "ORDER BY submitted_at DESC, id DESC LIMIT 1", (user_id,))
+        return bool(row[0]) if row else None
+
+    # ---------- 等待回复的提示 ----------
+
+    async def add_prompt(self, chat_id: int, message_id: int, kind: str, sid: int, user_id: int,
+                         cleanup: list[int], arg: int = 0) -> None:
+        await self._exec(
+            "INSERT OR REPLACE INTO prompts(chat_id, message_id, kind, sid, arg, user_id, cleanup, created_at) "
+            "VALUES(?, ?, ?, ?, ?, ?, ?, ?)",
+            (chat_id, message_id, kind, sid, arg, user_id, json.dumps(cleanup), now_ts()),
+        )
+
+    async def get_prompt(self, chat_id: int, message_id: int) -> Prompt | None:
+        row = await self._one("SELECT * FROM prompts WHERE chat_id=? AND message_id=?", (chat_id, message_id))
+        return Prompt.from_row(row) if row else None
+
+    async def delete_prompt(self, chat_id: int, message_id: int) -> None:
+        await self._exec("DELETE FROM prompts WHERE chat_id=? AND message_id=?", (chat_id, message_id))
+
+    async def prompts_of(self, chat_id: int, user_id: int) -> list[Prompt]:
+        rows = await self._all("SELECT * FROM prompts WHERE chat_id=? AND user_id=?", (chat_id, user_id))
+        return [Prompt.from_row(r) for r in rows]
+
+    async def stale_prompts(self, older_than: int) -> list[Prompt]:
+        return [Prompt.from_row(r) for r in await self._all("SELECT * FROM prompts WHERE created_at<?", (older_than,))]
 
     # ---------- kv ----------
 

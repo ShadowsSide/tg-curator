@@ -20,9 +20,10 @@ Built with Python 3.12 + [aiogram 3](https://github.com/aiogram/aiogram) + SQLit
 - Submitters choose to post **signed** (with their name) or **anonymously**. Either way, admins can always see who sent it
 - **Formatting is kept exactly as sent**: links, bold, quotes, spoiler text, code, date/time and emoji all come through to the channel unchanged
 - Submitters can **edit their post** until it has been reviewed, either with Telegram's built-in "Edit" or by **replying** to it with `/edit`
+- **Spam checks** (optional): keyword blacklist, a link limit (whitelisted domains don't count) and a cooldown for new submitters. By default a hit only puts a ⚠️ Possible spam note on the control message for reviewers to judge; it can also block the submission
 
 **Reviewer ↔ submitter messaging**
-- Both sides use `/msg message` as a reply to the relevant submission or message, and the bot relays it. Submitters always see the sender as “Reviewer”; neither side sees the other's account
+- Reviewers tap **💬 Message submitter** on the control message (or use `/msg message`); submitters simply reply to the reviewer's message (or use `/msg`). The bot relays it. Submitters always see the sender as “Reviewer”; neither side sees the other's account
 - Formatting is kept, and a single photo or file can be attached; the conversation is stored and the control message shows the message count
 - Possible any time during review, and for 3 days after it's published or rejected (`MSG_WINDOW_DAYS`); banned users can't send
 
@@ -30,7 +31,9 @@ Built with Python 3.12 + [aiogram 3](https://github.com/aiogram/aiogram) + SQLit
 - Each submission gets a preview in the review group (exactly what the channel will show), followed by a control message with colored buttons
 - Publish now · Schedule · Reject · Ban submitter
 - Publishing options: 🙈 **spoiler** (blur the media) and 🔕 **silent** (subscribers get a notification without sound)
+- Pick a common reject reason with one tap (`REJECT_TEMPLATES`)
 - `/edit` to change a post, `/no reason` to reject, `/ban reason` to ban. Banning also rejects every open submission from that user
+- Safe against accidental taps: Publish now, Reject and Ban need a second tap to confirm
 - Safe against double actions: if two admins press "Publish" at the same time, the post is still published only once
 - **Only answers in private chats and the review group**: it never replies in other groups, and leaves any other group or channel it's added to. The publishing channel and its linked discussion group are whitelisted and never left
 
@@ -43,10 +46,6 @@ Built with Python 3.12 + [aiogram 3](https://github.com/aiogram/aiogram) + SQLit
   #review_stats [updated 16:03:10]
   ```
 - Contributor activity ranking and per-user stats; submitters can see their own stats with `/me`
-
-**Topic mode** (optional, switched on separately for each side)
-- **Review group**: every new submission gets its own topic holding the preview, the control message and the discussion. Inside a topic you can send `/no`, `/edit` and the other commands directly, without replying. The topic name follows the status (⏳ pending → ⏰ scheduled → ✅ published / ❌ rejected), and the topic is closed once the review is done
-- **Submitter's private chat**: every submission gets its own topic, so its content, edits and review notifications stay together and separate from other submissions
 
 **English and Chinese**
 - Submitters see the language of their Telegram app (Chinese clients get Chinese, everyone else English); the review group, channel signatures and the review summary use the `LANGUAGE` setting
@@ -122,15 +121,19 @@ Everything is configured in `.env`. See [`.env.example`](.env.example) for a ful
 | `REVIEW_CHAT_ID` | — | **Required.** Review group ID |
 | `LANGUAGE` | `zh` | Language of the review group, channel signatures and review summary: `zh` / `en` |
 | `USER_LANGUAGE` | `auto` | Language submitters see: `auto` follows their Telegram app, or fix it to `zh` / `en` |
-| `REVIEW_TOPICS` | `false` | Topic mode in the review group: the group needs topics enabled, and the bot must be an admin allowed to manage topics |
-| `USER_TOPICS` | `false` | Topic mode in private chats: enable topic mode for the bot in @BotFather first |
-| `REVIEWERS` | `admins` | Who can review: `admins` = review group admins and owner; `all` = every member; or user IDs, combinable, e.g. `admins,123456` |
+| `REVIEWERS` | `admins` | Who can review: `admins` = review group admins and owner; `all` = every member; or user IDs, combinable, e.g. `admins,123456`. Bots never count as reviewers |
+| `REJECT_TEMPLATES` | 4 default reasons, depends on `LANGUAGE` | Reasons offered after tapping Reject, separated by `\|`, e.g. `Duplicate\|Ads`; set it to empty to skip the reason panel |
 | `MSG_WINDOW_DAYS` | `3` | `/msg`: days after a submission is published or rejected during which messaging stays open; always open during review |
 | `LEAVE_UNKNOWN_CHATS` | `true` | Leave any other group or channel the bot is added to; `false` stays but never responds. The publishing channel and its linked discussion group (detected at startup) are always kept |
 | `TZ` | `Asia/Shanghai` | Time zone for scheduling and for what counts as "today" in stats |
 | `SIGN_TEMPLATE` | depends on `LANGUAGE`: `Submitted by {name}` / `投稿人：{name}` | Signature for signed posts; `{name}` becomes a link to the submitter |
 | `ANON_SIGNATURE` | depends on `LANGUAGE`: `Anonymous submission` / `匿名投稿` | Signature for anonymous posts; set it to empty for none |
 | `MAX_PENDING_PER_USER` | `5` | Maximum open submissions per user at a time |
+| `SPAM_KEYWORDS` | empty | Keyword blacklist, comma-separated, case-insensitive; checks both the text and link addresses |
+| `MAX_LINKS` | `0` | Maximum links per submission, `0` = no limit; domains in `LINK_WHITELIST` don't count |
+| `LINK_WHITELIST` | empty | Domains that don't count toward the link limit, comma-separated, subdomains included, e.g. `t.me,github.com` |
+| `SPAM_ACTION` | `flag` | On a keyword or link-limit hit: `flag` = submit as usual and mark the control message; `block` = refuse it, the submitter can edit and resubmit |
+| `NEW_USER_COOLDOWN_MINUTES` | `0` | Submitters with nothing published yet must wait this many minutes between submissions; `0` = no limit |
 | `ALBUM_DELAY` | `1.5` | Seconds to wait while collecting the parts of an album |
 | `SCHEDULE_PRESETS` | `09:00,12:00,18:00,21:00` | Quick time buttons in the schedule panel |
 | `DEFAULT_SILENT` | `false` | Whether new submissions are published silently by default |
@@ -142,8 +145,6 @@ Everything is configured in `.env`. See [`.env.example`](.env.example) for a ful
 | `TELEGRAM_API_URL` | — | Self-hosted Bot API server, which lifts the official 20 MB / 50 MB file limits |
 | `IMAGE` | `tg-submit-bot:latest` | Set this when using a prebuilt image |
 
-> If topic mode can't be used (the review group has no topics, topic mode isn't enabled in BotFather, or a permission is missing), the bot falls back to normal mode and logs why.
-
 > Inside Docker, `127.0.0.1` means the container itself. To use a proxy running on the host, use the host's IP address or `host.docker.internal` (Docker Desktop).
 
 ## Usage
@@ -152,18 +153,35 @@ Everything is configured in `.env`. See [`.env.example`](.env.example) for a ful
 
 | Action | Description |
 |---|---|
-| Send any content | Starts a submission, then choose signed or anonymous |
+| Send any content | Starts a submission, then choose signed or anonymous. Your previous choice is marked “(last time)” and shown first; you still tap it |
 | Edit the original message with Telegram's "Edit" | Changes the submission until it has been reviewed: text, formatting, or even the image |
+| Reply to your submission with a photo / video | The choice panel gets an extra **➕ Add to that submission** button that adds the new photos to it; or submit them as a new submission as usual. Only drafts and pending submissions can take more |
+| 🗑 Remove a photo / video | Shown on the bot's message while a draft or pending submission has 2 or more photos/videos; tap it and pick the one to remove. Nothing can be changed once the review has started (scheduled, published, rejected) |
 | `/edit new content` | Only works as a **reply** to your submission (or the bot's message about it); without a reply nothing is changed |
 | `/edit` (as a reply) | Shows the current content with formatting, so you can copy and change it |
-| `/msg message` | Message the reviewers: **reply** to the reviewer's message or your submission. Replying to the reviewer without `/msg` gets a reminder |
+| Reply to the reviewer's message | Sent to the reviewers as a message (text, a photo or a file), no `/msg` needed |
+| `/msg message` | Message the reviewers: **reply** to the reviewer's message or your submission |
 | `/me` | Your submission stats |
 
 ### Admins (review group)
 
-Buttons on the control message: **✅ Publish now**, **⏰ Schedule**, **❌ Reject**, **🚫 Ban submitter**, plus the **🙈 Spoiler** and **🔕 Silent** toggles.
+Buttons on the control message: **✅ Publish now**, **⏰ Schedule**, **❌ Reject**, **🚫 Ban submitter**, **✏️ Edit**, **💬 Message submitter**, **🖼 Media**, plus the **🙈 Spoiler** and **🔕 Silent** toggles.
 
-Use the commands below by **replying** to a submission's preview or control message (with review-group topics on, just send them inside the submission's topic). The bot never shows submission numbers, and no command needs one:
+**✏️ Edit**, **💬 Message submitter**, **✏️ Custom reason** on the reason panel and **✏️ Custom time** on the schedule panel post a “please reply to this message…” prompt. Just reply to it, no commands to remember:
+- Only the reply of whoever tapped the button counts (anonymous admins excepted); send `/cancel` to give up (as a reply to a prompt it drops that one; on its own it drops all your open prompts)
+- **Edit** first posts the current content with formatting so you can copy and change it; the prompt and that copy are deleted once you're done
+- **Custom reason** rejects as soon as you send the reason, with no extra confirmation
+- Prompts are stored in the database, so they still work after a restart; prompts left unanswered for 24 hours are deleted
+
+**🖼 Media** (only while pending) opens the media panel: **➕ Add photo / video** (an album reply works too), **🔁 Replace N** and **🗑 Remove N** (asks to confirm; the last one can't be removed). Photos and videos only, at most 10 per submission; submissions with a file, GIF or audio can't use it. A text submission can get photos too: its text becomes their caption (see “Known limitations and risks” below).
+
+Every edit posts a new preview. The review group keeps only the original preview and the latest edited one; older edited previews are deleted (Telegram doesn't let bots delete messages older than 48 hours, so those stay).
+
+To avoid accidental taps, **Publish now, Reject and Ban** first switch to “Confirm / Back” buttons and only act on the second tap. Scheduling, retrying and the `/no` and `/ban` commands need no confirmation.
+
+**❌ Reject** first asks for a reason (`REJECT_TEMPLATES`; defaults: Duplicate, Off-topic, Low quality, Advertising; or “No reason”). The confirm button shows the chosen reason, and the reason is sent to the submitter. For a reason of your own, tap **✏️ Custom reason** or use `/no reason`.
+
+The commands below do the same as the buttons, for those who prefer commands. Use them by **replying** to a submission's preview or control message. The bot never shows submission numbers, and no command needs one:
 
 | Command | Description |
 |---|---|
@@ -179,6 +197,29 @@ Use the commands below by **replying** to a submission's preview or control mess
 | `/user <user ID>` | Shows one contributor's stats |
 
 `/ban` and `/unban` also accept a user ID (`/ban <user ID> reason`) for users with nothing under review, or to ban someone in advance. Each scheduled post in `/queue` has a “view” link that jumps to its control message.
+
+## Known limitations and risks
+
+**Review actions**
+- **More taps**: Publish now, Reject and Ban always need a second tap, and Reject first asks for a reason by default (Reject → reason → Confirm, three taps). Set `REJECT_TEMPLATES=` to skip the reason; the confirmation itself can't be turned off
+- **The confirm panel can be reset**: if the control message refreshes while you're about to confirm (the submitter edits, someone sends `/msg`, …), the buttons go back to normal and you need to tap again. Nothing runs by accident
+- **Changing `REJECT_TEMPLATES` can shift old panels**: buttons store the reason's position. After reordering the reasons and restarting, a panel opened before the restart picks the reason by the new order; an out-of-range position means “No reason”. Finish any rejection in progress before changing it
+- **Reasons can't contain `|`**: it's the separator
+- **The review group hits rate limits sooner**: the confirm and reason panels each edit the control message once more, so with heavy review traffic Telegram's limits come sooner. The bot waits and retries automatically, but actions get slower
+
+**Changing photos and videos**
+- **Adding photos to a text submission**: the text limit drops from 4096 to 1024 characters (longer text can't take photos), the link preview goes away, it can't turn back into plain text, and the post looks different in the channel (text under the photos)
+- **Replaced or removed photos can't be brought back**: the original is stored (`original_items`), but the bot has no way to restore it
+- **Reviewers aren't notified when a submitter changes photos**: a new preview appears and the control message shows “edited (submitter)”
+- **Submitters keep the old button after the review starts**: tapping it explains that nothing can be changed any more and removes the button
+
+**Spam checks**
+- **Chinese keywords can over-match**: Chinese has no word boundaries, so keywords match as substrings (e.g. “微信” also matches “微信公众号推荐”). That's why the default only flags (`SPAM_ACTION=flag`); watch the flags for a while before switching to `block`
+- **Blocking doesn't tell the submitter which word matched**: so it can't be dodged on purpose, but the submitter may not know what to change
+- **Only URLs and hyperlinks count as links**: `@usernames`, emails and phone numbers don't
+- **Edits only update the flags, never block**: even with `SPAM_ACTION=block`, adding a keyword by editing after submitting just shows a flag for reviewers
+- **The cooldown only applies to submitters with nothing published yet**: one published post lifts it; it counts from the last submission, rejected ones included
+- **Bad values stop the bot from starting**: a non-number in `MAX_LINKS` or `NEW_USER_COOLDOWN_MINUTES`, or a `SPAM_ACTION` other than `flag` / `block`, makes the bot exit with an error at startup
 
 ## FAQ
 
@@ -202,7 +243,7 @@ Telegram doesn't allow GIFs in albums, so each GIF becomes its own submission.
 Requires Python 3.10 or newer.
 
 ```bash
-python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
+python3 -m venv .venv && .venv/bin/pip install -r requirements.txt -r requirements-dev.txt
 cp .env.example .env && mkdir -p data
 set -a; source .env; set +a
 DB_PATH=./data/bot.db .venv/bin/python -m bot
@@ -215,11 +256,30 @@ The tests need no token and no network access:
 .venv/bin/python tests/test_i18n.py       # unit tests: every text exists in both languages
 .venv/bin/python tests/test_errors.py     # unit tests: business logic returns notice codes, translated only when shown
 .venv/bin/python tests/test_structure.py  # unit tests: handlers don't touch the database; core modules don't redefine methods
+.venv/bin/python tests/test_confirm.py    # unit tests: confirm panel; bots are never reviewers
+.venv/bin/python tests/test_reject_templates.py  # unit tests: reject reasons parsing and panel
+.venv/bin/python tests/test_spam.py       # unit tests: keywords, link counting and whitelist
+.venv/bin/python tests/test_media.py      # unit tests: rules for changing photos and videos, related buttons
+.venv/bin/python tests/test_db.py         # unit tests: upgrading an old database (drops columns of removed features)
+.venv/bin/python tests/test_reply.py      # unit tests: implicit replies inside forum topics are not replies
 .venv/bin/python tests/live_test.py       # end-to-end: runs the real bot against a mock Bot API server (~1 minute)
-.venv/bin/python tests/live_topics_test.py  # end-to-end: topic mode (~10 seconds)
 .venv/bin/python tests/live_msg_test.py     # end-to-end: /msg edge cases (~10 seconds)
 .venv/bin/python tests/live_flood_test.py   # end-to-end: retries and rescheduling under rate limits (~20 seconds)
-.venv/bin/python tests/live_perm_test.py    # end-to-end: reviewer permissions (~10 seconds)
+.venv/bin/python tests/live_perm_test.py    # end-to-end: reviewer permissions (~20 seconds)
+.venv/bin/python tests/live_confirm_test.py   # end-to-end: confirmation, default reject reasons (~15 seconds)
+.venv/bin/python tests/live_reject_test.py    # end-to-end: custom reject reasons (~10 seconds)
+.venv/bin/python tests/live_buttons_test.py   # end-to-end: Retry and Unschedule buttons (~10 seconds)
+.venv/bin/python tests/live_spam_test.py      # end-to-end: spam flags, re-check on edit, new-user cooldown (~10 seconds)
+.venv/bin/python tests/live_spam_block_test.py  # end-to-end: spam block mode (~10 seconds)
+.venv/bin/python tests/live_prompt_test.py      # end-to-end: Edit, Message submitter and Custom reason buttons; old preview deletion (~10 seconds)
+.venv/bin/python tests/live_media_test.py       # end-to-end: reviewers' media panel; submitters adding and removing photos (~10 seconds)
+.venv/bin/python tests/live_choice_test.py      # end-to-end: remembering the last signed / anonymous choice (~8 seconds)
+```
+
+GitHub Actions (`.github/workflows/test.yml`) first checks the code with pyflakes (undefined names, unused imports and variables, …), then runs all of these on every pull request and every push to `main`. To check locally:
+
+```bash
+.venv/bin/python -m pyflakes bot tests
 ```
 
 ### Project layout
@@ -235,7 +295,7 @@ bot/
     editing.py      editing (/edit and Telegram's built-in edit)
     review.py       publish, schedule, reject, ban, spoiler / silent toggles
     messaging.py    /msg messaging
-    topics.py       topic mode
+    prompts.py      reply prompts (Edit, Message submitter, custom reason / time)
     stats.py        review summary, activity, scheduled queue
     scheduler.py    background jobs: scheduled publishing, draft cleanup, summary reminders
   render.py       sending content (single / album, signature, spoiler, silent) and message texts
@@ -244,6 +304,8 @@ bot/
   errors.py       notice codes returned by the business logic (translated when shown)
   guard.py        only handle private chats and the review group; leave other groups
   permissions.py  reviewer permissions (REVIEWERS)
+  spam.py         spam checks: keywords, link limit
+  media.py        rules for changing photos and videos: add, replace, remove
   ratelimit.py    automatic waiting and retrying when rate-limited
   keyboards.py    colored inline buttons
   album.py        album collection

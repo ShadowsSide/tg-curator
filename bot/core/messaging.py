@@ -35,7 +35,7 @@ class MessagingMixin(CoreBase):
         return {**item, "text": text, "entities": entities}
 
     async def relay_to_user(self, sid: int, reviewer: TgUser, item: dict) -> Notice | None:
-        """审核员 → 投稿人：以“审核员”的身份发到投稿人那条投稿下面（话题模式下在对应话题里）。"""
+        """审核员 → 投稿人：以“审核员”的身份发到投稿人那条投稿下面。"""
         sub = await self.db.get(sid)
         if not sub:
             return notice("sub_not_found")
@@ -46,7 +46,7 @@ class MessagingMixin(CoreBase):
         try:
             sent = await send_items(
                 self.bot, sub.user_id, [self._labeled(item, t(lang, "msg_from_reviewer"))], sig=("", []),
-                spoiler=bool(item.get("spoiler")), reply_to=sub.user_msg_id, thread_id=sub.user_topic_id,
+                spoiler=bool(item.get("spoiler")), reply_to=sub.user_msg_id,
             )
         except TelegramAPIError as e:
             return notice("msg_undelivered", error=str(e))
@@ -56,7 +56,7 @@ class MessagingMixin(CoreBase):
         return None
 
     async def relay_to_review(self, sid: int, user: TgUser, item: dict, user_msg_id: int) -> Notice | None:
-        """投稿人 → 审核员：发到审核群，回复在这条投稿的控制消息下面（话题模式下在对应话题里）。"""
+        """投稿人 → 审核员：发到审核群，回复在这条投稿的控制消息下面。"""
         sub = await self.db.get(sid)
         if not sub or sub.user_id != user.id:
             return notice("u_edit_not_found")
@@ -70,7 +70,6 @@ class MessagingMixin(CoreBase):
             sent = await send_items(
                 self.bot, self.s.review_chat_id, [self._labeled(item, t(self.lang, "msg_from_submitter"))],
                 sig=("", []), spoiler=bool(item.get("spoiler")), reply_to=sub.review_msg_id,
-                thread_id=sub.review_topic_id,
             )
         except TelegramAPIError as e:
             return notice("msg_failed", error=str(e))

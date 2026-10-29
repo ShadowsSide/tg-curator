@@ -47,6 +47,9 @@ async def main() -> None:
         format="%(asctime)s %(levelname)s %(name)s: %(message)s",
     )
     settings = load_settings()
+    for name in ("REVIEW_TOPICS", "USER_TOPICS"):
+        if os.getenv(name):
+            logging.warning("%s 已移除（话题模式不再支持），可以从配置里删掉", name)
 
     db = DB(settings.db_path)
     await db.connect()

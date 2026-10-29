@@ -34,7 +34,6 @@ class SchedulerMixin(CoreBase):
                             )
                         except TelegramAPIError:
                             pass
-                    await self.sync_topics(sub.id)
             except Exception:
                 log.exception("调度循环出错")
             await asyncio.sleep(SCHEDULER_TICK)

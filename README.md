@@ -45,10 +45,6 @@
   ```
 - 投稿人活跃度排行、单个投稿人统计；投稿人可以用 `/me` 查看自己的统计
 
-**话题模式**（可选，两边分别开启）
-- **审核群**：每条新投稿自动建一个话题，预览、控制消息和讨论都在里面；在话题里直接发 `/no`、`/edit` 等命令，不用回复消息。话题名称会随状态变化（⏳ 待审核 → ⏰ 已定时 → ✅ 已发布 / ❌ 已拒绝），审核完成后话题自动关闭
-- **投稿人私聊**：每条投稿一个话题，投稿内容、修改和审核结果通知都在同一个话题里，多条投稿互不干扰
-
 **中英文界面**
 - 投稿人看到的语言跟随其 Telegram 客户端（中文客户端显示中文，其他显示英文）；审核群、频道落款和统计提醒使用 `LANGUAGE` 配置的语言
 - 命令菜单也按客户端语言显示
@@ -123,8 +119,6 @@ docker compose cp bot:/app/data/bot.db ./backup-$(date +%F).db   # 备份数据�
 | `REVIEW_CHAT_ID` | — | **必填**。审核群 ID |
 | `LANGUAGE` | `zh` | 审核群、频道落款、统计提醒的语言：`zh` / `en` |
 | `USER_LANGUAGE` | `auto` | 投稿人看到的语言：`auto` 跟随其客户端，或固定为 `zh` / `en` |
-| `REVIEW_TOPICS` | `false` | 审核群话题模式：审核群需开启话题，机器人需是管理员并有“管理话题”权限 |
-| `USER_TOPICS` | `false` | 私聊话题模式：需先在 @BotFather 里为机器人开启话题模式 |
 | `REVIEWERS` | `admins` | 谁可以审核：`admins` 审核群管理员和群主；`all` 审核群所有成员；也可以写用户 ID，可组合，如 `admins,123456`。机器人不算审核员 |
 | `REJECT_TEMPLATES` | 随 `LANGUAGE` 的 4 条默认理由 | 点“拒绝”后可选的理由，用 `\|` 分隔，如 `重复投稿\|广告`；设为空则不显示理由面板 |
 | `MSG_WINDOW_DAYS` | `3` | `/msg` 沟通：审核结束（发布或拒绝）后还能继续沟通的天数；审核中始终可以 |
@@ -149,8 +143,6 @@ docker compose cp bot:/app/data/bot.db ./backup-$(date +%F).db   # 备份数据�
 | `TELEGRAM_API_URL` | — | 自建 Bot API 服务器地址，可以突破官方 API 的 20MB/50MB 文件限制 |
 | `IMAGE` | `tg-submit-bot:latest` | 使用预构建镜像时填写 |
 
-> 话题模式的条件不满足时（审核群没开话题、BotFather 里没开话题模式、缺少权限），机器人会自动改用普通模式，并在日志里提示。
-
 > 在 Docker 里运行时，`127.0.0.1` 指的是容器自己。要使用宿主机上的代理，请填宿主机 IP，或者 `host.docker.internal`（Docker Desktop）。
 
 ## 使用
@@ -174,7 +166,7 @@ docker compose cp bot:/app/data/bot.db ./backup-$(date +%F).db   # 备份数据�
 
 点 **❌ 拒绝** 后先选理由（`REJECT_TEMPLATES`，默认：重复投稿、与频道主题不符、内容质量不足、含广告或推广；也可以选“不附理由”），确认按钮上会显示选中的理由，理由会发给投稿人。需要自定义理由时用 `/no 理由`。
 
-以下命令通过**回复**某条投稿的预览或控制消息来指定投稿（开启审核群话题模式后，在投稿的话题里直接发送即可，不用回复）。机器人不会显示投稿编号，命令也不需要编号：
+以下命令通过**回复**某条投稿的预览或控制消息来指定投稿。机器人不会显示投稿编号，命令也不需要编号：
 
 | 命令 | 说明 |
 |---|---|
@@ -246,8 +238,9 @@ DB_PATH=./data/bot.db .venv/bin/python -m bot
 .venv/bin/python tests/test_confirm.py    # 单元测试：确认面板、机器人不算审核员
 .venv/bin/python tests/test_reject_templates.py  # 单元测试：拒绝理由的解析与面板
 .venv/bin/python tests/test_spam.py       # 单元测试：关键词、链接计数与白名单
+.venv/bin/python tests/test_db.py         # 单元测试：旧数据库升级（删除已移除功能的列）
+.venv/bin/python tests/test_reply.py      # 单元测试：判断“回复”时忽略话题里的隐式回复
 .venv/bin/python tests/live_test.py       # 端到端测试：启动模拟的 Bot API 服务器，运行真实的机器人进程（约 1 分钟）
-.venv/bin/python tests/live_topics_test.py  # 端到端测试：话题模式（约 10 秒）
 .venv/bin/python tests/live_msg_test.py     # 端到端测试：/msg 沟通的边界情况（约 10 秒）
 .venv/bin/python tests/live_flood_test.py   # 端到端测试：被限流时的自动重试与改期（约 20 秒）
 .venv/bin/python tests/live_perm_test.py    # 端到端测试：审核员权限（约 20 秒）
@@ -277,7 +270,6 @@ bot/
     editing.py      修改稿件（/edit、Telegram 自带编辑）
     review.py       发布、定时、拒绝、封禁、剧透 / 静音开关
     messaging.py    /msg 沟通
-    topics.py       话题模式
     stats.py        审核统计、活跃度、定时队列
     scheduler.py    后台任务：定时发布、清理草稿、统计提醒
   render.py       发送内容（单条 / 相册、落款、剧透、静音）与文案

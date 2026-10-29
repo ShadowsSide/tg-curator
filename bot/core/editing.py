@@ -95,7 +95,7 @@ class EditingMixin(CoreBase):
         if sub.status != "draft":  # 草稿还没进审核群，不用发预览
             preview = await send_items(
                 self.bot, self.s.review_chat_id, sub.items, sig=await self._signature(sub),
-                spoiler=False, reply_to=sub.review_msg_id, thread_id=sub.review_topic_id,
+                spoiler=False, reply_to=sub.review_msg_id,
             )
             await self.db.link_review_messages(sub.id, [m.message_id for m in preview])
             await self.refresh_control(sub.id)

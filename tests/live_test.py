@@ -38,23 +38,18 @@ def chat(cid):
     return {"id": cid, "type": "private" if cid > 0 else ("channel" if cid == CHANNEL else "supergroup")}
 
 
-MOCK = {"review_is_forum": False, "bot_topics": False,
-        # 限流注入："方法名:chat_id" → 依次返回的 retry_after 秒数列表，每次调用消耗一个
+MOCK = {# 限流注入："方法名:chat_id" → 依次返回的 retry_after 秒数列表，每次调用消耗一个
         "flood": {},
         # 失败注入："方法名:chat_id" → 依次返回的错误描述列表（HTTP 400），每次调用消耗一个
         "fail": {},
         # 审核群管理员（getChatMember 返回 creator），其他人返回普通成员
         "admins": {7}}
-next_topic = [7000]
 markups: dict = {}  # (chat_id, message_id) → 当前按钮：和 Telegram 一样，按钮没变时编辑会报 “message is not modified”
 
 
-def make_msg(chat_id, thread_id=None):
+def make_msg(chat_id):
     mid[0] += 1
-    msg = {"message_id": mid[0], "date": now(), "chat": chat(int(chat_id))}
-    if thread_id:
-        msg.update(message_thread_id=int(thread_id), is_topic_message=True)
-    return msg
+    return {"message_id": mid[0], "date": now(), "chat": chat(int(chat_id))}
 
 
 async def handle(request: web.Request):
@@ -112,16 +107,14 @@ async def handle(request: web.Request):
                                      status=400)
         markups[key] = params.get("reply_markup")
 
-    thread = params.get("message_thread_id")
     if m == "getme":
-        result = {"id": 1, "is_bot": True, "first_name": "TestBot", "username": "test_bot",
-                  "has_topics_enabled": MOCK["bot_topics"]}
+        result = {"id": 1, "is_bot": True, "first_name": "TestBot", "username": "test_bot"}
     elif m == "getchat":
         info = {"accent_color_id": 0, "max_reaction_count": 11,
                 "accepted_gift_types": {k: False for k in ("unlimited_gifts", "limited_gifts", "unique_gifts",
                                                            "premium_subscription", "gifts_from_channels")}}
         if str(params.get("chat_id")) == str(REVIEW):
-            result = {**chat(REVIEW), "title": "Review", "is_forum": MOCK["review_is_forum"], **info}
+            result = {**chat(REVIEW), "title": "Review", **info}
         else:
             result = {**chat(CHANNEL), "title": "Test Channel", "username": "testchan", "linked_chat_id": LINKED, **info}
     elif m == "getchatmember":
@@ -129,15 +122,12 @@ async def handle(request: web.Request):
         member_user = {"id": uid_, "is_bot": False, "first_name": f"U{uid_}"}
         result = ({"status": "creator", "user": member_user, "is_anonymous": False} if uid_ in MOCK["admins"]
                   else {"status": "member", "user": member_user})
-    elif m == "createforumtopic":
-        next_topic[0] += 1
-        result = {"message_thread_id": next_topic[0], "name": params["name"], "icon_color": int(params.get("icon_color", 0))}
     elif m == "copymessages":
-        result = [{"message_id": make_msg(params["chat_id"], thread)["message_id"]} for _ in params["message_ids"]]
+        result = [{"message_id": make_msg(params["chat_id"])["message_id"]} for _ in params["message_ids"]]
     elif m == "sendmediagroup":
-        result = [make_msg(params["chat_id"], thread) for _ in params["media"]]
+        result = [make_msg(params["chat_id"]) for _ in params["media"]]
     elif m.startswith("send"):
-        result = make_msg(params["chat_id"], thread)
+        result = make_msg(params["chat_id"])
     else:
         result = True
     log.append({"method": method, "params": params, "result": result, "t": time.time()})

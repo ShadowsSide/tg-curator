@@ -55,8 +55,6 @@ class Settings:
     api_url: str
     language: str  # 审核群、频道落款、统计提醒的语言
     user_language: str  # 投稿人看到的语言：auto（跟随客户端）/ zh / en
-    review_topics: bool  # 审核群话题模式：每条投稿一个话题
-    user_topics: bool  # 私聊话题模式：每条投稿在投稿人私聊里一个话题
     leave_unknown_chats: bool  # 被拉进私聊/审核群/发布频道以外的聊天时自动退出
     msg_window_days: int  # /msg 沟通：审核结束（发布/拒绝）后还能沟通的天数
     reviewers: str  # 谁可以审核：admins（默认）/ all / 用户 ID，可组合，见 permissions.py
@@ -114,8 +112,6 @@ def load_settings() -> Settings:
         api_url=_env("TELEGRAM_API_URL"),
         language=language,
         user_language=_choice(_env("USER_LANGUAGE", "auto"), ("auto", *LANGS), "USER_LANGUAGE"),
-        review_topics=_bool(_env("REVIEW_TOPICS", "false")),
-        user_topics=_bool(_env("USER_TOPICS", "false")),
         leave_unknown_chats=_bool(_env("LEAVE_UNKNOWN_CHATS", "true")),
         msg_window_days=int(_env("MSG_WINDOW_DAYS", "3")),
         reviewers=_env("REVIEWERS", "admins"),

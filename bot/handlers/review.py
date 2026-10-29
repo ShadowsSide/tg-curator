@@ -11,7 +11,7 @@ from aiogram.types import CallbackQuery, ForceReply, Message
 
 from .. import entities as ent
 from ..config import Settings
-from ..core import NO_PREVIEW, Core, explicit_reply, mention, topic_of
+from ..core import NO_PREVIEW, Core, explicit_reply, mention
 from ..permissions import ReviewerCheck, ReviewerOnly, ReviewerPolicy
 from ..i18n import t
 from ..keyboards import ReviewCB, route
@@ -44,13 +44,9 @@ def _split_user(args: str) -> tuple[int | None, str | None]:
 
 
 async def _replied_sid(m: Message, core: Core) -> int | None:
-    """命令针对的投稿：回复了投稿消息就用它；话题模式下，在投稿的话题里直接发命令也行。"""
+    """命令针对的投稿：回复的那条投稿消息（预览、控制消息、转来的留言）。"""
     reply = explicit_reply(m)
-    if reply:
-        return await core.sid_for_review_message(reply.message_id)
-    if topic_of(m):
-        return await core.sid_for_review_topic(topic_of(m))
-    return None
+    return await core.sid_for_review_message(reply.message_id) if reply else None
 
 
 def build_router(settings: Settings) -> Router:
@@ -196,7 +192,7 @@ def build_router(settings: Settings) -> Router:
 
     @router.message(Command("msg"))
     async def msg_cmd(m: Message, core: Core) -> None:
-        """审核员给投稿人发消息：回复投稿（或在投稿的话题里）发送 /msg 内容。"""
+        """审核员给投稿人发消息：回复投稿发送 /msg 内容。"""
         body, entities = ent.strip_command(m.text or m.caption or "", ent.dump(m.entities or m.caption_entities))
         sid = await _replied_sid(m, core)
         if sid is None:

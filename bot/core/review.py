@@ -136,7 +136,7 @@ class ReviewMixin(CoreBase):
             return notice("status_changed")
         lang = await self.user_lang(sub.user_id)
         await self.notify_user(sub.user_id, t(lang, "notify_rejected", sid=sid) + _reason_line(lang, reason),
-                               reply_to=sub.user_msg_id, thread_id=sub.user_topic_id)
+                               reply_to=sub.user_msg_id)
         await self.refresh_control(sid)
         await self.refresh_stats()
         return None

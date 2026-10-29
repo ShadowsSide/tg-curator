@@ -4,18 +4,16 @@
 """
 from __future__ import annotations
 
-from .base import NO_PREVIEW, CoreBase, explicit_reply, mention, topic_of
+from .base import NO_PREVIEW, CoreBase, explicit_reply, mention
 from .editing import EditingMixin
 from .messaging import MessagingMixin
 from .review import ReviewMixin
 from .scheduler import SchedulerMixin
 from .stats import StatsMixin
 from .submissions import SubmissionsMixin
-from .topics import TopicsMixin
 
-__all__ = ["Core", "NO_PREVIEW", "explicit_reply", "mention", "topic_of"]
+__all__ = ["Core", "NO_PREVIEW", "explicit_reply", "mention"]
 
 
-class Core(SubmissionsMixin, EditingMixin, ReviewMixin, MessagingMixin, TopicsMixin, StatsMixin, SchedulerMixin,
-           CoreBase):
+class Core(SubmissionsMixin, EditingMixin, ReviewMixin, MessagingMixin, StatsMixin, SchedulerMixin, CoreBase):
     pass

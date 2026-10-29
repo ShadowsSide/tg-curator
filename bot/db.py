@@ -56,9 +56,6 @@ CREATE TABLE IF NOT EXISTS submissions (
     original_items TEXT,
     edited_by      TEXT,
     edited_at      INTEGER,
-    review_topic_id INTEGER,
-    user_topic_id  INTEGER,
-    topic_status   TEXT,
     msg_count      INTEGER NOT NULL DEFAULT 0,
     error          TEXT
 );
@@ -104,11 +101,15 @@ MIGRATIONS = [
     ("submissions", "edited_by", "ALTER TABLE submissions ADD COLUMN edited_by TEXT"),
     ("submissions", "edited_at", "ALTER TABLE submissions ADD COLUMN edited_at INTEGER"),
     ("users", "lang", "ALTER TABLE users ADD COLUMN lang TEXT"),
-    ("submissions", "review_topic_id", "ALTER TABLE submissions ADD COLUMN review_topic_id INTEGER"),
-    ("submissions", "user_topic_id", "ALTER TABLE submissions ADD COLUMN user_topic_id INTEGER"),
-    ("submissions", "topic_status", "ALTER TABLE submissions ADD COLUMN topic_status TEXT"),
     ("submissions", "msg_count", "ALTER TABLE submissions ADD COLUMN msg_count INTEGER NOT NULL DEFAULT 0"),
     ("submissions", "spam_flags", "ALTER TABLE submissions ADD COLUMN spam_flags TEXT"),
+]
+
+# 已移除功能留下的列：旧库里有就删掉 (表, 列)
+DROPPED_COLUMNS = [
+    ("submissions", "review_topic_id"),  # 话题模式
+    ("submissions", "user_topic_id"),
+    ("submissions", "topic_status"),
 ]
 
 JSON_COLUMNS = ("items", "original_items", "spam_flags")  # 存成 JSON 文本的列
@@ -157,9 +158,6 @@ class Submission:
     original_items: list[dict[str, Any]] | None  # 第一次 /edit 前的原稿
     edited_by: str | None
     edited_at: int | None
-    review_topic_id: int | None  # 话题模式：审核群里这条投稿的话题
-    user_topic_id: int | None  # 话题模式：投稿人私聊里这条投稿的话题
-    topic_status: str | None  # 话题名称上次同步时的状态，避免重复改名
     msg_count: int  # /msg 沟通的条数
     error: str | None
     spam_flags: list[dict[str, Any]] | None = None  # 防垃圾检查的命中项，见 spam.py；没命中为 None
@@ -198,6 +196,10 @@ class DB:
             columns = {r[1] for r in await self._all(f"PRAGMA table_info({table})")}
             if column not in columns:
                 await self.conn.execute(ddl)
+        for table, column in DROPPED_COLUMNS:
+            columns = {r[1] for r in await self._all(f"PRAGMA table_info({table})")}
+            if column in columns:
+                await self.conn.execute(f"ALTER TABLE {table} DROP COLUMN {column}")  # SQLite 3.35+
         await self.conn.commit()
 
     async def close(self) -> None:
@@ -332,16 +334,6 @@ class DB:
         )
         await self.conn.execute("UPDATE submissions SET msg_count = msg_count + 1 WHERE id=?", (sid,))
         await self.conn.commit()
-
-    async def sid_by_review_topic(self, thread_id: int) -> int | None:
-        row = await self._one("SELECT id FROM submissions WHERE review_topic_id=? ORDER BY id DESC LIMIT 1", (thread_id,))
-        return row[0] if row else None
-
-    async def sid_by_user_topic(self, user_id: int, thread_id: int) -> int | None:
-        row = await self._one(
-            "SELECT id FROM submissions WHERE user_id=? AND user_topic_id=? ORDER BY id DESC LIMIT 1", (user_id, thread_id)
-        )
-        return row[0] if row else None
 
     async def transition(self, sid: int, from_states: Iterable[str], to_state: str, **fields: Any) -> bool:
         """原子地把状态从 from_states 之一改成 to_state；状态不符时返回 False（防并发重复操作）。"""

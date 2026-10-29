@@ -124,7 +124,7 @@ def _strip_custom_emoji(items: list[dict[str, Any]], sig: Signature) -> tuple[li
 
 async def send_items(
     bot: Bot, chat_id: int | str, items: list[dict[str, Any]], *, sig: Signature, spoiler: bool,
-    silent: bool = False, reply_to: int | None = None, thread_id: int | None = None,
+    silent: bool = False, reply_to: int | None = None,
 ) -> list[Message]:
     """发送投稿内容；单条用对应的 send_*，多条用 send_media_group。落款加在承载说明文字的那一项后面。
 
@@ -133,21 +133,19 @@ async def send_items(
     silent=True 时订阅者收到的是无声通知（disable_notification）。
     """
     try:
-        return await _send(bot, chat_id, items, sig, spoiler, silent, reply_to, thread_id)
+        return await _send(bot, chat_id, items, sig, spoiler, silent, reply_to)
     except TelegramBadRequest as e:
         uses_custom = any(ent.has_custom_emoji(it.get("entities", [])) for it in items) or ent.has_custom_emoji(sig[1])
         if not uses_custom:
             raise
         log.warning("发送自定义 emoji 被拒绝（%s），改用普通 emoji 重发", e.message)
         items, sig = _strip_custom_emoji(items, sig)
-        return await _send(bot, chat_id, items, sig, spoiler, silent, reply_to, thread_id)
+        return await _send(bot, chat_id, items, sig, spoiler, silent, reply_to)
 
 
 async def _send(bot: Bot, chat_id: int | str, items: list[dict[str, Any]], sig: Signature,
-                spoiler: bool, silent: bool, reply_to: int | None, thread_id: int | None) -> list[Message]:
+                spoiler: bool, silent: bool, reply_to: int | None) -> list[Message]:
     common: dict[str, Any] = {"disable_notification": silent, "parse_mode": None}
-    if thread_id:  # 话题模式：发到指定话题里
-        common["message_thread_id"] = thread_id
     if reply_to:
         common["reply_parameters"] = ReplyParameters(message_id=reply_to, allow_sending_without_reply=True)
 

@@ -22,11 +22,6 @@ from ..timeutil import fmt_ts
 
 log = logging.getLogger(__name__)
 
-# 话题名称前的状态图标
-STATUS_ICON = {"draft": "📝", "pending": "⏳", "scheduled": "⏰", "published": "✅",
-               "rejected": "❌", "failed": "⚠️", "cancelled": "🚫"}
-TOPIC_COLOR = 7322096  # 蓝色（Telegram 只允许几种固定颜色）
-
 SCHEDULER_TICK = 15  # 秒
 DRAFT_TTL = 24 * 3600
 STATS_MSG_KEY = "stats_msg_id"
@@ -47,8 +42,6 @@ class CoreBase:
         self.db = db
         self.s = settings
         self.lang = settings.language
-        self.review_topics = settings.review_topics
-        self.user_topics = settings.user_topics
         self.albums = AlbumCollector(settings.album_delay, self.receive)
         self.channel_post_base: str | None = None
         self.channel_chat_id: int | None = None
@@ -69,18 +62,6 @@ class CoreBase:
         else:
             self.channel_post_base = f"https://t.me/c/{str(chat.id).removeprefix('-100')}/"
         await self.db.reset_stuck_publishing()
-
-        # 话题模式的前提条件不满足时，降级为普通模式并在日志里说明，而不是启动失败
-        if self.review_topics:
-            review = await self.bot.get_chat(self.s.review_chat_id)
-            if not review.is_forum:
-                log.warning("REVIEW_TOPICS=true，但审核群没有开启话题功能，已改用普通模式")
-                self.review_topics = False
-        if self.user_topics:
-            me = await self.bot.get_me()
-            if not me.has_topics_enabled:
-                log.warning("USER_TOPICS=true，但机器人没有在 @BotFather 开启话题模式，已改用普通模式")
-                self.user_topics = False
 
     def start_background(self) -> None:
         self._tasks = [
@@ -125,9 +106,6 @@ class CoreBase:
         """审核群里这条消息（预览、控制消息、转来的 /msg）属于哪条投稿。"""
         return await self.db.sid_by_review_message(message_id)
 
-    async def sid_for_review_topic(self, thread_id: int) -> int | None:
-        return await self.db.sid_by_review_topic(thread_id)
-
     async def find_user_message(self, user_id: int, message_id: int) -> tuple[int, int | None] | None:
         """投稿人私聊里这条消息属于哪条投稿：(投稿, 第几项) 或 (投稿, None)。"""
         return await self.db.find_by_user_message(user_id, message_id)
@@ -159,18 +137,15 @@ class CoreBase:
     async def notify(self, sub: Submission, key: str, **kw) -> None:
         """用投稿人自己的语言通知他，回复在他的投稿提示消息下面。"""
         lang = await self.user_lang(sub.user_id)
-        await self.notify_user(sub.user_id, t(lang, key, **kw), reply_to=sub.user_msg_id, thread_id=sub.user_topic_id)
+        await self.notify_user(sub.user_id, t(lang, key, **kw), reply_to=sub.user_msg_id)
 
-    async def notify_user(self, user_id: int, text: str, reply_to: int | None = None,
-                          thread_id: int | None = None) -> None:
+    async def notify_user(self, user_id: int, text: str, reply_to: int | None = None) -> None:
         try:
-            await self.bot.send_message(user_id, text, reply_parameters=_reply_to(reply_to),
-                                        message_thread_id=thread_id)
+            await self.bot.send_message(user_id, text, reply_parameters=_reply_to(reply_to))
         except TelegramAPIError as e:  # 用户把机器人拉黑、从没启动过机器人等
             log.info("通知用户 %s 失败：%s", user_id, e)
 
     async def refresh_control(self, sid: int) -> None:
-        await self.sync_topics(sid)
         sub = await self.db.get(sid)
         if not sub or not sub.review_msg_id:
             return
@@ -218,17 +193,13 @@ def _reason_line(lang: str, reason: str | None) -> str:
 
 def explicit_reply(m: Message) -> Message | None:
     """用户真正“回复”的那条消息。
-    话题里的每条消息都会隐式地回复话题的第一条消息（创建话题的服务消息），那不算回复。"""
+    审核群开了话题功能时，话题里的每条消息都会隐式地回复话题的第一条消息（创建话题的服务消息），那不算回复。"""
     r = m.reply_to_message
     if r is None:
         return None
     if r.forum_topic_created or (m.is_topic_message and r.message_id == m.message_thread_id):
         return None
     return r
-
-
-def topic_of(m: Message) -> int | None:
-    return m.message_thread_id if m.is_topic_message else None
 
 
 def mention(user: TgUser) -> str:

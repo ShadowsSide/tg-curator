@@ -3,6 +3,7 @@
 - 标题层级、表格行、代码块数量一致（英文版开头多一段语言说明，不算）
 - 配置表的分组和每组的变量、顺序一致，并且正好是 bot/config.py 读取的变量（加 compose 用的 IMAGE）
 - 审核群和私聊的命令表都列出了机器人注册的命令（/start、/help 除外）
+- .env.example（中文）和 .env.en.example（英文）的分组、变量、顺序都和 README 配置表一致，示例值也一致（LANGUAGE 除外）
 """
 import os
 import pathlib
@@ -16,6 +17,8 @@ from bot.i18n import PRIVATE_COMMANDS, REVIEW_COMMANDS  # noqa: E402
 
 ZH = (ROOT / "README.md").read_text(encoding="utf-8").split("\n")
 EN = (ROOT / "README.en.md").read_text(encoding="utf-8").split("\n")
+ENV_ZH = (ROOT / ".env.example").read_text(encoding="utf-8").split("\n")
+ENV_EN = (ROOT / ".env.en.example").read_text(encoding="utf-8").split("\n")
 # 只在 README 里说明、代码里不读的变量；以及只在开发说明里出现、不放进配置表的变量
 EXTRA_VARS = {"IMAGE"}
 UNLISTED_VARS = {"DB_PATH"}
@@ -84,6 +87,29 @@ def test_command_tables_list_registered_commands():
             want = {c for c, _ in registered["zh"]} - TRIVIAL_COMMANDS
             missing = want - commands(lines, a, b)
             assert not missing, f"{a}: missing {missing}"
+
+
+def env_groups(lines):
+    """按 “# ===== 组名 =====” 分组，收集每组里的变量（包括注释掉的 “# VAR=…”），同名只记一次。"""
+    groups = []
+    for line in lines:
+        if line.startswith("# ====="):
+            groups.append([])
+        elif (m := re.match(r"#? ?([A-Z_]+)=", line)) and m.group(1) not in groups[-1]:
+            groups[-1].append(m.group(1))
+    return groups
+
+
+def env_values(lines):
+    return [line for line in lines if re.match(r"[A-Z_]+=", line) and not line.startswith("LANGUAGE=")]
+
+
+def test_env_examples_match_readme():
+    readme = config_groups(ZH, "## 配置", "## 使用")
+    assert env_groups(ENV_ZH) == readme, env_groups(ENV_ZH)
+    assert env_groups(ENV_EN) == readme, env_groups(ENV_EN)
+    assert env_values(ENV_ZH) == env_values(ENV_EN)
+    assert "LANGUAGE=zh" in ENV_ZH and "LANGUAGE=en" in ENV_EN
 
 
 if __name__ == "__main__":

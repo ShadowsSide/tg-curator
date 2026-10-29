@@ -110,7 +110,7 @@ docker compose cp bot:/app/data/bot.db ./backup-$(date +%F).db   # 备份数据�
 
 ## 配置
 
-所有配置都通过 `.env` 设置，完整示例见 [`.env.example`](.env.example)。
+所有配置都通过 `.env` 设置，完整示例见 [`.env.example`](.env.example)，分组和下面一致（英文版：[`.env.en.example`](.env.en.example)）。
 
 ### 必填
 
@@ -279,7 +279,7 @@ DB_PATH=./data/bot.db .venv/bin/python -m bot
 .venv/bin/python tests/test_media.py      # 单元测试：修改图片视频的规则、相关按钮
 .venv/bin/python tests/test_db.py         # 单元测试：旧数据库升级（删除已移除功能的列）
 .venv/bin/python tests/test_reply.py      # 单元测试：判断“回复”时忽略话题里的隐式回复
-.venv/bin/python tests/test_readme.py     # 单元测试：中英文 README 结构一致，配置变量和命令与代码对得上
+.venv/bin/python tests/test_readme.py     # 单元测试：中英文 README 和 .env 示例结构一致，配置变量和命令与代码对得上
 .venv/bin/python tests/live_test.py       # 端到端测试：启动模拟的 Bot API 服务器，运行真实的机器人进程（约 1 分钟）
 .venv/bin/python tests/live_msg_test.py     # 端到端测试：/msg 沟通的边界情况（约 10 秒）
 .venv/bin/python tests/live_flood_test.py   # 端到端测试：被限流时的自动重试与改期（约 20 秒）

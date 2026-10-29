@@ -11,7 +11,7 @@ A Telegram channel submission bot: users send posts to the bot in a private chat
 
 Built with Python 3.12 + [aiogram 3](https://github.com/aiogram/aiogram) + SQLite, deployed with a single Docker Compose command. It uses long polling, so **you don't need a public IP or HTTPS**.
 
-> The bot speaks **English and Chinese**. Submitters see the language of their Telegram app (Chinese for Chinese clients, English otherwise); the review group, channel signatures and the review summary use `LANGUAGE`. For an English setup, set `LANGUAGE=en` in `.env`.
+> The bot speaks **English and Chinese**. Submitters see the language of their Telegram app (Chinese for Chinese clients, English otherwise); the review group, channel signatures and the review summary use `LANGUAGE`. For an English setup, start from `.env.en.example`, which sets `LANGUAGE=en`.
 
 ## Features
 
@@ -81,7 +81,7 @@ User sends content ─► chooses signed / anonymous ─► Review group: previe
 ```bash
 git clone https://github.com/ShadowsSide/tg-submit-bot.git
 cd tg-submit-bot
-cp .env.example .env        # fill in BOT_TOKEN, CHANNEL_ID and REVIEW_CHAT_ID; set LANGUAGE=en for English
+cp .env.en.example .env     # fill in BOT_TOKEN, CHANNEL_ID and REVIEW_CHAT_ID (LANGUAGE=en is already set)
 docker compose up -d --build
 docker compose logs -f
 ```
@@ -112,7 +112,7 @@ The database lives in the `bot-data` Docker volume. Its schema is migrated autom
 
 ## Configuration
 
-Everything is configured in `.env`. See [`.env.example`](.env.example) for a full example.
+Everything is configured in `.env`. See [`.env.en.example`](.env.en.example) for a full example, grouped the same way as below ([`.env.example`](.env.example) is the Chinese version).
 
 ### Required
 
@@ -263,7 +263,7 @@ Requires Python 3.10 or newer.
 
 ```bash
 python3 -m venv .venv && .venv/bin/pip install -r requirements.txt -r requirements-dev.txt
-cp .env.example .env && mkdir -p data
+cp .env.en.example .env && mkdir -p data
 set -a; source .env; set +a
 DB_PATH=./data/bot.db .venv/bin/python -m bot
 ```
@@ -281,7 +281,7 @@ The tests need no token and no network access:
 .venv/bin/python tests/test_media.py      # unit tests: rules for changing photos and videos, related buttons
 .venv/bin/python tests/test_db.py         # unit tests: upgrading an old database (drops columns of removed features)
 .venv/bin/python tests/test_reply.py      # unit tests: implicit replies inside forum topics are not replies
-.venv/bin/python tests/test_readme.py     # unit tests: both READMEs match in structure; config variables and commands match the code
+.venv/bin/python tests/test_readme.py     # unit tests: both READMEs and .env examples match; config variables and commands match the code
 .venv/bin/python tests/live_test.py       # end-to-end: runs the real bot against a mock Bot API server (~1 minute)
 .venv/bin/python tests/live_msg_test.py     # end-to-end: /msg edge cases (~10 seconds)
 .venv/bin/python tests/live_flood_test.py   # end-to-end: retries and rescheduling under rate limits (~20 seconds)

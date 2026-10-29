@@ -112,38 +112,56 @@ docker compose cp bot:/app/data/bot.db ./backup-$(date +%F).db   # 备份数据�
 
 所有配置都通过 `.env` 设置，完整示例见 [`.env.example`](.env.example)。
 
+### 必填
+
+不填无法启动。
+
 | 变量 | 默认值 | 说明 |
 |---|---|---|
-| `BOT_TOKEN` | — | **必填**。机器人 token |
-| `CHANNEL_ID` | — | **必填**。发布频道，填 `@username` 或 `-100…` |
-| `REVIEW_CHAT_ID` | — | **必填**。审核群 ID |
+| `BOT_TOKEN` | — | 机器人 token |
+| `CHANNEL_ID` | — | 发布频道，填 `@username` 或 `-100…` |
+| `REVIEW_CHAT_ID` | — | 审核群 ID |
+
+### 常用
+
+大多数部署会按需调整的选项。
+
+| 变量 | 默认值 | 说明 |
+|---|---|---|
 | `LANGUAGE` | `zh` | 审核群、频道落款、统计提醒的语言：`zh` / `en` |
 | `USER_LANGUAGE` | `auto` | 投稿人看到的语言：`auto` 跟随其客户端，或固定为 `zh` / `en` |
 | `REVIEWERS` | `admins` | 谁可以审核：`admins` 审核群管理员和群主；`all` 审核群所有成员；也可以写用户 ID，可组合，如 `admins,123456`。机器人不算审核员 |
-| `REJECT_TEMPLATES` | 随 `LANGUAGE` 的 4 条默认理由 | 点“拒绝”后可选的理由，用 `\|` 分隔，如 `重复投稿\|广告`；设为空则不显示理由面板 |
-| `MSG_WINDOW_DAYS` | `3` | `/msg` 沟通：审核结束（发布或拒绝）后还能继续沟通的天数；审核中始终可以 |
-| `LEAVE_UNKNOWN_CHATS` | `true` | 被拉进其他群组或频道时自动退出；设为 `false` 则留在群里但不响应。发布频道及其关联群组（启动时自动识别）始终保留 |
 | `TZ` | `Asia/Shanghai` | 时区，影响定时发布和“今天”的统计范围 |
 | `SIGN_TEMPLATE` | 随 `LANGUAGE`：`投稿人：{name}` / `Submitted by {name}` | 署名落款，`{name}` 会替换成投稿人链接 |
 | `ANON_SIGNATURE` | 随 `LANGUAGE`：`匿名投稿` / `Anonymous submission` | 匿名落款，设为空则不加落款 |
+| `REJECT_TEMPLATES` | 随 `LANGUAGE` 的 4 条默认理由 | 点“拒绝”后可选的理由，用 `\|` 分隔，如 `重复投稿\|广告`；设为空则不显示理由面板 |
 | `MAX_PENDING_PER_USER` | `5` | 每人同时最多保留几条未处理投稿 |
+| `SCHEDULE_PRESETS` | `09:00,12:00,18:00,21:00` | 定时面板里的快捷时间点 |
+| `DEFAULT_SILENT` | `false` | 新投稿是否默认静音发送 |
+| `REMINDER_INTERVAL_MINUTES` | `60` | 审核统计提醒的间隔（分钟），按整点对齐；`0` 表示关闭 |
+| `REMINDER_QUIET_HOURS` | — | 免打扰时段，例如 `0-8` |
+| `PROXY` | — | 代理，例如 `socks5://host:port` |
+| `IMAGE` | `tg-submit-bot:latest` | 使用预构建镜像时填写 |
+
+> 在 Docker 里运行时，`127.0.0.1` 指的是容器自己。要使用宿主机上的代理，请填宿主机 IP，或者 `host.docker.internal`（Docker Desktop）。
+
+### 高级
+
+防垃圾、沟通期限、统计口径等，一般保持默认即可。
+
+| 变量 | 默认值 | 说明 |
+|---|---|---|
 | `SPAM_KEYWORDS` | 空 | 关键词黑名单，逗号分隔，不区分大小写；同时检查文字和链接地址 |
 | `MAX_LINKS` | `0` | 每条投稿最多几个链接，`0` 不限；`LINK_WHITELIST` 里的域名不计 |
 | `LINK_WHITELIST` | 空 | 不计入链接上限的域名，逗号分隔，子域名也算，如 `t.me,github.com` |
 | `SPAM_ACTION` | `flag` | 命中关键词或链接上限时：`flag` 照常提交并在控制消息上标记；`block` 拦下，投稿人修改后可重新提交 |
 | `NEW_USER_COOLDOWN_MINUTES` | `0` | 还没有稿件发布过的投稿人，两次提交之间至少间隔几分钟；`0` 不限 |
+| `MSG_WINDOW_DAYS` | `3` | `/msg` 沟通：审核结束（发布或拒绝）后还能继续沟通的天数；审核中始终可以 |
+| `LEAVE_UNKNOWN_CHATS` | `true` | 被拉进其他群组或频道时自动退出；设为 `false` 则留在群里但不响应。发布频道及其关联群组（启动时自动识别）始终保留 |
 | `ALBUM_DELAY` | `1.5` | 收集相册时等待的秒数 |
-| `SCHEDULE_PRESETS` | `09:00,12:00,18:00,21:00` | 定时面板里的快捷时间点 |
-| `DEFAULT_SILENT` | `false` | 新投稿是否默认静音发送 |
-| `REMINDER_INTERVAL_MINUTES` | `60` | 审核统计提醒的间隔（分钟），按整点对齐；`0` 表示关闭 |
 | `REMINDER_ONLY_WHEN_PENDING` | `true` | 只在有待审核投稿时提醒 |
-| `REMINDER_QUIET_HOURS` | — | 免打扰时段，例如 `0-8` |
 | `STATS_SCOPE` | `today` | 统计范围：`today` 时接受/拒绝只统计当天的；`all` 统计全部历史 |
-| `PROXY` | — | 代理，例如 `socks5://host:port` |
 | `TELEGRAM_API_URL` | — | 自建 Bot API 服务器地址，可以突破官方 API 的 20MB/50MB 文件限制 |
-| `IMAGE` | `tg-submit-bot:latest` | 使用预构建镜像时填写 |
-
-> 在 Docker 里运行时，`127.0.0.1` 指的是容器自己。要使用宿主机上的代理，请填宿主机 IP，或者 `host.docker.internal`（Docker Desktop）。
 
 ## 使用
 

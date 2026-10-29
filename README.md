@@ -275,35 +275,13 @@ set -a; source .env; set +a
 DB_PATH=./data/bot.db .venv/bin/python -m bot
 ```
 
-测试不需要 token，也不需要联网：
+测试不需要 token，也不需要联网。`tests/test_*.py` 是单元测试；`tests/live_*.py` 是端到端测试，会启动模拟的 Bot API 服务器，运行真实的机器人进程。每个文件都是独立脚本，可以单独运行，开头的说明写了它测什么。运行全部测试（约 4 分钟）：
 
 ```bash
-.venv/bin/python tests/test_entities.py   # 单元测试：格式偏移（UTF-16）计算
-.venv/bin/python tests/test_i18n.py       # 单元测试：中英文文案齐全、占位符一致
-.venv/bin/python tests/test_errors.py     # 单元测试：业务层只返回提示代码，翻译在显示时进行
-.venv/bin/python tests/test_structure.py  # 单元测试：处理函数不直接访问数据库，core 各模块不重复定义方法
-.venv/bin/python tests/test_confirm.py    # 单元测试：确认面板、机器人不算审核员
-.venv/bin/python tests/test_reject_templates.py  # 单元测试：拒绝理由的解析与面板
-.venv/bin/python tests/test_spam.py       # 单元测试：关键词、链接计数与白名单
-.venv/bin/python tests/test_media.py      # 单元测试：修改图片视频的规则、相关按钮
-.venv/bin/python tests/test_db.py         # 单元测试：旧数据库升级（删除已移除功能的列）
-.venv/bin/python tests/test_reply.py      # 单元测试：判断“回复”时忽略话题里的隐式回复
-.venv/bin/python tests/test_readme.py     # 单元测试：中英文 README 和 .env 示例结构一致，配置变量和命令与代码对得上
-.venv/bin/python tests/live_test.py       # 端到端测试：启动模拟的 Bot API 服务器，运行真实的机器人进程（约 1 分钟）
-.venv/bin/python tests/live_msg_test.py     # 端到端测试：/msg 沟通的边界情况（约 10 秒）
-.venv/bin/python tests/live_flood_test.py   # 端到端测试：被限流时的自动重试与改期（约 20 秒）
-.venv/bin/python tests/live_perm_test.py    # 端到端测试：审核员权限（约 20 秒）
-.venv/bin/python tests/live_confirm_test.py   # 端到端测试：二次确认、默认拒绝理由（约 15 秒）
-.venv/bin/python tests/live_reject_test.py    # 端到端测试：自定义拒绝理由（约 10 秒）
-.venv/bin/python tests/live_buttons_test.py   # 端到端测试：重试发布、取消定时（约 10 秒）
-.venv/bin/python tests/live_spam_test.py      # 端到端测试：防垃圾标记、改稿重新检查、新用户冷却（约 10 秒）
-.venv/bin/python tests/live_spam_block_test.py  # 端到端测试：防垃圾拦截模式（约 10 秒）
-.venv/bin/python tests/live_prompt_test.py      # 端到端测试：修改、联系投稿人、自定义理由按钮，删除旧预览（约 10 秒）
-.venv/bin/python tests/live_media_test.py       # 端到端测试：审核员的媒体面板，投稿人加图、删图（约 10 秒）
-.venv/bin/python tests/live_choice_test.py      # 端到端测试：记住上次选的署名 / 匿名（约 8 秒）
+for f in tests/test_*.py tests/live_*.py; do .venv/bin/python "$f" || echo "FAILED: $f"; done
 ```
 
-每个 PR 和推送到 `main` 时，GitHub Actions（`.github/workflows/test.yml`）会先用 pyflakes 检查代码（未定义的名字、没用到的 import 和变量等），再运行以上全部测试。本地检查：
+每个 PR 和推送到 `main` 时，GitHub Actions（`.github/workflows/test.yml`）会先用 pyflakes 检查代码（未定义的名字、没用到的 import 和变量等），再运行全部测试。本地检查：
 
 ```bash
 .venv/bin/python -m pyflakes bot tests

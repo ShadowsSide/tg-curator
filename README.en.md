@@ -277,35 +277,13 @@ set -a; source .env; set +a
 DB_PATH=./data/bot.db .venv/bin/python -m bot
 ```
 
-The tests need no token and no network access:
+The tests need no token and no network access. `tests/test_*.py` are unit tests; `tests/live_*.py` are end-to-end tests that run the real bot process against a mock Bot API server. Each file is a standalone script you can run on its own, and its opening docstring says what it covers. To run them all (about 4 minutes):
 
 ```bash
-.venv/bin/python tests/test_entities.py   # unit tests: formatting offsets (UTF-16)
-.venv/bin/python tests/test_i18n.py       # unit tests: every text exists in both languages
-.venv/bin/python tests/test_errors.py     # unit tests: business logic returns notice codes, translated only when shown
-.venv/bin/python tests/test_structure.py  # unit tests: handlers don't touch the database; core modules don't redefine methods
-.venv/bin/python tests/test_confirm.py    # unit tests: confirm panel; bots are never reviewers
-.venv/bin/python tests/test_reject_templates.py  # unit tests: reject reasons parsing and panel
-.venv/bin/python tests/test_spam.py       # unit tests: keywords, link counting and whitelist
-.venv/bin/python tests/test_media.py      # unit tests: rules for changing photos and videos, related buttons
-.venv/bin/python tests/test_db.py         # unit tests: upgrading an old database (drops columns of removed features)
-.venv/bin/python tests/test_reply.py      # unit tests: implicit replies inside forum topics are not replies
-.venv/bin/python tests/test_readme.py     # unit tests: both READMEs and .env examples match; config variables and commands match the code
-.venv/bin/python tests/live_test.py       # end-to-end: runs the real bot against a mock Bot API server (~1 minute)
-.venv/bin/python tests/live_msg_test.py     # end-to-end: /msg edge cases (~10 seconds)
-.venv/bin/python tests/live_flood_test.py   # end-to-end: retries and rescheduling under rate limits (~20 seconds)
-.venv/bin/python tests/live_perm_test.py    # end-to-end: reviewer permissions (~20 seconds)
-.venv/bin/python tests/live_confirm_test.py   # end-to-end: confirmation, default reject reasons (~15 seconds)
-.venv/bin/python tests/live_reject_test.py    # end-to-end: custom reject reasons (~10 seconds)
-.venv/bin/python tests/live_buttons_test.py   # end-to-end: Retry and Unschedule buttons (~10 seconds)
-.venv/bin/python tests/live_spam_test.py      # end-to-end: spam flags, re-check on edit, new-user cooldown (~10 seconds)
-.venv/bin/python tests/live_spam_block_test.py  # end-to-end: spam block mode (~10 seconds)
-.venv/bin/python tests/live_prompt_test.py      # end-to-end: Edit, Message submitter and Custom reason buttons; old preview deletion (~10 seconds)
-.venv/bin/python tests/live_media_test.py       # end-to-end: reviewers' media panel; submitters adding and removing photos (~10 seconds)
-.venv/bin/python tests/live_choice_test.py      # end-to-end: remembering the last signed / anonymous choice (~8 seconds)
+for f in tests/test_*.py tests/live_*.py; do .venv/bin/python "$f" || echo "FAILED: $f"; done
 ```
 
-GitHub Actions (`.github/workflows/test.yml`) first checks the code with pyflakes (undefined names, unused imports and variables, …), then runs all of these on every pull request and every push to `main`. To check locally:
+GitHub Actions (`.github/workflows/test.yml`) first checks the code with pyflakes (undefined names, unused imports and variables, …), then runs all the tests on every pull request and every push to `main`. To check locally:
 
 ```bash
 .venv/bin/python -m pyflakes bot tests

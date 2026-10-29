@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # 用 buildx 一次构建 linux/amd64 + linux/arm64 镜像并推送到镜像仓库。
-# 用法：scripts/build-multiarch.sh ghcr.io/<你>/tg-submit-bot:latest
+# 用法：scripts/build-multiarch.sh ghcr.io/<你>/tg-curator:latest
 # 需要先 docker login；在 x86 机器上构建 arm64（或反过来）依赖 QEMU，Docker Desktop 已自带。
 set -euo pipefail
 

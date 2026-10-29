@@ -1,7 +1,7 @@
-# tg-submit-bot
+# Curator
 
-[![docker](https://github.com/ShadowsSide/tg-submit-bot/actions/workflows/docker.yml/badge.svg)](https://github.com/ShadowsSide/tg-submit-bot/actions/workflows/docker.yml)
-[![license](https://img.shields.io/github/license/ShadowsSide/tg-submit-bot)](LICENSE)
+[![docker](https://github.com/ShadowsSide/tg-curator/actions/workflows/docker.yml/badge.svg)](https://github.com/ShadowsSide/tg-curator/actions/workflows/docker.yml)
+[![license](https://img.shields.io/github/license/ShadowsSide/tg-curator)](LICENSE)
 ![python](https://img.shields.io/badge/python-3.12-blue)
 ![platform](https://img.shields.io/badge/platform-linux%2Famd64%20%7C%20linux%2Farm64-lightgrey)
 
@@ -9,7 +9,7 @@
 
 [Features](#features) · [How it works](#how-it-works) · [Quick start](#quick-start) · [Configuration](#configuration) · [Usage](#usage) · [Known limitations and risks](#known-limitations-and-risks) · [FAQ](#faq) · [Development](#development) · [License](#license)
 
-A Telegram channel submission bot: users send posts to the bot in a private chat, admins review them in a review group, and approved posts are published to the channel.
+**Curator** is a Telegram channel submission bot: users send posts to the bot in a private chat, admins review them in a review group, and approved posts are published to the channel.
 
 Built with Python 3.12 + [aiogram 3](https://github.com/aiogram/aiogram) + SQLite, deployed with a single Docker Compose command. It uses long polling, so **you don't need a public IP or HTTPS**.
 
@@ -88,8 +88,8 @@ Before deciding: 🙈 Spoiler · 🔕 Silent · ✏️ Edit · 🖼 Media · �
 ### 2. Deploy
 
 ```bash
-git clone https://github.com/ShadowsSide/tg-submit-bot.git
-cd tg-submit-bot
+git clone https://github.com/ShadowsSide/tg-curator.git
+cd tg-curator
 cp .env.en.example .env     # fill in BOT_TOKEN, CHANNEL_ID and REVIEW_CHAT_ID (LANGUAGE=en is already set)
 docker compose up -d --build
 docker compose logs -f
@@ -98,7 +98,7 @@ docker compose logs -f
 To use the prebuilt image instead of building on your server, add this to `.env`:
 
 ```bash
-IMAGE=ghcr.io/shadowsside/tg-submit-bot:latest
+IMAGE=ghcr.io/shadowsside/tg-curator:latest
 ```
 
 and run:
@@ -120,6 +120,8 @@ docker compose pull && docker compose up -d --no-build           # 2. or: update
 ```
 
 The database lives in the `bot-data` Docker volume.
+
+> **Upgrading from tg-submit-bot**: the project is now called Curator, and the repository and image are now `tg-curator`. If you use the prebuilt image, change `IMAGE` in `.env` to `ghcr.io/shadowsside/tg-curator:latest`; the old image is no longer updated. **Don't rename your deployment directory**: Docker Compose names the data volume after it, so a renamed directory gets a new, empty volume (the old data is still there, but the bot can't see it).
 
 ## Configuration
 
@@ -154,7 +156,7 @@ Options most deployments adjust as needed.
 | `REMINDER_INTERVAL_MINUTES` | `60` | Interval of the review summary, aligned to the clock; `0` turns it off |
 | `REMINDER_QUIET_HOURS` | — | Quiet hours with no summaries, e.g. `0-8` |
 | `PROXY` | — | Proxy, e.g. `socks5://host:port` |
-| `IMAGE` | `tg-submit-bot:latest` | Set this when using a prebuilt image |
+| `IMAGE` | `tg-curator:latest` | Set this when using a prebuilt image |
 
 > Inside Docker, `127.0.0.1` means the container itself. To use a proxy running on the host, use the host's IP address or `host.docker.internal` (Docker Desktop).
 
@@ -339,7 +341,7 @@ scripts/          multi-arch image build script
 
 ### Publishing images (for your own fork)
 
-On every push to `main` or `v*` tag, GitHub Actions builds amd64 + arm64 images and publishes them to `ghcr.io/<owner>/tg-submit-bot`.
+On every push to `main` or `v*` tag, GitHub Actions builds amd64 + arm64 images and publishes them to `ghcr.io/<owner>/tg-curator`.
 
 To publish to Docker Hub as well, add the variable `DOCKERHUB_USERNAME` and the secret `DOCKERHUB_TOKEN` (a Docker Hub access token with Read & Write permission) under **Settings → Secrets and variables → Actions** in your repository.
 

@@ -121,8 +121,6 @@ docker compose pull && docker compose up -d --no-build           # 2. or: update
 
 The database lives in the `bot-data` Docker volume.
 
-> **Upgrading from tg-submit-bot**: the project is now called Curator, and the repository and image are now `tg-curator`. If you use the prebuilt image, change `IMAGE` in `.env` to `ghcr.io/shadowsside/tg-curator:latest`; the old image is no longer updated. **Don't rename your deployment directory**: Docker Compose names the data volume after it, so a renamed directory gets a new, empty volume (the old data is still there, but the bot can't see it).
-
 ## Configuration
 
 Everything is configured in `.env`. See [`.env.en.example`](.env.en.example) for a full example, grouped the same way as below ([`.env.example`](.env.example) is the Chinese version).

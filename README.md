@@ -119,8 +119,6 @@ docker compose pull && docker compose up -d --no-build           # 2. 或者：�
 
 数据库保存在 Docker 卷 `bot-data` 中。
 
-> **从 tg-submit-bot 升级**：项目改名为 Curator，仓库和镜像改名为 `tg-curator`。用预构建镜像的，把 `.env` 里的 `IMAGE` 改成 `ghcr.io/shadowsside/tg-curator:latest`，旧镜像不再更新。**不要给部署目录改名**：Docker Compose 按目录名给数据卷命名，改了目录会换成一个新的空数据卷（旧数据还在，但机器人用不到）。
-
 ## 配置
 
 所有配置都通过 `.env` 设置，完整示例见 [`.env.example`](.env.example)，分组和下面一致（英文版：[`.env.en.example`](.env.en.example)）。

@@ -7,6 +7,8 @@
 
 **简体中文** | [English](README.en.md)
 
+[功能](#功能) · [工作流程](#工作流程) · [快速开始](#快速开始) · [配置](#配置) · [使用](#使用) · [已知限制与风险](#已知限制与风险) · [常见问题](#常见问题) · [开发](#开发) · [License](#license)
+
 一个 Telegram 频道投稿机器人：用户私聊投稿，管理员在审核群里审核，通过后发布到频道。
 
 基于 Python 3.12 + [aiogram 3](https://github.com/aiogram/aiogram) + SQLite，使用 Docker Compose 一键部署。采用长轮询方式运行，**不需要公网 IP，也不需要 HTTPS**。

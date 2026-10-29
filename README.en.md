@@ -7,6 +7,8 @@
 
 [简体中文](README.md) | **English**
 
+[Features](#features) · [How it works](#how-it-works) · [Quick start](#quick-start) · [Configuration](#configuration) · [Usage](#usage) · [Known limitations and risks](#known-limitations-and-risks) · [FAQ](#faq) · [Development](#development) · [License](#license)
+
 A Telegram channel submission bot: users send posts to the bot in a private chat, admins review them in a review group, and approved posts are published to the channel.
 
 Built with Python 3.12 + [aiogram 3](https://github.com/aiogram/aiogram) + SQLite, deployed with a single Docker Compose command. It uses long polling, so **you don't need a public IP or HTTPS**.

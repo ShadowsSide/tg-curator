@@ -165,7 +165,7 @@ Everything is configured in `.env`. See [`.env.example`](.env.example) for a ful
 Buttons on the control message: **✅ Publish now**, **⏰ Schedule**, **❌ Reject**, **🚫 Ban submitter**, **✏️ Edit**, **💬 Message submitter**, plus the **🙈 Spoiler** and **🔕 Silent** toggles.
 
 **✏️ Edit**, **💬 Message submitter**, **✏️ Custom reason** on the reason panel and **✏️ Custom time** on the schedule panel post a “please reply to this message…” prompt. Just reply to it, no commands to remember:
-- Only the reply of whoever tapped the button counts (anonymous admins excepted); reply “cancel” to give up
+- Only the reply of whoever tapped the button counts (anonymous admins excepted); send `/cancel` to give up (as a reply to a prompt it drops that one; on its own it drops all your open prompts)
 - **Edit** first posts the current content with formatting so you can copy and change it; the prompt and that copy are deleted once you're done
 - **Custom reason** rejects as soon as you send the reason, with no extra confirmation
 - Prompts are stored in the database, so they still work after a restart; prompts left unanswered for 24 hours are deleted

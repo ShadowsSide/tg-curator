@@ -1,4 +1,4 @@
-"""“按钮 + 回复”流程：✏️ 修改、💬 联系投稿人、✏️ 自定义理由；改稿后删掉上一份修改预览。
+"""“按钮 + 回复”流程：✏️ 修改、💬 联系投稿人、✏️ 自定义理由、/cancel；改稿后删掉上一份修改预览。
 
 用法（项目根目录下）：python tests/live_prompt_test.py
 复用 live_test.py 的模拟 Bot API 服务器。约 15 秒。
@@ -99,15 +99,31 @@ async def scenario():
     check("a finished prompt doesn't accept replies",
           await nothing(lambda e: is_send(e, "sendMessage", REVIEW, "已修改"), n))
 
-    # 6. 回复“取消”：提示删掉，不改稿
+    # 6. /cancel：回复提示发送只放弃这一个；别人的提示放弃不了；直接发送放弃自己所有的提示
     n = len(log); lt.cb("r:edit:1:0", REVIEW, ADMIN, message_id=ctrl1)
-    p = await wait_for(lambda e: is_prompt(e, "修改后的正文"), since=n)
-    n = len(log); lt.gm("取消", reply_to=p["result"]["message_id"])
+    p = await wait_for(lambda e: is_prompt(e, "/cancel"), since=n)
+    n = len(log); reply_from(OTHER_ADMIN, "/cancel", p["result"]["message_id"])
+    told = await wait_for(lambda e: is_send(e, "sendMessage", REVIEW, "没有等你回复"), since=n)
+    check("/cancel on someone else's prompt → not cancelled", told and p["result"]["message_id"] not in deleted(n))
+    n = len(log); lt.gm("/cancel", reply_to=p["result"]["message_id"])
     told = await wait_for(lambda e: is_send(e, "sendMessage", REVIEW, "已取消"), since=n)
     await wait_for(lambda e: e["method"] == "deleteMessages", since=n)
-    check("reply “取消” → cancelled, prompt deleted, nothing edited",
+    check("/cancel as a reply → that prompt deleted, nothing edited",
           told and p["result"]["message_id"] in deleted(n)
           and not any(is_send(e, "sendMessage", REVIEW, "已修改") for e in log[n:]))
+    n = len(log)
+    lt.cb("r:edit:1:0", REVIEW, ADMIN, message_id=ctrl1)
+    p1 = await wait_for(lambda e: is_prompt(e, "修改后的正文"), since=n)
+    lt.cb("r:msg:1:0", REVIEW, ADMIN, message_id=ctrl1)
+    p2 = await wait_for(lambda e: is_prompt(e, "转给投稿人"), since=n)
+    n = len(log); lt.gm("/cancel")
+    await wait_for(lambda e: is_send(e, "sendMessage", REVIEW, "已取消"), since=n)
+    await asyncio.sleep(0.5)
+    check("/cancel on its own → all my open prompts dropped",
+          {p1["result"]["message_id"], p2["result"]["message_id"]} <= deleted(n), deleted(n))
+    n = len(log); lt.gm("/cancel")
+    check("/cancel with nothing open → told so",
+          await wait_for(lambda e: is_send(e, "sendMessage", REVIEW, "没有等你回复"), since=n))
 
     # 7. 文字太长：提示保留，可以重新回复
     n = len(log); lt.cb("r:edit:1:0", REVIEW, ADMIN, message_id=ctrl1)

@@ -47,6 +47,15 @@ class PromptsMixin(CoreBase):
         except TelegramAPIError as e:  # 已被手动删掉、超过 48 小时等：不影响
             log.info("删除提示消息失败：%s", e)
 
+    async def prompts_of(self, chat_id: int, user_id: int) -> list[Prompt]:
+        return await self.db.prompts_of(chat_id, user_id)
+
+    async def cancel_prompt(self, prompt: Prompt) -> None:
+        """/cancel：放弃提示。自定义理由是从拒绝理由面板来的，控制消息恢复原样。"""
+        await self.finish_prompt(prompt)
+        if prompt.kind == "reason":
+            await self.refresh_control(prompt.sid)
+
     async def expire_prompts(self) -> None:
         for prompt in await self.db.stale_prompts(now_ts() - PROMPT_TTL):
             await self.finish_prompt(prompt)

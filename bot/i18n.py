@@ -352,25 +352,26 @@ T: dict[str, dict[str, str]] = {
 
     # ---------- 审核：等待回复的提示（点按钮后“请回复本消息……”） ----------
     "prompt_time": {
-        "zh": '{who} 请<b>回复本消息</b>输入发布时间：\n<code>20:30</code> · <code>10-20 09:00</code> · <code>2026-10-20 09:00</code> · <code>+90m</code> · <code>+2h</code>\n回复「取消」放弃。',
-        "en": '{who} please <b>reply to this message</b> with a publish time:\n<code>20:30</code> · <code>10-20 09:00</code> · <code>2026-10-20 09:00</code> · <code>+90m</code> · <code>+2h</code>\nReply “cancel” to give up.',
+        "zh": '{who} 请<b>回复本消息</b>输入发布时间：\n<code>20:30</code> · <code>10-20 09:00</code> · <code>2026-10-20 09:00</code> · <code>+90m</code> · <code>+2h</code>\n发送 /cancel 放弃。',
+        "en": '{who} please <b>reply to this message</b> with a publish time:\n<code>20:30</code> · <code>10-20 09:00</code> · <code>2026-10-20 09:00</code> · <code>+90m</code> · <code>+2h</code>\nSend /cancel to give up.',
     },
     "prompt_edit": {
-        "zh": '{who} 请<b>回复本消息</b>发送修改后的正文或说明文字，格式原样保留。上面是当前内容，可以复制后修改。\n回复「取消」放弃。',
+        "zh": '{who} 请<b>回复本消息</b>发送修改后的正文或说明文字，格式原样保留。上面是当前内容，可以复制后修改。\n发送 /cancel 放弃。',
         "en": '{who} please <b>reply to this message</b> with the new text or caption; formatting is kept. '
-              'The current content is above, copy it and change it.\nReply “cancel” to give up.',
+              'The current content is above, copy it and change it.\nSend /cancel to give up.',
     },
     "prompt_msg": {
-        "zh": '{who} 请<b>回复本消息</b>发送要转给投稿人的内容（文字、图片、文件都可以），投稿人看到的是“审核员”。\n回复「取消」放弃。',
+        "zh": '{who} 请<b>回复本消息</b>发送要转给投稿人的内容（文字、图片、文件都可以），投稿人看到的是“审核员”。\n发送 /cancel 放弃。',
         "en": '{who} please <b>reply to this message</b> with what to send to the submitter (text, a photo or a file). '
-              'They will see it as from “Reviewer”.\nReply “cancel” to give up.',
+              'They will see it as from “Reviewer”.\nSend /cancel to give up.',
     },
     "prompt_reason": {
-        "zh": '{who} 请<b>回复本消息</b>写拒绝理由，发送后立即拒绝，理由会发给投稿人。\n回复「取消」放弃。',
+        "zh": '{who} 请<b>回复本消息</b>写拒绝理由，发送后立即拒绝，理由会发给投稿人。\n发送 /cancel 放弃。',
         "en": '{who} please <b>reply to this message</b> with the reason. The submission is rejected as soon as you '
-              'send it, and the reason goes to the submitter.\nReply “cancel” to give up.',
+              'send it, and the reason goes to the submitter.\nSend /cancel to give up.',
     },
     "prompt_cancelled": {"zh": "已取消。", "en": "Cancelled."},
+    "prompt_none": {"zh": "没有等你回复的操作。", "en": "Nothing is waiting for your reply."},
     "prompt_text_needed": {"zh": "请发送文字。", "en": "Please send text."},
     "custom_time_bad": {
         "zh": "看不懂这个时间 🤔 例如 <code>20:30</code>、<code>10-20 09:00</code>、<code>+2h</code>",
@@ -383,8 +384,8 @@ T: dict[str, dict[str, str]] = {
 
     # ---------- 审核：命令 ----------
     "review_help": {
-        "zh": '🛠 <b>审核群命令</b>\n/stats 发送最新审核统计\n/queue 定时发布队列\n/active [天数] 投稿人活跃度排行（默认 30 天）\n/user &lt;用户ID&gt; 查看某位投稿人\n\n<b>处理投稿</b>（控制消息上的 ✏️ 修改、💬 联系投稿人 按钮作用相同；命令要回复投稿的预览或控制消息使用）\n/edit 新内容 —— 替换正文或说明文字，格式原样保留\n/edit —— 不带内容：把当前文字（含格式）发出来，方便复制后修改\n/msg 内容 —— 发消息给投稿人（以“审核员”身份），投稿人也可以用 /msg 回复\n/no [理由] —— 拒绝，理由会发给投稿人\n/ban [理由] —— 封禁投稿人，并自动拒绝其所有未处理来稿\n\n<b>按用户处理</b>\n/ban &lt;用户ID&gt; [理由] · /unban &lt;用户ID&gt;',
-        "en": "🛠 <b>Review group commands</b>\n/stats post the latest review summary\n/queue scheduled posts\n/active [days] contributor ranking (default 30 days)\n/user &lt;user ID&gt; show one contributor\n\n<b>Handling a submission</b> (the ✏️ Edit and 💬 Message submitter buttons do the same; reply to the submission's preview or control message to use a command)\n/edit new content — replace the text or caption, keeping formatting\n/edit — on its own: show the current text with formatting so you can copy it\n/msg message — message the submitter (shown as “Reviewer”); they can answer with /msg too\n/no [reason] — reject; the reason is sent to the submitter\n/ban [reason] — ban the submitter and reject all their open submissions\n\n<b>By user</b>\n/ban &lt;user ID&gt; [reason] · /unban &lt;user ID&gt;",
+        "zh": '🛠 <b>审核群命令</b>\n/stats 发送最新审核统计\n/queue 定时发布队列\n/active [天数] 投稿人活跃度排行（默认 30 天）\n/user &lt;用户ID&gt; 查看某位投稿人\n\n<b>处理投稿</b>（控制消息上的 ✏️ 修改、💬 联系投稿人 按钮作用相同；命令要回复投稿的预览或控制消息使用）\n/edit 新内容 —— 替换正文或说明文字，格式原样保留\n/edit —— 不带内容：把当前文字（含格式）发出来，方便复制后修改\n/msg 内容 —— 发消息给投稿人（以“审核员”身份），投稿人也可以用 /msg 回复\n/no [理由] —— 拒绝，理由会发给投稿人\n/ban [理由] —— 封禁投稿人，并自动拒绝其所有未处理来稿\n/cancel —— 放弃正在等你回复的操作（点了 修改、联系投稿人 等按钮后）\n\n<b>按用户处理</b>\n/ban &lt;用户ID&gt; [理由] · /unban &lt;用户ID&gt;',
+        "en": "🛠 <b>Review group commands</b>\n/stats post the latest review summary\n/queue scheduled posts\n/active [days] contributor ranking (default 30 days)\n/user &lt;user ID&gt; show one contributor\n\n<b>Handling a submission</b> (the ✏️ Edit and 💬 Message submitter buttons do the same; reply to the submission's preview or control message to use a command)\n/edit new content — replace the text or caption, keeping formatting\n/edit — on its own: show the current text with formatting so you can copy it\n/msg message — message the submitter (shown as “Reviewer”); they can answer with /msg too\n/no [reason] — reject; the reason is sent to the submitter\n/ban [reason] — ban the submitter and reject all their open submissions\n/cancel — drop what's waiting for your reply (after tapping Edit, Message submitter and so on)\n\n<b>By user</b>\n/ban &lt;user ID&gt; [reason] · /unban &lt;user ID&gt;",
     },
     "no_permission": {"zh": "⛔ 你没有审核权限", "en": "⛔ You don't have reviewer permission"},
     "reply_to_submission": {
@@ -520,10 +521,11 @@ REVIEW_COMMANDS = {
     "zh": [("stats", "审核统计"), ("queue", "定时发布队列"), ("active", "投稿人活跃度"),
            ("edit", "修改稿件（回复投稿）新内容"), ("msg", "给投稿人发消息（回复投稿）内容"),
            ("no", "拒绝投稿（回复投稿）[理由]"),
-           ("ban", "封禁投稿人并拒绝其来稿 [理由]"), ("unban", "解除封禁"), ("user", "查看投稿人"), ("help", "命令说明")],
+           ("ban", "封禁投稿人并拒绝其来稿 [理由]"), ("unban", "解除封禁"), ("user", "查看投稿人"),
+           ("cancel", "放弃正在等你回复的操作"), ("help", "命令说明")],
     "en": [("stats", "Review summary"), ("queue", "Scheduled posts"), ("active", "Contributor activity"),
            ("edit", "Edit a submission (reply to it) new content"), ("msg", "Message the submitter (reply) text"),
            ("no", "Reject a submission (reply to it) [reason]"),
            ("ban", "Ban the submitter and reject their posts [reason]"), ("unban", "Lift a ban"),
-           ("user", "Show a contributor"), ("help", "Command help")],
+           ("user", "Show a contributor"), ("cancel", "Drop what's waiting for your reply"), ("help", "Command help")],
 }

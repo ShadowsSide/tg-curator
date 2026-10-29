@@ -508,6 +508,10 @@ class DB:
     async def delete_prompt(self, chat_id: int, message_id: int) -> None:
         await self._exec("DELETE FROM prompts WHERE chat_id=? AND message_id=?", (chat_id, message_id))
 
+    async def prompts_of(self, chat_id: int, user_id: int) -> list[Prompt]:
+        rows = await self._all("SELECT * FROM prompts WHERE chat_id=? AND user_id=?", (chat_id, user_id))
+        return [Prompt.from_row(r) for r in rows]
+
     async def stale_prompts(self, older_than: int) -> list[Prompt]:
         return [Prompt.from_row(r) for r in await self._all("SELECT * FROM prompts WHERE created_at<?", (older_than,))]
 

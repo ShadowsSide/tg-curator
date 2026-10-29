@@ -19,12 +19,17 @@ from ..render import dump_link_preview, message_item, user_link
 from ..timeutil import parse_time
 
 MAX_REASON = 500
-CANCEL_WORDS = ("取消", "cancel")
 # 回复提示时这些错误可以改了再回复一次，提示保留；其他错误（比如投稿已被别人处理）提示作废
 RETRYABLE = ("prompt_text_needed", "custom_time_bad", "time_past", "too_long", "text_empty")
 
 
 PROMPT_KIND = {"custom": "time", "edit": "edit", "msg": "msg", "creason": "reason"}  # 按钮 → 提示的种类
+
+
+def _is_owner(m: Message, prompt: Prompt) -> bool:
+    """这条消息是不是点按钮的那个人发的。匿名管理员（以群的身份发言）看不出是谁，一律算数。"""
+    anonymous_admin = m.sender_chat is not None and m.sender_chat.id == m.chat.id
+    return m.from_user.id == prompt.user_id or anonymous_admin
 
 
 def _user_id_arg(command: CommandObject) -> int | None:
@@ -135,16 +140,8 @@ def build_router(settings: Settings) -> Router:
         """回复了机器人的提示（“请回复本消息……”）。不是提示、不是点按钮的那个人、或者发的是命令，就交给后面的处理函数。"""
         reply = explicit_reply(m)
         prompt = await core.get_prompt(m.chat.id, reply.message_id) if reply else None
-        anonymous_admin = m.sender_chat is not None and m.sender_chat.id == m.chat.id
-        if (not prompt or (m.from_user.id != prompt.user_id and not anonymous_admin)
-                or (m.text or "").startswith("/")):
+        if not prompt or not _is_owner(m, prompt) or (m.text or "").startswith("/"):
             raise SkipHandler
-        if (m.text or "").strip().lower() in CANCEL_WORDS:
-            await core.finish_prompt(prompt)
-            if prompt.kind == "reason":
-                await core.refresh_control(prompt.sid)
-            await m.reply(t(core.lang, "prompt_cancelled"))
-            return
         err, done = await _answer_prompt(prompt, m, core)
         if err:
             await m.reply(err.text(core.lang))
@@ -177,6 +174,20 @@ def build_router(settings: Settings) -> Router:
         reason = _clean_reason(body)
         return (await core.reject(sid, who, reason),
                 t(lang, "rejected_reply") + t(lang, "reason_line", reason=html.escape(reason)))
+
+    @router.message(Command("cancel"))
+    async def cancel_cmd(m: Message, core: Core) -> None:
+        """放弃等待回复的提示：回复某条提示发送就只放弃它，直接发送放弃自己在审核群里所有的提示。
+        只能放弃自己的（匿名管理员除外），和回复提示的规则一样。"""
+        reply = explicit_reply(m)
+        prompt = await core.get_prompt(m.chat.id, reply.message_id) if reply else None
+        if prompt:
+            prompts = [prompt] if _is_owner(m, prompt) else []
+        else:
+            prompts = await core.prompts_of(m.chat.id, m.from_user.id)
+        for p in prompts:
+            await core.cancel_prompt(p)
+        await m.reply(t(core.lang, "prompt_cancelled" if prompts else "prompt_none"))
 
     # ---------- 命令 ----------
 

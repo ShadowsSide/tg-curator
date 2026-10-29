@@ -17,9 +17,9 @@ Built with Python 3.12 + [aiogram 3](https://github.com/aiogram/aiogram) + SQLit
 
 **Submitting**
 - Text, photos, videos, GIFs, files, audio and voice messages. Albums of several photos or videos are merged into one submission
-- Submitters choose to post **signed** (with their name) or **anonymously**. Either way, admins can always see who sent it
+- Submitters choose to post **signed** (with their name) or **anonymously**. Either way, admins can always see who sent it. Their previous choice is shown first
 - **Formatting is kept exactly as sent**: links, bold, quotes, spoiler text, code, date/time and emoji all come through to the channel unchanged
-- Submitters can **edit their post** until it has been reviewed, either with Telegram's built-in "Edit" or by **replying** to it with `/edit`
+- Submitters can **edit their post** until the review starts, either with Telegram's built-in "Edit" or by **replying** to it with `/edit`; they can also **add or remove photos** (reply to their submission with a photo to add it)
 - **Spam checks** (optional): keyword blacklist, a link limit (whitelisted domains don't count) and a cooldown for new submitters. By default a hit only puts a ⚠️ Possible spam note on the control message for reviewers to judge; it can also block the submission
 
 **Reviewer ↔ submitter messaging**
@@ -32,7 +32,9 @@ Built with Python 3.12 + [aiogram 3](https://github.com/aiogram/aiogram) + SQLit
 - Publish now · Schedule · Reject · Ban submitter
 - Publishing options: 🙈 **spoiler** (blur the media) and 🔕 **silent** (subscribers get a notification without sound)
 - Pick a common reject reason with one tap (`REJECT_TEMPLATES`)
-- `/edit` to change a post, `/no reason` to reject, `/ban reason` to ban. Banning also rejects every open submission from that user
+- **✏️ Edit**, **💬 Message submitter**, **✏️ Custom reason / time**: tap the button, then just reply to the bot's prompt, no commands to remember; send `/cancel` to give up
+- **🖼 Media**: while pending, add, replace or remove photos and videos (up to 10); text submissions can get photos too
+- Commands work as well: `/edit` to change a post, `/no reason` to reject, `/ban reason` to ban. Banning also rejects every open submission from that user
 - Safe against accidental taps: Publish now, Reject and Ban need a second tap to confirm
 - Safe against double actions: if two admins press "Publish" at the same time, the post is still published only once
 - **Only answers in private chats and the review group**: it never replies in other groups, and leaves any other group or channel it's added to. The publishing channel and its linked discussion group are whitelisted and never left
@@ -58,13 +60,18 @@ Built with Python 3.12 + [aiogram 3](https://github.com/aiogram/aiogram) + SQLit
 ## How it works
 
 ```
-User sends content ─► chooses signed / anonymous ─► Review group: preview + control message
-                                                             │
-        ┌───────────────┬──────────────────┬─────────────────┼──────────────────┐
-  spoiler / silent   ✏️ Edit          ✅ Publish now      ⏰ Schedule      ❌ Reject / 🚫 Ban
-                                             │                 │                  │
-                                             ▼                 ▼                  ▼
-                                   Channel + notify user   Publish on time   Notify user (with reason)
+                               User sends content
+                                        ▼
+                           Chooses signed / anonymous
+                                        ▼
+                     Review group: preview + control message
+                                        │
+Before deciding: 🙈 Spoiler · 🔕 Silent · ✏️ Edit · 🖼 Media · 💬 Message submitter
+                                        │
+            ┌───────────────────────────┼───────────────────────────┐
+     ✅ Publish now                ⏰ Schedule             ❌ Reject / 🚫 Ban
+            ▼                           ▼                           ▼
+  Channel + notify user          Publish on time        Notify user (with reason)
 ```
 
 ## Quick start
@@ -174,7 +181,7 @@ Spam checks, messaging window, stats scope and so on; the defaults are usually f
 | Action | Description |
 |---|---|
 | Send any content | Starts a submission, then choose signed or anonymous. Your previous choice is marked “(last time)” and shown first; you still tap it |
-| Edit the original message with Telegram's "Edit" | Changes the submission until it has been reviewed: text, formatting, or even the image |
+| Edit the original message with Telegram's "Edit" | Changes the submission until the review starts (scheduled, published, rejected): text, formatting, or even the image |
 | Reply to your submission with a photo / video | The choice panel gets an extra **➕ Add to that submission** button that adds the new photos to it; or submit them as a new submission as usual. Only drafts and pending submissions can take more |
 | 🗑 Remove a photo / video | Shown on the bot's message while a draft or pending submission has 2 or more photos/videos; tap it and pick the one to remove. Nothing can be changed once the review has started (scheduled, published, rejected) |
 | `/edit new content` | Only works as a **reply** to your submission (or the bot's message about it); without a reply nothing is changed |

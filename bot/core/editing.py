@@ -47,7 +47,7 @@ class EditingMixin(CoreBase):
         items = [dict(it) for it in sub.items]
         old = items[index]
         if old["type"] in media.MEDIA_TYPES and new_item["type"] == "text":
-            # 纯文字投稿用 /add 加过图：原来那条文字消息现在是第一个媒体的说明，编辑它就是改说明
+            # 纯文字投稿加过图：原来那条文字消息现在是第一个媒体的说明，编辑它就是改说明
             items[index] = {**old, "text": new_item["text"], "entities": new_item["entities"]}
         elif (old["type"] == "text") != (new_item["type"] == "text"):
             return notice("type_change")
@@ -57,7 +57,7 @@ class EditingMixin(CoreBase):
 
     async def change_media(self, sid: int, op: str, index: int, new_items: list[dict], editor: str,
                            allowed: tuple[str, ...], by_submitter: bool) -> Notice | None:
-        """/add、/replace、/remove：新增 / 替换 / 删除图片和视频，规则见 media.py。
+        """新增 / 替换 / 删除图片和视频（op = add / replace / remove），规则见 media.py。
         审核员发的媒体不记 msg_id：那是审核群里的消息编号，会和投稿人私聊里的编号混淆（投稿人“编辑”时按它找稿件）。"""
         sub = await self.db.get(sid)
         err = self._check_editable(sub, sid, allowed)
@@ -73,7 +73,10 @@ class EditingMixin(CoreBase):
             items, err = media.remove(sub.items, index)
         if err:
             return err
-        return await self._save_edit(sub, items, editor, allowed)
+        err = await self._save_edit(sub, items, editor, allowed)
+        if not err:
+            await self.refresh_user_kb(sid)
+        return err
 
     @staticmethod
     def _check_editable(sub: Submission | None, sid: int, allowed: tuple[str, ...]) -> Notice | None:

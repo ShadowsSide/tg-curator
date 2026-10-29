@@ -6,11 +6,12 @@ from aiogram.types import Message, User as TgUser
 from .. import spam
 from ..errors import Notice, notice
 from ..i18n import t
-from ..keyboards import control_kb, user_choice_kb
+from ..db import SUBMITTER_EDITABLE
+from ..keyboards import control_kb, media_count, user_kb
 from ..render import control_text, describe, extract_item, send_items
 from ..timeutil import now_ts
 
-from .base import CoreBase, NO_PREVIEW, _reply_to, _reason_line
+from .base import CoreBase, NO_PREVIEW, _reply_to, _reason_line, explicit_reply
 
 
 class SubmissionsMixin(CoreBase):
@@ -42,9 +43,45 @@ class SubmissionsMixin(CoreBase):
         # 用户自己给媒体加了剧透时，默认保留剧透
         spoiler = any(i.get("spoiler") for i in items)
         sid = await self.db.create_draft(user.id, items, silent=self.s.default_silent, spoiler=spoiler)
-        prompt = await first.reply(t(lang, "choose_mode", desc=describe(items, lang)),
-                                   reply_markup=user_choice_kb(sid, lang))
+        merge_to = await self._merge_target(first, items)
+        text = t(lang, "choose_mode", desc=describe(items, lang))
+        if merge_to:
+            await self.db.update(sid, merge_to=merge_to)
+            text += t(lang, "choose_or_merge")
+        prompt = await first.reply(text, reply_markup=user_kb(await self.db.get(sid), lang))
         await self.db.update(sid, user_msg_id=prompt.message_id)
+
+    async def _merge_target(self, first: Message, items: list[dict]) -> int | None:
+        """回复自己的一条投稿（还能修改的）发来的图片视频：可以加到那条投稿里，返回它的编号。"""
+        reply = explicit_reply(first)
+        if not reply or not media_count(items):
+            return None
+        found = await self.db.find_by_user_message(first.from_user.id, reply.message_id)
+        target = await self.db.get(found[0]) if found else None
+        if target and target.user_id == first.from_user.id and target.status in SUBMITTER_EDITABLE:
+            return target.id
+        return None
+
+    async def merge_draft(self, sid: int, user_id: int, editor: str) -> Notice | None:
+        """把草稿里的图片视频加到它回复的那条投稿（merge_to）里，草稿随即作废。"""
+        draft = await self.db.get(sid)
+        if not draft or draft.user_id != user_id or not draft.merge_to:
+            return notice("invalid_sub")
+        if draft.status != "draft":
+            return notice("already_handled")
+        err = await self.change_media(draft.merge_to, "add", 0, draft.items, editor, SUBMITTER_EDITABLE,
+                                      by_submitter=True)
+        if err:
+            return err
+        await self.db.transition(sid, ("draft",), "cancelled")
+        return None
+
+    async def remove_own_media(self, sid: int, user_id: int, index: int, editor: str) -> Notice | None:
+        """投稿人删掉自己投稿里的第 index 个图片视频（草稿、待审核时）。"""
+        sub = await self.db.get(sid)
+        if not sub or sub.user_id != user_id:
+            return notice("invalid_sub")
+        return await self.change_media(sid, "remove", index, [], editor, SUBMITTER_EDITABLE, by_submitter=True)
 
     async def submit(self, sid: int, user_id: int, anonymous: bool) -> Notice | None:
         sub = await self.db.get(sid)

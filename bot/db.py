@@ -58,7 +58,8 @@ CREATE TABLE IF NOT EXISTS submissions (
     edited_at      INTEGER,
     msg_count      INTEGER NOT NULL DEFAULT 0,
     error          TEXT,
-    edit_preview   TEXT
+    edit_preview   TEXT,
+    merge_to       INTEGER
 );
 
 CREATE INDEX IF NOT EXISTS idx_sub_status ON submissions(status, scheduled_at);
@@ -89,8 +90,9 @@ CREATE INDEX IF NOT EXISTS idx_conv_user ON conversations(user_msg_id);
 CREATE TABLE IF NOT EXISTS prompts (
     chat_id    INTEGER NOT NULL,
     message_id INTEGER NOT NULL,      -- 提示消息
-    kind       TEXT    NOT NULL,      -- 等什么：time / edit / msg / reason，见 handlers/review.py
+    kind       TEXT    NOT NULL,      -- 等什么：time / edit / msg / reason / madd / mrep，见 handlers/review.py
     sid        INTEGER NOT NULL,
+    arg        INTEGER NOT NULL DEFAULT 0,  -- 附加参数：mrep = 替换第几个媒体
     user_id    INTEGER NOT NULL,      -- 点按钮的人；只有他的回复算数
     cleanup    TEXT,                  -- 完成后一起删掉的其他消息（JSON 列表），例如“修改”时发出的当前内容
     created_at INTEGER NOT NULL,
@@ -117,6 +119,8 @@ MIGRATIONS = [
     ("submissions", "msg_count", "ALTER TABLE submissions ADD COLUMN msg_count INTEGER NOT NULL DEFAULT 0"),
     ("submissions", "spam_flags", "ALTER TABLE submissions ADD COLUMN spam_flags TEXT"),
     ("submissions", "edit_preview", "ALTER TABLE submissions ADD COLUMN edit_preview TEXT"),
+    ("submissions", "merge_to", "ALTER TABLE submissions ADD COLUMN merge_to INTEGER"),
+    ("prompts", "arg", "ALTER TABLE prompts ADD COLUMN arg INTEGER NOT NULL DEFAULT 0"),
 ]
 
 # 已移除功能留下的列：旧库里有就删掉 (表, 列)
@@ -176,6 +180,7 @@ class Submission:
     error: str | None
     spam_flags: list[dict[str, Any]] | None = None  # 防垃圾检查的命中项，见 spam.py；没命中为 None
     edit_preview: list[int] | None = None  # 审核群里最新一份修改后预览的消息（改稿时删掉上一份）
+    merge_to: int | None = None  # 草稿：投稿人回复旧投稿发的图片，可以“加到”这条投稿里
 
     @property
     def spoilerable(self) -> bool:
@@ -203,6 +208,7 @@ class Prompt:
     user_id: int
     cleanup: list[int]
     created_at: int
+    arg: int = 0
 
     @classmethod
     def from_row(cls, row: aiosqlite.Row) -> "Prompt":
@@ -322,11 +328,13 @@ class DB:
 
     async def find_by_user_message(self, user_id: int, message_id: int) -> tuple[int, int | None] | None:
         """用户私聊里的某条消息属于哪条投稿：
-        - 是投稿内容本身 → (投稿编号, 第几项)
+        - 是投稿内容本身 → (投稿编号, 第几项)。同一条消息可能在两条投稿里（图片“加到”了旧投稿，
+          新建的草稿随即作废），优先取没作废的那条
         - 是机器人的“请选择投稿方式 / 已提交”提示 → (投稿编号, None)"""
         row = await self._one(
             """SELECT s.id, CAST(j.key AS INTEGER) FROM submissions s, json_each(s.items) j
-               WHERE s.user_id=? AND json_extract(j.value, '$.msg_id')=? ORDER BY s.id DESC LIMIT 1""",
+               WHERE s.user_id=? AND json_extract(j.value, '$.msg_id')=?
+               ORDER BY s.status='cancelled', s.id DESC LIMIT 1""",
             (user_id, message_id),
         )
         if row:
@@ -494,11 +502,11 @@ class DB:
     # ---------- 等待回复的提示 ----------
 
     async def add_prompt(self, chat_id: int, message_id: int, kind: str, sid: int, user_id: int,
-                         cleanup: list[int]) -> None:
+                         cleanup: list[int], arg: int = 0) -> None:
         await self._exec(
-            "INSERT OR REPLACE INTO prompts(chat_id, message_id, kind, sid, user_id, cleanup, created_at) "
-            "VALUES(?, ?, ?, ?, ?, ?, ?)",
-            (chat_id, message_id, kind, sid, user_id, json.dumps(cleanup), now_ts()),
+            "INSERT OR REPLACE INTO prompts(chat_id, message_id, kind, sid, arg, user_id, cleanup, created_at) "
+            "VALUES(?, ?, ?, ?, ?, ?, ?, ?)",
+            (chat_id, message_id, kind, sid, arg, user_id, json.dumps(cleanup), now_ts()),
         )
 
     async def get_prompt(self, chat_id: int, message_id: int) -> Prompt | None:

@@ -15,15 +15,19 @@ from ..errors import Notice, notice
 from ..permissions import ReviewerCheck, ReviewerOnly, ReviewerPolicy
 from ..i18n import t
 from ..keyboards import ReviewCB, route
-from ..render import dump_link_preview, message_item, user_link
+from ..render import dump_link_preview, extract_item, message_item, user_link
 from ..timeutil import parse_time
 
 MAX_REASON = 500
 # 回复提示时这些错误可以改了再回复一次，提示保留；其他错误（比如投稿已被别人处理）提示作废
-RETRYABLE = ("prompt_text_needed", "custom_time_bad", "time_past", "too_long", "text_empty")
+RETRYABLE = ("prompt_text_needed", "custom_time_bad", "time_past", "too_long", "text_empty",
+             "media_only_photo_video", "media_replace_one", "media_too_many")
+REVIEWER_MEDIA = ("pending",)  # 审核员只能在待审核时改媒体
 
 
-PROMPT_KIND = {"custom": "time", "edit": "edit", "msg": "msg", "creason": "reason"}  # 按钮 → 提示的种类
+# 按钮 → 提示的种类；FOLD 里的按钮来自面板（理由面板、媒体面板），发提示时把控制消息恢复原样
+PROMPT_KIND = {"custom": "time", "edit": "edit", "msg": "msg", "creason": "reason", "madd": "madd", "mrep": "mrep"}
+FOLD = ("creason", "madd", "mrep")
 
 
 def _is_owner(m: Message, prompt: Prompt) -> bool:
@@ -110,10 +114,18 @@ def build_router(settings: Settings) -> Router:
             await cq.answer(err.text(lang) if err else t(lang, "toast_scheduled", when=core.fmt(v)),
                             show_alert=bool(err))
         elif action in PROMPT_KIND:  # 发一条提示，审核员回复它（见 on_prompt_reply）
-            if action == "creason":
-                await core.refresh_control(sid)  # 收起理由面板
-            await core.ask(sid, PROMPT_KIND[action], who, cq.message.message_id)
+            if action in FOLD:
+                await core.refresh_control(sid)
+            await core.ask(sid, PROMPT_KIND[action], who, cq.message.message_id, v)
             await cq.answer()
+        elif action == "media":
+            err = await core.show_media_panel(sid)
+            await cq.answer(err.text(lang) if err else None, show_alert=bool(err))
+        elif action == "mrm":
+            err = await core.change_media(sid, "remove", v, [], who.full_name, REVIEWER_MEDIA, by_submitter=False)
+            if err:
+                await core.refresh_control(sid)  # 收起确认面板
+            await cq.answer(err.text(lang) if err else t(lang, "toast_media_removed", n=v), show_alert=bool(err))
         elif action == "unsched":
             err = await core.unschedule(sid)
             await cq.answer(err.text(lang) if err else t(lang, "toast_unscheduled"))
@@ -142,7 +154,22 @@ def build_router(settings: Settings) -> Router:
         prompt = await core.get_prompt(m.chat.id, reply.message_id) if reply else None
         if not prompt or not _is_owner(m, prompt) or (m.text or "").startswith("/"):
             raise SkipHandler
-        err, done = await _answer_prompt(prompt, m, core)
+        if prompt.kind in ("madd", "mrep"):
+            if m.media_group_id:  # 回复的是相册：收齐所有项再一起处理
+                core.albums.add(m, lambda messages: _answer_media(prompt, messages, core))
+            else:
+                await _answer_media(prompt, [m], core)
+            return
+        await _finish(prompt, m, core, *await _answer_prompt(prompt, m, core))
+
+    @router.message(F.media_group_id)
+    async def album_rest(m: Message, core: Core) -> None:
+        """相册里没带回复的其余项（如果有）：并进正在收集的那个相册。"""
+        if not core.albums.join(m):
+            raise SkipHandler
+
+    async def _finish(prompt: Prompt, m: Message, core: Core, err: Notice | None, done: str) -> None:
+        """回复提示的结果：成功就删掉提示；出错时能改了再试的保留提示，其他的作废。"""
         if err:
             await m.reply(err.text(core.lang))
             if err.key not in RETRYABLE:
@@ -150,6 +177,18 @@ def build_router(settings: Settings) -> Router:
             return
         await core.finish_prompt(prompt)
         await m.reply(done)
+
+    async def _answer_media(prompt: Prompt, messages: list[Message], core: Core) -> None:
+        """回复了“添加 / 替换”的提示：发来的图片视频（可以是相册）加进投稿或换掉第 arg 个。"""
+        first = messages[0]
+        items = [extract_item(x) for x in messages]
+        if any(it is None or it["type"] == "text" for it in items):
+            err = notice("media_only_photo_video")
+        else:
+            op = "add" if prompt.kind == "madd" else "replace"
+            err = await core.change_media(prompt.sid, op, prompt.arg, items, first.from_user.full_name,
+                                          REVIEWER_MEDIA, by_submitter=False)
+        await _finish(prompt, first, core, err, t(core.lang, "admin_edited"))
 
     async def _answer_prompt(prompt: Prompt, m: Message, core: Core) -> tuple[Notice | None, str]:
         """按提示的种类执行，返回 (错误, 成功时的回复)。"""

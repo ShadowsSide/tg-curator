@@ -51,6 +51,10 @@ def test_route_every_review_action():
         (("pub_ok", 0, True), ("run", "pub", 0)),
         (("ban", 0, True), ("confirm", "ban", 0)),
         (("ban_ok", 0, True), ("run", "ban", 0)),
+        (("mrm", 2, True), ("confirm", "mrm", 2)),  # 删除媒体：v 是第几个，原样带到确认按钮
+        (("mrm_ok", 2, True), ("run", "mrm", 2)),
+        (("madd", 0, True), ("run", "madd", 0)),
+        (("mrep", 3, True), ("run", "mrep", 3)),
         # 其余按钮不需要确认
         (("retry", 0, True), ("run", "retry", 0)),
         (("unsched", 0, True), ("run", "unsched", 0)),

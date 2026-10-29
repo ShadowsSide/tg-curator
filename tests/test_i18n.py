@@ -10,7 +10,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from bot.db import Submission, User  # noqa: E402
 from bot.i18n import LANGS, PRIVATE_COMMANDS, REVIEW_COMMANDS, T, normalize, t  # noqa: E402
-from bot.keyboards import control_kb, schedule_kb, user_choice_kb  # noqa: E402
+from bot.keyboards import control_kb, media_kb, schedule_kb, user_kb, user_media_kb  # noqa: E402
 from bot.render import control_text, describe, stats_text  # noqa: E402
 
 CJK = re.compile(r"[一-鿿]")
@@ -72,7 +72,10 @@ def test_english_review_ui_has_no_chinese():
         assert not CJK.search(text), (status, text)
         assert not any(CJK.search(x) for x in _texts(control_kb(sub, "en"))), status
     assert not any(CJK.search(x) for x in _texts(schedule_kb(7, ("09:00", "21:00"), TZ, "en")))
-    assert not any(CJK.search(x) for x in _texts(user_choice_kb(7, "en")))
+    assert not any(CJK.search(x) for x in _texts(media_kb(_sub(), "en")))
+    for status in ("draft", "pending"):
+        assert not any(CJK.search(x) for x in _texts(user_kb(_sub(status, merge_to=3), "en"))), status
+    assert not any(CJK.search(x) for x in _texts(user_media_kb(_sub(), "en")))
     stats = stats_text(3, 1, 4, datetime(2026, 1, 1, 16, 3, 10), "en")
     assert stats == "Accepted 3 Rejected 1 Pending 4\nApproval rate: 75.00% Review rate: 50.00%\n#review_stats [updated 16:03:10]"
     assert describe([{"type": "photo"}, {"type": "photo"}, {"type": "video"}], "en") == "2 photo(s), 1 video(s)"

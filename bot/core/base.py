@@ -15,8 +15,9 @@ from aiogram.types import InlineKeyboardMarkup, LinkPreviewOptions, Message, Rep
 from ..album import AlbumCollector
 from ..config import Settings
 from ..db import DB, Submission, User
+from ..errors import Notice, notice
 from ..i18n import normalize, t
-from ..keyboards import confirm_kb, control_kb, reasons_kb, schedule_kb
+from ..keyboards import confirm_kb, control_kb, media_count, media_kb, reasons_kb, schedule_kb, user_kb
 from ..render import control_text, signature
 from ..timeutil import fmt_ts
 
@@ -168,8 +169,34 @@ class CoreBase:
 
     async def show_confirm(self, sid: int, action: str, v: int = 0) -> None:
         """发布 / 拒绝 / 封禁的二次确认：把控制消息的按钮换成“确认 / 返回”。拒绝时 v 是选的理由。"""
-        detail = self.s.reject_template(v) if action == "reject" else None
+        detail = {"reject": self.s.reject_template(v), "mrm": t(self.lang, "media_nth", n=v)}.get(action)
         await self._swap_control_kb(sid, confirm_kb(sid, action, self.lang, v, detail))
+
+    async def show_media_panel(self, sid: int) -> Notice | None:
+        """审核员的媒体面板（添加 / 替换 / 删除）。只在待审核时能用；含文件、GIF 等其他类型时不能用。"""
+        sub = await self.db.get(sid)
+        if not sub:
+            return notice("sub_not_found", sid=sid)
+        if sub.status != "pending":
+            return notice("media_not_pending")
+        is_text = len(sub.items) == 1 and sub.items[0]["type"] == "text"
+        if not is_text and not media_count(sub.items):
+            return notice("media_mixed_types")
+        await self._swap_control_kb(sid, media_kb(sub, self.lang))
+        return None
+
+    async def refresh_user_kb(self, sid: int) -> None:
+        """更新投稿人私聊里那条提示消息上的按钮（图片数量变了，“删除图片”可能出现或消失）。"""
+        sub = await self.db.get(sid)
+        if not sub or not sub.user_msg_id:
+            return
+        try:
+            await self.bot.edit_message_reply_markup(
+                chat_id=sub.user_id, message_id=sub.user_msg_id,
+                reply_markup=user_kb(sub, await self.user_lang(sub.user_id)))
+        except TelegramAPIError as e:  # 按钮没变、消息太旧等
+            if "not modified" not in str(e):
+                log.info("更新投稿人 #%s 的按钮失败：%s", sid, e)
 
     async def show_reject_reasons(self, sid: int) -> None:
         await self._swap_control_kb(sid, reasons_kb(sid, self.s.reject_templates, self.lang))

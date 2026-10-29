@@ -155,6 +155,8 @@ Everything is configured in `.env`. See [`.env.example`](.env.example) for a ful
 |---|---|
 | Send any content | Starts a submission, then choose signed or anonymous |
 | Edit the original message with Telegram's "Edit" | Changes the submission until it has been reviewed: text, formatting, or even the image |
+| Reply to your submission with a photo / video | The choice panel gets an extra **➕ Add to that submission** button that adds the new photos to it; or submit them as a new submission as usual. Only drafts and pending submissions can take more |
+| 🗑 Remove a photo / video | Shown on the bot's message while a draft or pending submission has 2 or more photos/videos; tap it and pick the one to remove. Nothing can be changed once the review has started (scheduled, published, rejected) |
 | `/edit new content` | Only works as a **reply** to your submission (or the bot's message about it); without a reply nothing is changed |
 | `/edit` (as a reply) | Shows the current content with formatting, so you can copy and change it |
 | `/msg message` | Message the reviewers: **reply** to the reviewer's message or your submission. Replying to the reviewer without `/msg` gets a reminder |
@@ -162,13 +164,15 @@ Everything is configured in `.env`. See [`.env.example`](.env.example) for a ful
 
 ### Admins (review group)
 
-Buttons on the control message: **✅ Publish now**, **⏰ Schedule**, **❌ Reject**, **🚫 Ban submitter**, **✏️ Edit**, **💬 Message submitter**, plus the **🙈 Spoiler** and **🔕 Silent** toggles.
+Buttons on the control message: **✅ Publish now**, **⏰ Schedule**, **❌ Reject**, **🚫 Ban submitter**, **✏️ Edit**, **💬 Message submitter**, **🖼 Media**, plus the **🙈 Spoiler** and **🔕 Silent** toggles.
 
 **✏️ Edit**, **💬 Message submitter**, **✏️ Custom reason** on the reason panel and **✏️ Custom time** on the schedule panel post a “please reply to this message…” prompt. Just reply to it, no commands to remember:
 - Only the reply of whoever tapped the button counts (anonymous admins excepted); send `/cancel` to give up (as a reply to a prompt it drops that one; on its own it drops all your open prompts)
 - **Edit** first posts the current content with formatting so you can copy and change it; the prompt and that copy are deleted once you're done
 - **Custom reason** rejects as soon as you send the reason, with no extra confirmation
 - Prompts are stored in the database, so they still work after a restart; prompts left unanswered for 24 hours are deleted
+
+**🖼 Media** (only while pending) opens the media panel: **➕ Add photo / video** (an album reply works too), **🔁 Replace N** and **🗑 Remove N** (asks to confirm; the last one can't be removed). Photos and videos only, at most 10 per submission; submissions with a file, GIF or audio can't use it. A text submission can get photos too: its text becomes their caption (see “Known limitations and risks” below).
 
 Every edit posts a new preview. The review group keeps only the original preview and the latest edited one; older edited previews are deleted (Telegram doesn't let bots delete messages older than 48 hours, so those stay).
 
@@ -201,6 +205,12 @@ The commands below do the same as the buttons, for those who prefer commands. Us
 - **Changing `REJECT_TEMPLATES` can shift old panels**: buttons store the reason's position. After reordering the reasons and restarting, a panel opened before the restart picks the reason by the new order; an out-of-range position means “No reason”. Finish any rejection in progress before changing it
 - **Reasons can't contain `|`**: it's the separator
 - **The review group hits rate limits sooner**: the confirm and reason panels each edit the control message once more, so with heavy review traffic Telegram's limits come sooner. The bot waits and retries automatically, but actions get slower
+
+**Changing photos and videos**
+- **Adding photos to a text submission**: the text limit drops from 4096 to 1024 characters (longer text can't take photos), the link preview goes away, it can't turn back into plain text, and the post looks different in the channel (text under the photos)
+- **Replaced or removed photos can't be brought back**: the original is stored (`original_items`), but the bot has no way to restore it
+- **Reviewers aren't notified when a submitter changes photos**: a new preview appears and the control message shows “edited (submitter)”
+- **Submitters keep the old button after the review starts**: tapping it explains that nothing can be changed any more and removes the button
 
 **Spam checks**
 - **Chinese keywords can over-match**: Chinese has no word boundaries, so keywords match as substrings (e.g. “微信” also matches “微信公众号推荐”). That's why the default only flags (`SPAM_ACTION=flag`); watch the flags for a while before switching to `block`
@@ -248,6 +258,7 @@ The tests need no token and no network access:
 .venv/bin/python tests/test_confirm.py    # unit tests: confirm panel; bots are never reviewers
 .venv/bin/python tests/test_reject_templates.py  # unit tests: reject reasons parsing and panel
 .venv/bin/python tests/test_spam.py       # unit tests: keywords, link counting and whitelist
+.venv/bin/python tests/test_media.py      # unit tests: rules for changing photos and videos, related buttons
 .venv/bin/python tests/test_db.py         # unit tests: upgrading an old database (drops columns of removed features)
 .venv/bin/python tests/test_reply.py      # unit tests: implicit replies inside forum topics are not replies
 .venv/bin/python tests/live_test.py       # end-to-end: runs the real bot against a mock Bot API server (~1 minute)
@@ -260,6 +271,7 @@ The tests need no token and no network access:
 .venv/bin/python tests/live_spam_test.py      # end-to-end: spam flags, re-check on edit, new-user cooldown (~10 seconds)
 .venv/bin/python tests/live_spam_block_test.py  # end-to-end: spam block mode (~10 seconds)
 .venv/bin/python tests/live_prompt_test.py      # end-to-end: Edit, Message submitter and Custom reason buttons; old preview deletion (~10 seconds)
+.venv/bin/python tests/live_media_test.py       # end-to-end: reviewers' media panel; submitters adding and removing photos (~10 seconds)
 ```
 
 GitHub Actions (`.github/workflows/test.yml`) first checks the code with pyflakes (undefined names, unused imports and variables, …), then runs all of these on every pull request and every push to `main`. To check locally:
@@ -291,6 +303,7 @@ bot/
   guard.py        only handle private chats and the review group; leave other groups
   permissions.py  reviewer permissions (REVIEWERS)
   spam.py         spam checks: keywords, link limit
+  media.py        rules for changing photos and videos: add, replace, remove
   ratelimit.py    automatic waiting and retrying when rate-limited
   keyboards.py    colored inline buttons
   album.py        album collection

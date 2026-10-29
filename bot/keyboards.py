@@ -8,6 +8,7 @@ from aiogram.filters.callback_data import CallbackData
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
 from .db import Submission
+from .media import MAX_MEDIA, MEDIA_TYPES
 from .i18n import on_off, t
 from .timeutil import next_occurrence
 
@@ -20,7 +21,7 @@ from .timeutil import next_occurrence
 GREEN, BLUE, RED = ButtonStyle.SUCCESS, ButtonStyle.PRIMARY, ButtonStyle.DANGER
 
 # 需要二次确认的操作：点按钮先显示确认面板，确认按钮的动作是 "<动作>_ok"
-CONFIRMABLE = {"pub": GREEN, "reject": RED, "ban": RED}
+CONFIRMABLE = {"pub": GREEN, "reject": RED, "ban": RED, "mrm": RED}
 CONFIRMED = "_ok"
 
 
@@ -45,9 +46,17 @@ class UserCB(CallbackData, prefix="u"):
     sid: int
 
 
+class UserMediaCB(CallbackData, prefix="um"):
+    """投稿人改图片的按钮。单独一类：给 UserCB 加字段会让旧消息上的按钮（u:sign:5）解析失败。"""
+    a: str  # merge：把这份草稿的图片加到投稿 v 里；mdel：打开删除面板；mrm：删掉第 v 个；mback：收起删除面板
+    sid: int
+    v: int = 0
+
+
 class ReviewCB(CallbackData, prefix="r"):
     a: str  # spoiler / silent / pub / sched / preset / custom / back / unsched / reject / ban / retry
     #         edit / msg / creason：发一条提示，回复它来修改稿件 / 给投稿人发消息 / 写拒绝理由
+    #         media：媒体面板；madd / mrep：发提示，回复图片视频来添加 / 替换第 v 个；mrm / mrm_ok：删除第 v 个
     #         pub_ok / reject_ok / ban_ok：确认面板上的“确认”，见 CONFIRMABLE
     #         reason：拒绝理由面板上选了一项
     # v：preset = 定时的时间戳；reason / reject / reject_ok = 第几个拒绝理由（从 1 开始，0 = 不附理由）
@@ -63,16 +72,44 @@ def _toggle(on: bool) -> ButtonStyle | None:
     return BLUE if on else None
 
 
-def user_choice_kb(sid: int, lang: str) -> InlineKeyboardMarkup:
-    def b(text: str, a: str, style: ButtonStyle | None = None) -> InlineKeyboardButton:
-        return InlineKeyboardButton(text=text, callback_data=UserCB(a=a, sid=sid).pack(), style=style)
+def _ub(text: str, a: str, sid: int, style: ButtonStyle | None = None) -> InlineKeyboardButton:
+    return InlineKeyboardButton(text=text, callback_data=UserCB(a=a, sid=sid).pack(), style=style)
 
-    return InlineKeyboardMarkup(
-        inline_keyboard=[
-            [b(t(lang, "btn_sign"), "sign", BLUE), b(t(lang, "btn_anon"), "anon", BLUE)],
-            [b(t(lang, "btn_cancel"), "cancel")],
-        ]
-    )
+
+def _umb(text: str, a: str, sid: int, v: int = 0, style: ButtonStyle | None = None) -> InlineKeyboardButton:
+    return InlineKeyboardButton(text=text, callback_data=UserMediaCB(a=a, sid=sid, v=v).pack(), style=style)
+
+
+def media_count(items: list[dict]) -> int:
+    """能逐个删除的图片视频有几个；含其他类型（文件、GIF 等）时返回 0，不提供媒体操作。"""
+    if any(it["type"] not in MEDIA_TYPES for it in items):
+        return 0
+    return len(items)
+
+
+def user_kb(sub: Submission, lang: str) -> InlineKeyboardMarkup | None:
+    """投稿人私聊里那条提示消息上的按钮。
+    草稿：署名 / 匿名 / 取消；回复旧投稿发的图片还多一个“加到这条投稿”（sub.merge_to）。
+    草稿和待审核：有 2 个以上图片视频时多一个“删除图片”。其他状态没有按钮。"""
+    sid = sub.id
+    rows: list[list[InlineKeyboardButton]] = []
+    if sub.status == "draft":
+        if sub.merge_to:
+            rows.append([_umb(t(lang, "btn_merge"), "merge", sid, sub.merge_to, GREEN)])
+        rows.append([_ub(t(lang, "btn_sign"), "sign", sid, style=BLUE), _ub(t(lang, "btn_anon"), "anon", sid, style=BLUE)])
+    if sub.status in ("draft", "pending") and media_count(sub.items) > 1:
+        rows.append([_umb(t(lang, "btn_user_media"), "mdel", sid)])
+    if sub.status == "draft":
+        rows.append([_ub(t(lang, "btn_cancel"), "cancel", sid)])
+    return InlineKeyboardMarkup(inline_keyboard=rows) if rows else None
+
+
+def user_media_kb(sub: Submission, lang: str) -> InlineKeyboardMarkup:
+    """投稿人的删除面板：“🗑 1”“🗑 2”……（按投稿里的顺序），再加“返回”。"""
+    buttons = [_umb(t(lang, "btn_media_rm", n=i), "mrm", sub.id, i) for i in range(1, len(sub.items) + 1)]
+    rows = [buttons[i : i + 5] for i in range(0, len(buttons), 5)]
+    rows.append([_umb(t(lang, "btn_back"), "mback", sub.id)])
+    return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
 def control_kb(sub: Submission, lang: str) -> InlineKeyboardMarkup | None:
@@ -97,7 +134,10 @@ def control_kb(sub: Submission, lang: str) -> InlineKeyboardMarkup | None:
     elif sub.status == "failed":
         rows.append([_rb(t(lang, "btn_retry"), "retry", sid, style=GREEN), reject])
     if sub.status in ("pending", "scheduled", "failed"):
-        rows.append([_rb(t(lang, "btn_edit"), "edit", sid), _rb(t(lang, "btn_msg"), "msg", sid)])
+        tools = [_rb(t(lang, "btn_edit"), "edit", sid), _rb(t(lang, "btn_msg"), "msg", sid)]
+        if sub.status == "pending":  # 审核员只能在待审核时改媒体
+            tools.append(_rb(t(lang, "btn_media"), "media", sid))
+        rows.append(tools)
     return InlineKeyboardMarkup(inline_keyboard=rows) if rows else None
 
 
@@ -126,6 +166,24 @@ def confirm_kb(sid: int, action: str, lang: str, v: int = 0, detail: str | None 
         [_rb(label, action + CONFIRMED, sid, v, style=CONFIRMABLE[action])],
         [_rb(t(lang, "btn_back"), "back", sid)],
     ])
+
+
+def media_kb(sub: Submission, lang: str) -> InlineKeyboardMarkup:
+    """审核员的媒体面板：➕ 添加；🔁 N 替换第 N 个；🗑 N 删除第 N 个（只剩一个时不能删）；« 返回。
+    纯文字投稿只有“添加”。调用前已确认只含图片视频（或纯文字）。"""
+    sid, items = sub.id, sub.items
+    is_text = len(items) == 1 and items[0]["type"] == "text"
+    n = 0 if is_text else len(items)
+    rows: list[list[InlineKeyboardButton]] = []
+    if n < MAX_MEDIA:
+        rows.append([_rb(t(lang, "btn_media_add"), "madd", sid, style=BLUE)])
+    replace = [_rb(t(lang, "btn_media_rep", n=i), "mrep", sid, i) for i in range(1, n + 1)]
+    rows += [replace[i : i + 5] for i in range(0, len(replace), 5)]
+    if n > 1:
+        remove = [_rb(t(lang, "btn_media_rm", n=i), "mrm", sid, i) for i in range(1, n + 1)]
+        rows += [remove[i : i + 5] for i in range(0, len(remove), 5)]
+    rows.append([_rb(t(lang, "btn_back"), "back", sid)])
+    return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
 def reasons_kb(sid: int, reasons: tuple[str, ...], lang: str) -> InlineKeyboardMarkup:

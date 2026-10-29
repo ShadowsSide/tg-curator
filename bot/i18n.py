@@ -133,6 +133,21 @@ T: dict[str, dict[str, str]] = {
         "en": "✅ Submitted {mode}.\nWe'll let you know the review result.",
     },
     "submitted_toast": {"zh": "已提交", "en": "Submitted"},
+    "choose_or_merge": {
+        "zh": "\n\n也可以把这些图片视频<b>加到你回复的那条投稿</b>里。",
+        "en": "\n\nOr <b>add these photos/videos to the submission you replied to</b>.",
+    },
+    "btn_merge": {"zh": "➕ 加到这条投稿", "en": "➕ Add to that submission"},
+    "merged": {
+        "zh": "➕ 已加到你之前的投稿里。",
+        "en": "➕ Added to your earlier submission.",
+    },
+    "merged_toast": {"zh": "已添加", "en": "Added"},
+    "btn_user_media": {"zh": "🗑 删除图片 / 视频", "en": "🗑 Remove a photo / video"},
+    "media_locked": {
+        "zh": "审核已经开始或结束，不能再修改图片视频了。",
+        "en": "The review has already started or ended, so photos and videos can't be changed any more.",
+    },
     "draft_expired": {
         "zh": "已过期，如需投稿请重新发送。",
         "en": "This has expired. Please send it again if you'd still like to submit it.",
@@ -248,6 +263,12 @@ T: dict[str, dict[str, str]] = {
     "media_none": {"zh": "这是文字投稿，没有可以替换或删除的图片视频", "en": "This is a text submission; there's no photo or video to replace or remove"},
     "media_replace_one": {"zh": "替换时一次只能发一个图片或视频", "en": "Send exactly one photo or video to replace with"},
     "media_last_one": {"zh": "不能删除最后一个图片或视频", "en": "The last photo or video can't be removed"},
+    "media_not_pending": {
+        "zh": "只有待审核的投稿能修改图片视频（已定时的请先取消定时）",
+        "en": "Photos and videos can only be changed while the submission is pending (unschedule it first)",
+    },
+    "media_nth": {"zh": "第 {n} 个", "en": "no. {n}"},
+    "toast_media_removed": {"zh": "已删除第 {n} 个", "en": "Removed no. {n}"},
     "type_change": {
         "zh": "不能把文字投稿改成媒体投稿（或反过来），请重新投稿",
         "en": "A text submission can't become a media submission (or the other way round). Please submit again",
@@ -303,6 +324,11 @@ T: dict[str, dict[str, str]] = {
     "btn_no_reason": {"zh": "不附理由", "en": "No reason"},
     "btn_custom_reason": {"zh": "✏️ 自定义理由", "en": "✏️ Custom reason"},
     "btn_edit": {"zh": "✏️ 修改", "en": "✏️ Edit"},
+    "btn_media": {"zh": "🖼 媒体", "en": "🖼 Media"},
+    "btn_media_add": {"zh": "➕ 添加图片 / 视频", "en": "➕ Add photo / video"},
+    "btn_media_rep": {"zh": "🔁 换第 {n} 个", "en": "🔁 Replace {n}"},
+    "btn_media_rm": {"zh": "🗑 删第 {n} 个", "en": "🗑 Remove {n}"},
+    "btn_confirm_mrm": {"zh": "🗑 确认删除", "en": "🗑 Confirm remove"},
     "btn_msg": {"zh": "💬 联系投稿人", "en": "💬 Message submitter"},
     "btn_confirm_ban": {"zh": "🚫 确认封禁（同时拒绝其所有未处理来稿）",
                         "en": "🚫 Confirm ban (also rejects all their open submissions)"},
@@ -369,6 +395,16 @@ T: dict[str, dict[str, str]] = {
         "zh": '{who} 请<b>回复本消息</b>写拒绝理由，发送后立即拒绝，理由会发给投稿人。\n发送 /cancel 放弃。',
         "en": '{who} please <b>reply to this message</b> with the reason. The submission is rejected as soon as you '
               'send it, and the reason goes to the submitter.\nSend /cancel to give up.',
+    },
+    "prompt_madd": {
+        "zh": '{who} 请<b>回复本消息</b>发送要添加的图片或视频，可以一次发一组（相册）。一条投稿最多 10 个。\n发送 /cancel 放弃。',
+        "en": '{who} please <b>reply to this message</b> with the photos or videos to add; an album works too. '
+              'At most 10 per submission.\nSend /cancel to give up.',
+    },
+    "prompt_mrep": {
+        "zh": '{who} 请<b>回复本消息</b>发送一张图片或一个视频，换掉第 {n} 个（说明文字保留）。\n发送 /cancel 放弃。',
+        "en": '{who} please <b>reply to this message</b> with one photo or video to replace no. {n} '
+              '(its caption is kept).\nSend /cancel to give up.',
     },
     "prompt_cancelled": {"zh": "已取消。", "en": "Cancelled."},
     "prompt_none": {"zh": "没有等你回复的操作。", "en": "Nothing is waiting for your reply."},

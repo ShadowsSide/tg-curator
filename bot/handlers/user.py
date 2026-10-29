@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from aiogram import F, Router
 from aiogram.enums import ChatType
+from aiogram.exceptions import TelegramBadRequest
 from aiogram.filters import Command, CommandStart
 from aiogram.types import CallbackQuery, Message
 
@@ -9,7 +10,7 @@ from .. import entities as ent
 from ..core import Core, explicit_reply
 from ..db import SUBMITTER_EDITABLE
 from ..i18n import t
-from ..keyboards import UserCB
+from ..keyboards import UserCB, UserMediaCB, user_kb, user_media_kb
 from ..render import dump_link_preview, extract_item, message_item
 
 def build_router() -> Router:
@@ -106,6 +107,39 @@ def build_router() -> Router:
             return
         await core.receive([m])
 
+    @router.callback_query(UserMediaCB.filter())
+    async def media_buttons(cq: CallbackQuery, callback_data: UserMediaCB, core: Core) -> None:
+        """投稿人自己改图片：把新发的图片加到旧投稿（merge）、删除面板（mdel / mrm / mback）。"""
+        sid, a, v, uid = callback_data.sid, callback_data.a, callback_data.v, cq.from_user.id
+        lang = core.lang_of(cq.from_user)
+        editor = t(core.lang, "submitter_label", name=cq.from_user.full_name)
+        if a == "merge":
+            err = await core.merge_draft(sid, uid, editor)
+            if not err:
+                await cq.message.edit_text(t(lang, "merged"))
+            await cq.answer(err.text(lang) if err else t(lang, "merged_toast"), show_alert=bool(err))
+            return
+        if a == "mrm":
+            err = await core.remove_own_media(sid, uid, v, editor)  # 成功时按钮由 core 恢复
+            await cq.answer(err.text(lang) if err else t(lang, "toast_media_removed", n=v), show_alert=bool(err))
+            if not err:
+                return
+        sub = await core.get_submission(sid)
+        if not sub or sub.user_id != uid:
+            await cq.answer(t(lang, "u_edit_not_found"), show_alert=True)
+            return
+        # 打开删除面板；返回、删除失败、或者已经不能改了（审核开始后点旧按钮）：恢复成当前状态的按钮
+        panel = a == "mdel" and sub.status in SUBMITTER_EDITABLE
+        try:
+            await cq.message.edit_reply_markup(reply_markup=user_media_kb(sub, lang) if panel else user_kb(sub, lang))
+        except TelegramBadRequest as e:
+            if "not modified" not in str(e):
+                raise
+        if a == "mdel" and not panel:
+            await cq.answer(t(lang, "media_locked"), show_alert=True)
+        elif a != "mrm":
+            await cq.answer()
+
     @router.callback_query(UserCB.filter())
     async def choice(cq: CallbackQuery, callback_data: UserCB, core: Core) -> None:
         sid = callback_data.sid
@@ -123,7 +157,8 @@ def build_router() -> Router:
             await cq.answer(err.text(lang), show_alert=True)
             return
         mode = t(lang, "mode_anon" if anonymous else "mode_signed")
-        await cq.message.edit_text(t(lang, "submitted", mode=mode, sid=sid))
+        await cq.message.edit_text(t(lang, "submitted", mode=mode, sid=sid),
+                                   reply_markup=user_kb(await core.get_submission(sid), lang))
         await cq.answer(t(lang, "submitted_toast"))
 
     return router

@@ -100,13 +100,15 @@ docker compose pull && docker compose up -d --no-build
 
 ### 3. 更新与备份
 
+**更新前先备份数据库**：升级时会自动迁移表结构，有的版本会删除不再使用的列，删了不能恢复。
+
 ```bash
-git pull && docker compose up -d --build                         # 更新（自己构建）
-docker compose pull && docker compose up -d --no-build           # 更新（预构建镜像）
-docker compose cp bot:/app/data/bot.db ./backup-$(date +%F).db   # 备份数据库
+docker compose cp bot:/app/data/bot.db ./backup-$(date +%F).db   # 1. 备份数据库
+git pull && docker compose up -d --build                         # 2. 更新（自己构建）
+docker compose pull && docker compose up -d --no-build           # 2. 或者：更新（预构建镜像）
 ```
 
-数据库保存在 Docker 卷 `bot-data` 中，升级时会自动迁移表结构。
+数据库保存在 Docker 卷 `bot-data` 中。
 
 ## 配置
 
@@ -257,7 +259,7 @@ Telegram 不允许把 GIF 放进相册，所以每个 GIF 会单独成为一条�
 
 ## 开发
 
-需要 Python 3.10 以上版本。
+需要 Python 3.12（和 Docker 镜像、CI 使用的版本一致）。
 
 ```bash
 python3 -m venv .venv && .venv/bin/pip install -r requirements.txt -r requirements-dev.txt

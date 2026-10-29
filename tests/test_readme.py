@@ -3,7 +3,7 @@
 - 标题层级、表格行、代码块数量一致（英文版开头多一段语言说明，不算）
 - 配置表的分组和每组的变量、顺序一致，并且正好是 bot/config.py 读取的变量（加 compose 用的 IMAGE）
 - 审核群和私聊的命令表都列出了机器人注册的命令（/start、/help 除外）
-- .env.example（中文）和 .env.en.example（英文）的分组、变量、顺序都和 README 配置表一致，示例值也一致（LANGUAGE、TZ 除外：英文版用 en 和 UTC）
+- .env.example（中文）和 .env.en.example（英文）的分组、变量、顺序都和 README 配置表一致，示例值也一致（LANGUAGE、TZ、REMINDER_QUIET_HOURS 除外：英文版用 en、UTC、不设免打扰）
 """
 import os
 import pathlib
@@ -24,7 +24,7 @@ EXTRA_VARS = {"IMAGE"}
 UNLISTED_VARS = {"DB_PATH"}
 TRIVIAL_COMMANDS = {"start", "help"}
 # 两份 .env 示例里按语言取不同值的变量
-PER_LANGUAGE = ("LANGUAGE=", "TZ=")
+PER_LANGUAGE = ("LANGUAGE=", "TZ=", "REMINDER_QUIET_HOURS=")
 
 
 def section(lines, start, stop):
@@ -113,6 +113,7 @@ def test_env_examples_match_readme():
     assert env_values(ENV_ZH) == env_values(ENV_EN)
     assert "LANGUAGE=zh" in ENV_ZH and "LANGUAGE=en" in ENV_EN
     assert "TZ=Asia/Shanghai" in ENV_ZH and "TZ=UTC" in ENV_EN
+    assert "REMINDER_QUIET_HOURS=0-8" in ENV_ZH and "REMINDER_QUIET_HOURS=" in ENV_EN
 
 
 if __name__ == "__main__":

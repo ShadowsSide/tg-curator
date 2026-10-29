@@ -102,13 +102,15 @@ Image tags: `latest` is the newest build of the main branch, `vX.Y.Z` are releas
 
 ### 3. Updating and backups
 
+**Back up the database before updating**: upgrades migrate the schema automatically, and some versions drop columns that are no longer used, which can't be undone.
+
 ```bash
-git pull && docker compose up -d --build                         # update (build yourself)
-docker compose pull && docker compose up -d --no-build           # update (prebuilt image)
-docker compose cp bot:/app/data/bot.db ./backup-$(date +%F).db   # back up the database
+docker compose cp bot:/app/data/bot.db ./backup-$(date +%F).db   # 1. back up the database
+git pull && docker compose up -d --build                         # 2. update (build yourself)
+docker compose pull && docker compose up -d --no-build           # 2. or: update (prebuilt image)
 ```
 
-The database lives in the `bot-data` Docker volume. Its schema is migrated automatically when you upgrade.
+The database lives in the `bot-data` Docker volume.
 
 ## Configuration
 
@@ -259,7 +261,7 @@ Telegram doesn't allow GIFs in albums, so each GIF becomes its own submission.
 
 ## Development
 
-Requires Python 3.10 or newer.
+Requires Python 3.12 (the version the Docker image and CI use).
 
 ```bash
 python3 -m venv .venv && .venv/bin/pip install -r requirements.txt -r requirements-dev.txt

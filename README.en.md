@@ -194,19 +194,27 @@ Spam checks, messaging window, stats scope and so on; the defaults are usually f
 
 Buttons on the control message: **✅ Publish now**, **⏰ Schedule**, **❌ Reject**, **🚫 Ban submitter**, **✏️ Edit**, **💬 Message submitter**, **🖼 Media**, plus the **🙈 Spoiler** and **🔕 Silent** toggles.
 
+#### Reply prompts
+
 **✏️ Edit**, **💬 Message submitter**, **✏️ Custom reason** on the reason panel and **✏️ Custom time** on the schedule panel post a “please reply to this message…” prompt. Just reply to it, no commands to remember:
 - Only the reply of whoever tapped the button counts (anonymous admins excepted); send `/cancel` to give up (as a reply to a prompt it drops that one; on its own it drops all your open prompts)
 - **Edit** first posts the current content with formatting so you can copy and change it; the prompt and that copy are deleted once you're done
 - **Custom reason** rejects as soon as you send the reason, with no extra confirmation
 - Prompts are stored in the database, so they still work after a restart; prompts left unanswered for 24 hours are deleted
 
+#### Changing photos and videos
+
 **🖼 Media** (only while pending) opens the media panel: **➕ Add photo / video** (an album reply works too), **🔁 Replace N** and **🗑 Remove N** (asks to confirm; the last one can't be removed). Photos and videos only, at most 10 per submission; submissions with a file, GIF or audio can't use it. A text submission can get photos too: its text becomes their caption (see “Known limitations and risks” below).
 
 Every edit posts a new preview. The review group keeps only the original preview and the latest edited one; older edited previews are deleted (Telegram doesn't let bots delete messages older than 48 hours, so those stay).
 
+#### Confirmation and reject reasons
+
 To avoid accidental taps, **Publish now, Reject and Ban** first switch to “Confirm / Back” buttons and only act on the second tap. Scheduling, retrying and the `/no` and `/ban` commands need no confirmation.
 
 **❌ Reject** first asks for a reason (`REJECT_TEMPLATES`; defaults: Duplicate, Off-topic, Low quality, Advertising; or “No reason”). The confirm button shows the chosen reason, and the reason is sent to the submitter. For a reason of your own, tap **✏️ Custom reason** or use `/no reason`.
+
+#### Commands
 
 The commands below do the same as the buttons, for those who prefer commands. Use them by **replying** to a submission's preview or control message. The bot never shows submission numbers, and no command needs one:
 
@@ -248,6 +256,9 @@ The commands below do the same as the buttons, for those who prefer commands. Us
 - **Edits only update the flags, never block**: even with `SPAM_ACTION=block`, adding a keyword by editing after submitting just shows a flag for reviewers
 - **The cooldown only applies to submitters with nothing published yet**: one published post lifts it; it counts from the last submission, rejected ones included
 - **Bad values stop the bot from starting**: a non-number in `MAX_LINKS` or `NEW_USER_COOLDOWN_MINUTES`, or a `SPAM_ACTION` other than `flag` / `block`, makes the bot exit with an error at startup
+
+**Other**
+- **An album being collected during a restart is lost or split**: the items of an album arrive separately, and the bot waits `ALBUM_DELAY` seconds in memory to collect them. If it restarts within those seconds, the items that already arrived are lost and the ones arriving after the restart become a separate submission. The submitter needs to send it again
 
 ## FAQ
 

@@ -211,6 +211,7 @@ docker compose cp bot:/app/data/bot.db ./backup-$(date +%F).db   # 备份数据�
 | `/queue` | 查看定时发布队列 |
 | `/active [天数]` | 投稿人活跃度排行（默认 30 天） |
 | `/user <用户ID>` | 查看某位投稿人 |
+| `/cancel` | 放弃等你回复的提示：回复某条提示发送只放弃这一条，直接发送放弃你所有等待中的提示 |
 
 `/ban` 和 `/unban` 也可以直接写用户 ID（`/ban <用户ID> 理由`），用来处理没有投稿在审核中的用户，或预先封禁。`/queue` 里每条定时投稿后面有“查看”链接，点开即跳到它的控制消息。
 
@@ -278,6 +279,7 @@ DB_PATH=./data/bot.db .venv/bin/python -m bot
 .venv/bin/python tests/test_media.py      # 单元测试：修改图片视频的规则、相关按钮
 .venv/bin/python tests/test_db.py         # 单元测试：旧数据库升级（删除已移除功能的列）
 .venv/bin/python tests/test_reply.py      # 单元测试：判断“回复”时忽略话题里的隐式回复
+.venv/bin/python tests/test_readme.py     # 单元测试：中英文 README 结构一致，配置变量和命令与代码对得上
 .venv/bin/python tests/live_test.py       # 端到端测试：启动模拟的 Bot API 服务器，运行真实的机器人进程（约 1 分钟）
 .venv/bin/python tests/live_msg_test.py     # 端到端测试：/msg 沟通的边界情况（约 10 秒）
 .venv/bin/python tests/live_flood_test.py   # 端到端测试：被限流时的自动重试与改期（约 20 秒）

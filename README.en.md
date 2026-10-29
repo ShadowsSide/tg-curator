@@ -213,6 +213,7 @@ The commands below do the same as the buttons, for those who prefer commands. Us
 | `/queue` | Lists scheduled posts |
 | `/active [days]` | Contributor activity ranking (default: 30 days) |
 | `/user <user ID>` | Shows one contributor's stats |
+| `/cancel` | Drops prompts waiting for your reply: as a reply to a prompt it drops that one; on its own it drops all of yours |
 
 `/ban` and `/unban` also accept a user ID (`/ban <user ID> reason`) for users with nothing under review, or to ban someone in advance. Each scheduled post in `/queue` has a “view” link that jumps to its control message.
 
@@ -280,6 +281,7 @@ The tests need no token and no network access:
 .venv/bin/python tests/test_media.py      # unit tests: rules for changing photos and videos, related buttons
 .venv/bin/python tests/test_db.py         # unit tests: upgrading an old database (drops columns of removed features)
 .venv/bin/python tests/test_reply.py      # unit tests: implicit replies inside forum topics are not replies
+.venv/bin/python tests/test_readme.py     # unit tests: both READMEs match in structure; config variables and commands match the code
 .venv/bin/python tests/live_test.py       # end-to-end: runs the real bot against a mock Bot API server (~1 minute)
 .venv/bin/python tests/live_msg_test.py     # end-to-end: /msg edge cases (~10 seconds)
 .venv/bin/python tests/live_flood_test.py   # end-to-end: retries and rescheduling under rate limits (~20 seconds)

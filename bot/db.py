@@ -57,7 +57,8 @@ CREATE TABLE IF NOT EXISTS submissions (
     edited_by      TEXT,
     edited_at      INTEGER,
     msg_count      INTEGER NOT NULL DEFAULT 0,
-    error          TEXT
+    error          TEXT,
+    edit_preview   TEXT
 );
 
 CREATE INDEX IF NOT EXISTS idx_sub_status ON submissions(status, scheduled_at);
@@ -84,6 +85,18 @@ CREATE TABLE IF NOT EXISTS conversations (
 CREATE INDEX IF NOT EXISTS idx_conv_sid  ON conversations(sid);
 CREATE INDEX IF NOT EXISTS idx_conv_user ON conversations(user_msg_id);
 
+-- 等待回复的提示消息（点了“修改”“联系投稿人”等按钮后，机器人发出的“请回复本消息……”）
+CREATE TABLE IF NOT EXISTS prompts (
+    chat_id    INTEGER NOT NULL,
+    message_id INTEGER NOT NULL,      -- 提示消息
+    kind       TEXT    NOT NULL,      -- 等什么：time / edit / msg / reason，见 handlers/review.py
+    sid        INTEGER NOT NULL,
+    user_id    INTEGER NOT NULL,      -- 点按钮的人；只有他的回复算数
+    cleanup    TEXT,                  -- 完成后一起删掉的其他消息（JSON 列表），例如“修改”时发出的当前内容
+    created_at INTEGER NOT NULL,
+    PRIMARY KEY (chat_id, message_id)
+);
+
 CREATE TABLE IF NOT EXISTS kv (
     key   TEXT PRIMARY KEY,
     value TEXT
@@ -103,6 +116,7 @@ MIGRATIONS = [
     ("users", "lang", "ALTER TABLE users ADD COLUMN lang TEXT"),
     ("submissions", "msg_count", "ALTER TABLE submissions ADD COLUMN msg_count INTEGER NOT NULL DEFAULT 0"),
     ("submissions", "spam_flags", "ALTER TABLE submissions ADD COLUMN spam_flags TEXT"),
+    ("submissions", "edit_preview", "ALTER TABLE submissions ADD COLUMN edit_preview TEXT"),
 ]
 
 # 已移除功能留下的列：旧库里有就删掉 (表, 列)
@@ -112,7 +126,7 @@ DROPPED_COLUMNS = [
     ("submissions", "topic_status"),
 ]
 
-JSON_COLUMNS = ("items", "original_items", "spam_flags")  # 存成 JSON 文本的列
+JSON_COLUMNS = ("items", "original_items", "spam_flags", "edit_preview")  # 存成 JSON 文本的列
 
 OPEN_STATES = ("pending", "scheduled", "failed")  # 已提交、尚未发布或拒绝
 SUBMITTER_EDITABLE = ("draft", "pending")  # 投稿人自己能修改的状态：审核结果出来之前
@@ -161,6 +175,7 @@ class Submission:
     msg_count: int  # /msg 沟通的条数
     error: str | None
     spam_flags: list[dict[str, Any]] | None = None  # 防垃圾检查的命中项，见 spam.py；没命中为 None
+    edit_preview: list[int] | None = None  # 审核群里最新一份修改后预览的消息（改稿时删掉上一份）
 
     @property
     def spoilerable(self) -> bool:
@@ -172,9 +187,27 @@ class Submission:
         data["items"] = json.loads(data["items"])
         data["original_items"] = json.loads(data["original_items"]) if data["original_items"] else None
         data["spam_flags"] = json.loads(data["spam_flags"]) if data.get("spam_flags") else None
+        data["edit_preview"] = json.loads(data["edit_preview"]) if data.get("edit_preview") else None
         data["anonymous"] = bool(data["anonymous"])
         data["spoiler"] = bool(data["spoiler"])
         data["silent"] = bool(data["silent"])
+        return cls(**data)
+
+
+@dataclass
+class Prompt:
+    chat_id: int
+    message_id: int
+    kind: str
+    sid: int
+    user_id: int
+    cleanup: list[int]
+    created_at: int
+
+    @classmethod
+    def from_row(cls, row: aiosqlite.Row) -> "Prompt":
+        data = dict(row)
+        data["cleanup"] = json.loads(data["cleanup"]) if data["cleanup"] else []
         return cls(**data)
 
 
@@ -363,6 +396,10 @@ class DB:
         )
         await self.conn.commit()
 
+    async def unlink_review_messages(self, message_ids: Iterable[int]) -> None:
+        await self.conn.executemany("DELETE FROM review_messages WHERE message_id=?", [(m,) for m in message_ids])
+        await self.conn.commit()
+
     async def sid_by_review_message(self, message_id: int) -> int | None:
         row = await self._one(
             """SELECT sid FROM review_messages WHERE message_id=?
@@ -453,6 +490,26 @@ class DB:
             (user_id,),
         )
         return {k: (row[k] or 0) if k not in ("first_at", "last_at") else row[k] for k in row.keys()}
+
+    # ---------- 等待回复的提示 ----------
+
+    async def add_prompt(self, chat_id: int, message_id: int, kind: str, sid: int, user_id: int,
+                         cleanup: list[int]) -> None:
+        await self._exec(
+            "INSERT OR REPLACE INTO prompts(chat_id, message_id, kind, sid, user_id, cleanup, created_at) "
+            "VALUES(?, ?, ?, ?, ?, ?, ?)",
+            (chat_id, message_id, kind, sid, user_id, json.dumps(cleanup), now_ts()),
+        )
+
+    async def get_prompt(self, chat_id: int, message_id: int) -> Prompt | None:
+        row = await self._one("SELECT * FROM prompts WHERE chat_id=? AND message_id=?", (chat_id, message_id))
+        return Prompt.from_row(row) if row else None
+
+    async def delete_prompt(self, chat_id: int, message_id: int) -> None:
+        await self._exec("DELETE FROM prompts WHERE chat_id=? AND message_id=?", (chat_id, message_id))
+
+    async def stale_prompts(self, older_than: int) -> list[Prompt]:
+        return [Prompt.from_row(r) for r in await self._all("SELECT * FROM prompts WHERE created_at<?", (older_than,))]
 
     # ---------- kv ----------
 

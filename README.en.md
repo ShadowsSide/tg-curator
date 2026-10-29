@@ -162,13 +162,21 @@ Everything is configured in `.env`. See [`.env.example`](.env.example) for a ful
 
 ### Admins (review group)
 
-Buttons on the control message: **✅ Publish now**, **⏰ Schedule**, **❌ Reject**, **🚫 Ban submitter**, plus the **🙈 Spoiler** and **🔕 Silent** toggles.
+Buttons on the control message: **✅ Publish now**, **⏰ Schedule**, **❌ Reject**, **🚫 Ban submitter**, **✏️ Edit**, **💬 Message submitter**, plus the **🙈 Spoiler** and **🔕 Silent** toggles.
+
+**✏️ Edit**, **💬 Message submitter**, **✏️ Custom reason** on the reason panel and **✏️ Custom time** on the schedule panel post a “please reply to this message…” prompt. Just reply to it, no commands to remember:
+- Only the reply of whoever tapped the button counts (anonymous admins excepted); reply “cancel” to give up
+- **Edit** first posts the current content with formatting so you can copy and change it; the prompt and that copy are deleted once you're done
+- **Custom reason** rejects as soon as you send the reason, with no extra confirmation
+- Prompts are stored in the database, so they still work after a restart; prompts left unanswered for 24 hours are deleted
+
+Every edit posts a new preview. The review group keeps only the original preview and the latest edited one; older edited previews are deleted (Telegram doesn't let bots delete messages older than 48 hours, so those stay).
 
 To avoid accidental taps, **Publish now, Reject and Ban** first switch to “Confirm / Back” buttons and only act on the second tap. Scheduling, retrying and the `/no` and `/ban` commands need no confirmation.
 
-**❌ Reject** first asks for a reason (`REJECT_TEMPLATES`; defaults: Duplicate, Off-topic, Low quality, Advertising; or “No reason”). The confirm button shows the chosen reason, and the reason is sent to the submitter. For a reason of your own, use `/no reason`.
+**❌ Reject** first asks for a reason (`REJECT_TEMPLATES`; defaults: Duplicate, Off-topic, Low quality, Advertising; or “No reason”). The confirm button shows the chosen reason, and the reason is sent to the submitter. For a reason of your own, tap **✏️ Custom reason** or use `/no reason`.
 
-Use the commands below by **replying** to a submission's preview or control message. The bot never shows submission numbers, and no command needs one:
+The commands below do the same as the buttons, for those who prefer commands. Use them by **replying** to a submission's preview or control message. The bot never shows submission numbers, and no command needs one:
 
 | Command | Description |
 |---|---|
@@ -251,6 +259,7 @@ The tests need no token and no network access:
 .venv/bin/python tests/live_buttons_test.py   # end-to-end: Retry and Unschedule buttons (~10 seconds)
 .venv/bin/python tests/live_spam_test.py      # end-to-end: spam flags, re-check on edit, new-user cooldown (~10 seconds)
 .venv/bin/python tests/live_spam_block_test.py  # end-to-end: spam block mode (~10 seconds)
+.venv/bin/python tests/live_prompt_test.py      # end-to-end: Edit, Message submitter and Custom reason buttons; old preview deletion (~10 seconds)
 ```
 
 GitHub Actions (`.github/workflows/test.yml`) first checks the code with pyflakes (undefined names, unused imports and variables, …), then runs all of these on every pull request and every push to `main`. To check locally:
@@ -272,6 +281,7 @@ bot/
     editing.py      editing (/edit and Telegram's built-in edit)
     review.py       publish, schedule, reject, ban, spoiler / silent toggles
     messaging.py    /msg messaging
+    prompts.py      reply prompts (Edit, Message submitter, custom reason / time)
     stats.py        review summary, activity, scheduled queue
     scheduler.py    background jobs: scheduled publishing, draft cleanup, summary reminders
   render.py       sending content (single / album, signature, spoiler, silent) and message texts

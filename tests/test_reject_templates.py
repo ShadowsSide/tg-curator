@@ -51,8 +51,9 @@ def test_reject_template_index_is_one_based_and_safe():
 def test_reasons_kb():
     cbs = _cbs(reasons_kb(9, ("A", "B", "C"), "zh"))
     assert [(text, cb.a, cb.v) for text, cb in cbs[:3]] == [("A", "reason", 1), ("B", "reason", 2), ("C", "reason", 3)]
-    assert (cbs[3][1].a, cbs[3][1].v) == ("reason", 0)  # 不附理由
-    assert cbs[4][1].a == "back"
+    assert cbs[3][1].a == "creason"  # 自定义理由：回复提示来写
+    assert (cbs[4][1].a, cbs[4][1].v) == ("reason", 0)  # 不附理由
+    assert cbs[5][1].a == "back"
     assert all(cb.sid == 9 for _, cb in cbs)
     assert not any(CJK.search(text) for text, _ in _cbs(reasons_kb(9, ("A",), "en")))
 

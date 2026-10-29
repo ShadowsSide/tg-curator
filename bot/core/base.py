@@ -24,6 +24,7 @@ log = logging.getLogger(__name__)
 
 SCHEDULER_TICK = 15  # 秒
 DRAFT_TTL = 24 * 3600
+PROMPT_TTL = 24 * 3600  # 等待回复的提示超过这么久就删掉
 STATS_MSG_KEY = "stats_msg_id"
 STATS_DEBOUNCE = 3  # 秒：统计消息在这段时间内的多次更新合并成一次编辑（减少审核群里的请求，避免限流）
 POSTPONE_MARGIN = 5  # 秒：发布被限流时，在 Telegram 要求的等待时间之后再多留一点余量

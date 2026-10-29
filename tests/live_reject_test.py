@@ -22,7 +22,7 @@ async def scenario():
     kb = await wait_for(lambda e: e["method"] == "editMessageReplyMarkup", since=n)
     check("custom REJECT_TEMPLATES shown on the reason panel",
           kb and buttons(kb) == {"图片模糊": "r:reason:1:1", "已有类似内容": "r:reason:1:2",
-                                 "不附理由": "r:reason:1:0", "« 返回": "r:back:1:0"}, kb and buttons(kb))
+                                 "✏️ 自定义理由": "r:creason:1:0", "不附理由": "r:reason:1:0", "« 返回": "r:back:1:0"}, kb and buttons(kb))
 
     # 2. 选理由 → 确认：理由发给投稿人，按钮提示里也有
     n = len(log); lt.cb("r:reason:1:2", REVIEW, ADMIN)

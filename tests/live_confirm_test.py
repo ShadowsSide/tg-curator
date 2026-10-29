@@ -57,9 +57,9 @@ async def scenario():
     n = len(log); lt.cb("r:reject:2:0", REVIEW, ADMIN)
     kb = await markup_edit(c2, n)
     b = buttons(kb) if kb else {}
-    check("Reject → reason panel (default reasons + No reason + Back)",
-          b.get("重复投稿") == "r:reason:2:1" and b.get("不附理由") == "r:reason:2:0" and b.get("« 返回") == "r:back:2:0"
-          and len(b) == 6, b)
+    check("Reject → reason panel (default reasons + Custom reason + No reason + Back)",
+          b.get("重复投稿") == "r:reason:2:1" and b.get("✏️ 自定义理由") == "r:creason:2:0"
+          and b.get("不附理由") == "r:reason:2:0" and b.get("« 返回") == "r:back:2:0" and len(b) == 7, b)
 
     n = len(log); lt.cb("r:reason:2:0", REVIEW, ADMIN)  # 不附理由 → 确认按钮上不带理由
     kb = await markup_edit(c2, n)

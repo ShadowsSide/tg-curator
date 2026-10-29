@@ -1,6 +1,11 @@
 """修改稿件（管理员 / 投稿人共用）：/edit、Telegram 自带编辑，格式由 entities 原样保留。"""
 from __future__ import annotations
 
+import logging
+
+from aiogram.exceptions import TelegramAPIError
+from aiogram.types import Message
+
 from .. import media, spam
 from ..db import OPEN_STATES, Submission
 from ..entities import u16len
@@ -8,6 +13,8 @@ from ..errors import Notice, notice
 from ..render import caption_index, send_items
 from ..timeutil import now_ts
 from .base import CoreBase
+
+log = logging.getLogger(__name__)
 
 
 class EditingMixin(CoreBase):
@@ -97,19 +104,40 @@ class EditingMixin(CoreBase):
                 self.bot, self.s.review_chat_id, sub.items, sig=await self._signature(sub),
                 spoiler=False, reply_to=sub.review_msg_id,
             )
-            await self.db.link_review_messages(sub.id, [m.message_id for m in preview])
+            ids = [m.message_id for m in preview]
+            await self.db.link_review_messages(sub.id, ids)
+            await self.db.update(sub.id, edit_preview=ids)
+            await self._delete_old_preview(sub.edit_preview)
             await self.refresh_control(sub.id)
         return None
+
+    async def _delete_old_preview(self, ids: list[int] | None) -> None:
+        """改稿后删掉上一份修改后的预览，审核群里只留最初的预览（控制消息回复的就是它）和最新一份。
+        删不掉（超过 48 小时、已被手动删掉）就留着，它仍然能用来回复定位投稿。"""
+        if not ids:
+            return
+        try:
+            await self.bot.delete_messages(self.s.review_chat_id, ids)
+        except TelegramAPIError as e:
+            log.info("删除旧预览失败：%s", e)
+            return
+        await self.db.unlink_review_messages(ids)
 
     async def show_text(self, sid: int, chat_id: int, reply_to: int) -> Notice | None:
         """把稿件当前的文字（带格式）发出来，方便复制后修改再 /edit。"""
         sub = await self.db.get(sid)
         if not sub:
             return notice("sub_not_found", sid=sid)
+        if not await self._send_current_text(sub, chat_id, reply_to):
+            return notice("no_text_to_show", sid=sid)
+        return None
+
+    async def _send_current_text(self, sub: Submission, chat_id: int, reply_to: int) -> Message | None:
+        """发出稿件当前的正文或说明文字（带格式）；没有文字时什么也不发，返回 None。"""
         target = sub.items[caption_index(sub.items)]
         if not target.get("text"):
-            return notice("no_text_to_show", sid=sid)
+            return None
         only_text = {"type": "text", "text": target["text"], "entities": target.get("entities", []),
                      "link_preview": {"is_disabled": True}}
-        await send_items(self.bot, chat_id, [only_text], sig=("", []), spoiler=False, reply_to=reply_to)
-        return None
+        sent = await send_items(self.bot, chat_id, [only_text], sig=("", []), spoiler=False, reply_to=reply_to)
+        return sent[0]

@@ -1,4 +1,4 @@
-"""数据库升级（bot/db.py 的 MIGRATIONS / DROPPED_COLUMNS）的单元测试。
+"""数据库的单元测试：旧库升级（MIGRATIONS / DROPPED_COLUMNS）、等待回复的提示。
 用法：python tests/test_db.py
 """
 import asyncio
@@ -48,7 +48,7 @@ def test_old_database_drops_topic_columns_and_keeps_data():
         assert sub.user_id == 42 and sub.status == "pending" and sub.items[0]["text"] == "hi", sub
         cols = columns(path)
         assert not {c for _, c in DROPPED_COLUMNS} & cols, cols
-        assert {"msg_count", "spam_flags"} <= cols, cols  # 其他升级照常进行
+        assert {"msg_count", "spam_flags", "edit_preview"} <= cols, cols  # 其他升级照常进行
         asyncio.run(upgrade(path))  # 再启动一次：列已经没了，不报错
 
 
@@ -57,6 +57,30 @@ def test_new_database_has_no_topic_columns():
         path = os.path.join(d, "new.db")
         asyncio.run(upgrade(path))
         assert not {c for _, c in DROPPED_COLUMNS} & columns(path)
+
+
+def test_prompts_survive_restart():
+    """等待回复的提示存在数据库里：重启（重新连接）后还在，完成后删掉。"""
+    async def run(path):
+        db = DB(path)
+        await db.connect()
+        await db.add_prompt(-100, 55, "edit", 3, 7, [54])
+        await db.close()
+        db = DB(path)
+        await db.connect()
+        try:
+            prompt = await db.get_prompt(-100, 55)
+            assert (prompt.kind, prompt.sid, prompt.user_id, prompt.cleanup) == ("edit", 3, 7, [54]), prompt
+            assert await db.get_prompt(-200, 55) is None  # 同一个消息编号，别的聊天
+            assert [p.message_id for p in await db.stale_prompts(prompt.created_at + 1)] == [55]
+            assert await db.stale_prompts(prompt.created_at) == []
+            await db.delete_prompt(-100, 55)
+            assert await db.get_prompt(-100, 55) is None
+        finally:
+            await db.close()
+
+    with tempfile.TemporaryDirectory() as d:
+        asyncio.run(run(os.path.join(d, "p.db")))
 
 
 if __name__ == "__main__":

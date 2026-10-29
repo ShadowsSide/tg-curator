@@ -7,6 +7,7 @@ from __future__ import annotations
 from .base import NO_PREVIEW, CoreBase, explicit_reply, mention
 from .editing import EditingMixin
 from .messaging import MessagingMixin
+from .prompts import PromptsMixin
 from .review import ReviewMixin
 from .scheduler import SchedulerMixin
 from .stats import StatsMixin
@@ -15,5 +16,6 @@ from .submissions import SubmissionsMixin
 __all__ = ["Core", "NO_PREVIEW", "explicit_reply", "mention"]
 
 
-class Core(SubmissionsMixin, EditingMixin, ReviewMixin, MessagingMixin, StatsMixin, SchedulerMixin, CoreBase):
+class Core(SubmissionsMixin, EditingMixin, ReviewMixin, MessagingMixin, PromptsMixin, StatsMixin, SchedulerMixin,
+           CoreBase):
     pass

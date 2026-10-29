@@ -301,6 +301,9 @@ T: dict[str, dict[str, str]] = {
     "btn_confirm_reject": {"zh": "❌ 确认拒绝", "en": "❌ Confirm reject"},
     "btn_confirm_with": {"zh": "{label}：{detail}", "en": "{label}: {detail}"},
     "btn_no_reason": {"zh": "不附理由", "en": "No reason"},
+    "btn_custom_reason": {"zh": "✏️ 自定义理由", "en": "✏️ Custom reason"},
+    "btn_edit": {"zh": "✏️ 修改", "en": "✏️ Edit"},
+    "btn_msg": {"zh": "💬 联系投稿人", "en": "💬 Message submitter"},
     "btn_confirm_ban": {"zh": "🚫 确认封禁（同时拒绝其所有未处理来稿）",
                         "en": "🚫 Confirm ban (also rejects all their open submissions)"},
 
@@ -347,12 +350,28 @@ T: dict[str, dict[str, str]] = {
     },
     "ban_default_reason": {"zh": "投稿人已被封禁", "en": "The submitter was banned"},
 
-    # ---------- 审核：自定义时间 ----------
-    "custom_time_prompt": {
+    # ---------- 审核：等待回复的提示（点按钮后“请回复本消息……”） ----------
+    "prompt_time": {
         "zh": '{who} 请<b>回复本消息</b>输入发布时间：\n<code>20:30</code> · <code>10-20 09:00</code> · <code>2026-10-20 09:00</code> · <code>+90m</code> · <code>+2h</code>\n回复「取消」放弃。',
         "en": '{who} please <b>reply to this message</b> with a publish time:\n<code>20:30</code> · <code>10-20 09:00</code> · <code>2026-10-20 09:00</code> · <code>+90m</code> · <code>+2h</code>\nReply “cancel” to give up.',
     },
-    "custom_time_cancelled": {"zh": "已取消自定义定时。", "en": "Custom scheduling cancelled."},
+    "prompt_edit": {
+        "zh": '{who} 请<b>回复本消息</b>发送修改后的正文或说明文字，格式原样保留。上面是当前内容，可以复制后修改。\n回复「取消」放弃。',
+        "en": '{who} please <b>reply to this message</b> with the new text or caption; formatting is kept. '
+              'The current content is above, copy it and change it.\nReply “cancel” to give up.',
+    },
+    "prompt_msg": {
+        "zh": '{who} 请<b>回复本消息</b>发送要转给投稿人的内容（文字、图片、文件都可以），投稿人看到的是“审核员”。\n回复「取消」放弃。',
+        "en": '{who} please <b>reply to this message</b> with what to send to the submitter (text, a photo or a file). '
+              'They will see it as from “Reviewer”.\nReply “cancel” to give up.',
+    },
+    "prompt_reason": {
+        "zh": '{who} 请<b>回复本消息</b>写拒绝理由，发送后立即拒绝，理由会发给投稿人。\n回复「取消」放弃。',
+        "en": '{who} please <b>reply to this message</b> with the reason. The submission is rejected as soon as you '
+              'send it, and the reason goes to the submitter.\nReply “cancel” to give up.',
+    },
+    "prompt_cancelled": {"zh": "已取消。", "en": "Cancelled."},
+    "prompt_text_needed": {"zh": "请发送文字。", "en": "Please send text."},
     "custom_time_bad": {
         "zh": "看不懂这个时间 🤔 例如 <code>20:30</code>、<code>10-20 09:00</code>、<code>+2h</code>",
         "en": "I can't read that time 🤔 Try <code>20:30</code>, <code>10-20 09:00</code> or <code>+2h</code>",
@@ -364,8 +383,8 @@ T: dict[str, dict[str, str]] = {
 
     # ---------- 审核：命令 ----------
     "review_help": {
-        "zh": '🛠 <b>审核群命令</b>\n/stats 发送最新审核统计\n/queue 定时发布队列\n/active [天数] 投稿人活跃度排行（默认 30 天）\n/user &lt;用户ID&gt; 查看某位投稿人\n\n<b>处理投稿</b>（回复投稿的预览或控制消息使用）\n/edit 新内容 —— 替换正文或说明文字，格式原样保留\n/edit —— 不带内容：把当前文字（含格式）发出来，方便复制后修改\n/msg 内容 —— 发消息给投稿人（以“审核员”身份），投稿人也可以用 /msg 回复\n/no [理由] —— 拒绝，理由会发给投稿人\n/ban [理由] —— 封禁投稿人，并自动拒绝其所有未处理来稿\n\n<b>按用户处理</b>\n/ban &lt;用户ID&gt; [理由] · /unban &lt;用户ID&gt;',
-        "en": "🛠 <b>Review group commands</b>\n/stats post the latest review summary\n/queue scheduled posts\n/active [days] contributor ranking (default 30 days)\n/user &lt;user ID&gt; show one contributor\n\n<b>Handling a submission</b> (reply to its preview or control message)\n/edit new content — replace the text or caption, keeping formatting\n/edit — on its own: show the current text with formatting so you can copy it\n/msg message — message the submitter (shown as “Reviewer”); they can answer with /msg too\n/no [reason] — reject; the reason is sent to the submitter\n/ban [reason] — ban the submitter and reject all their open submissions\n\n<b>By user</b>\n/ban &lt;user ID&gt; [reason] · /unban &lt;user ID&gt;",
+        "zh": '🛠 <b>审核群命令</b>\n/stats 发送最新审核统计\n/queue 定时发布队列\n/active [天数] 投稿人活跃度排行（默认 30 天）\n/user &lt;用户ID&gt; 查看某位投稿人\n\n<b>处理投稿</b>（控制消息上的 ✏️ 修改、💬 联系投稿人 按钮作用相同；命令要回复投稿的预览或控制消息使用）\n/edit 新内容 —— 替换正文或说明文字，格式原样保留\n/edit —— 不带内容：把当前文字（含格式）发出来，方便复制后修改\n/msg 内容 —— 发消息给投稿人（以“审核员”身份），投稿人也可以用 /msg 回复\n/no [理由] —— 拒绝，理由会发给投稿人\n/ban [理由] —— 封禁投稿人，并自动拒绝其所有未处理来稿\n\n<b>按用户处理</b>\n/ban &lt;用户ID&gt; [理由] · /unban &lt;用户ID&gt;',
+        "en": "🛠 <b>Review group commands</b>\n/stats post the latest review summary\n/queue scheduled posts\n/active [days] contributor ranking (default 30 days)\n/user &lt;user ID&gt; show one contributor\n\n<b>Handling a submission</b> (the ✏️ Edit and 💬 Message submitter buttons do the same; reply to the submission's preview or control message to use a command)\n/edit new content — replace the text or caption, keeping formatting\n/edit — on its own: show the current text with formatting so you can copy it\n/msg message — message the submitter (shown as “Reviewer”); they can answer with /msg too\n/no [reason] — reject; the reason is sent to the submitter\n/ban [reason] — ban the submitter and reject all their open submissions\n\n<b>By user</b>\n/ban &lt;user ID&gt; [reason] · /unban &lt;user ID&gt;",
     },
     "no_permission": {"zh": "⛔ 你没有审核权限", "en": "⛔ You don't have reviewer permission"},
     "reply_to_submission": {
@@ -447,8 +466,9 @@ T: dict[str, dict[str, str]] = {
               "<code>/msg OK, I'll add it</code>.",
     },
     "msg_hint_admin": {
-        "zh": "要回复投稿人，请回复这条消息并以 <code>/msg</code> 开头。",
-        "en": "To answer the submitter, reply to this message starting with <code>/msg</code>.",
+        "zh": "要回复投稿人，请回复这条消息并以 <code>/msg</code> 开头，或者点控制消息上的 💬 联系投稿人。",
+        "en": "To answer the submitter, reply to this message starting with <code>/msg</code>, "
+              "or tap 💬 Message submitter on the control message.",
     },
     "ctrl_msgs": {"zh": "💬 沟通 {n} 条", "en": "💬 Messages: {n}"},
     "ctrl_spam_keyword": {"zh": "⚠️ 疑似垃圾：含关键词「{word}」", "en": "⚠️ Possible spam: contains “{word}”"},

@@ -47,6 +47,7 @@ class UserCB(CallbackData, prefix="u"):
 
 class ReviewCB(CallbackData, prefix="r"):
     a: str  # spoiler / silent / pub / sched / preset / custom / back / unsched / reject / ban / retry
+    #         edit / msg / creason：发一条提示，回复它来修改稿件 / 给投稿人发消息 / 写拒绝理由
     #         pub_ok / reject_ok / ban_ok：确认面板上的“确认”，见 CONFIRMABLE
     #         reason：拒绝理由面板上选了一项
     # v：preset = 定时的时间戳；reason / reject / reject_ok = 第几个拒绝理由（从 1 开始，0 = 不附理由）
@@ -95,6 +96,8 @@ def control_kb(sub: Submission, lang: str) -> InlineKeyboardMarkup | None:
         rows.append([_rb(t(lang, "btn_unschedule"), "unsched", sid), reject])
     elif sub.status == "failed":
         rows.append([_rb(t(lang, "btn_retry"), "retry", sid, style=GREEN), reject])
+    if sub.status in ("pending", "scheduled", "failed"):
+        rows.append([_rb(t(lang, "btn_edit"), "edit", sid), _rb(t(lang, "btn_msg"), "msg", sid)])
     return InlineKeyboardMarkup(inline_keyboard=rows) if rows else None
 
 
@@ -126,8 +129,9 @@ def confirm_kb(sid: int, action: str, lang: str, v: int = 0, detail: str | None 
 
 
 def reasons_kb(sid: int, reasons: tuple[str, ...], lang: str) -> InlineKeyboardMarkup:
-    """拒绝理由面板：每个理由一个按钮（v = 第几个，从 1 开始），再加“不附理由”和“返回”。"""
+    """拒绝理由面板：每个理由一个按钮（v = 第几个，从 1 开始），再加“自定义理由”“不附理由”和“返回”。"""
     buttons = [_rb(r, "reason", sid, i) for i, r in enumerate(reasons, 1)]
     rows = [buttons[i : i + 2] for i in range(0, len(buttons), 2)]
-    rows.append([_rb(t(lang, "btn_no_reason"), "reason", sid, 0), _rb(t(lang, "btn_back"), "back", sid)])
+    rows.append([_rb(t(lang, "btn_custom_reason"), "creason", sid), _rb(t(lang, "btn_no_reason"), "reason", sid, 0),
+                 _rb(t(lang, "btn_back"), "back", sid)])
     return InlineKeyboardMarkup(inline_keyboard=rows)

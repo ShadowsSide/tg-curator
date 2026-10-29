@@ -10,7 +10,7 @@ from .. import entities as ent
 from ..core import Core, explicit_reply
 from ..db import SUBMITTER_EDITABLE
 from ..i18n import t
-from ..keyboards import UserCB, UserMediaCB, user_kb, user_media_kb
+from ..keyboards import UserCB, UserMediaCB, user_media_kb
 from ..render import dump_link_preview, extract_item, message_item
 
 def build_router() -> Router:
@@ -69,12 +69,7 @@ def build_router() -> Router:
         if not found:
             await m.reply(t(lang, "msg_usage_user"))
             return
-        item = message_item(m, body, entities)
-        if item is None:
-            await m.reply(t(lang, "msg_empty"))
-            return
-        err = await core.relay_to_review(found[0], m.from_user, item, m.message_id)
-        await m.reply(err.text(lang) if err else t(lang, "msg_sent_to_review"))
+        await _relay(m, core, found[0], body, entities)
 
     @router.edited_message()
     async def native_edit(m: Message, core: Core) -> None:
@@ -100,10 +95,12 @@ def build_router() -> Router:
         if m.text and m.text.startswith("/"):
             await m.answer(t(core.lang_of(m.from_user), "unknown_cmd"))
             return
-        # 直接回复了审核员的消息但没写 /msg：提醒用 /msg，而不是当成一条新投稿
+        # 直接回复了沟通消息（审核员转来的，或自己之前的留言）：当作留言转给审核员，而不是一条新投稿
         reply = explicit_reply(m)
-        if reply and await core.sid_for_relay_message(m.from_user.id, reply.message_id):
-            await m.reply(t(core.lang_of(m.from_user), "msg_hint_user"))
+        sid = await core.sid_for_relay_message(m.from_user.id, reply.message_id) if reply else None
+        if sid:
+            await _relay(m, core, sid, m.text or m.caption or "", ent.dump(m.entities or m.caption_entities),
+                         empty="unsupported")  # 贴纸等不能转达的类型
             return
         await core.receive([m])
 
@@ -131,7 +128,8 @@ def build_router() -> Router:
         # 打开删除面板；返回、删除失败、或者已经不能改了（审核开始后点旧按钮）：恢复成当前状态的按钮
         panel = a == "mdel" and sub.status in SUBMITTER_EDITABLE
         try:
-            await cq.message.edit_reply_markup(reply_markup=user_media_kb(sub, lang) if panel else user_kb(sub, lang))
+            await cq.message.edit_reply_markup(
+                reply_markup=user_media_kb(sub, lang) if panel else await core.user_keyboard(sub, lang))
         except TelegramBadRequest as e:
             if "not modified" not in str(e):
                 raise
@@ -158,10 +156,21 @@ def build_router() -> Router:
             return
         mode = t(lang, "mode_anon" if anonymous else "mode_signed")
         await cq.message.edit_text(t(lang, "submitted", mode=mode, sid=sid),
-                                   reply_markup=user_kb(await core.get_submission(sid), lang))
+                                   reply_markup=await core.user_keyboard(await core.get_submission(sid), lang))
         await cq.answer(t(lang, "submitted_toast"))
 
     return router
+
+
+async def _relay(m: Message, core: Core, sid: int, body: str, entities: list, empty: str = "msg_empty") -> None:
+    """投稿人的留言（/msg 或直接回复审核员）转给审核群。empty：没有可转达的内容时的提示。"""
+    lang = core.lang_of(m.from_user)
+    item = message_item(m, body, entities)
+    if item is None:
+        await m.reply(t(lang, empty))
+        return
+    err = await core.relay_to_review(sid, m.from_user, item, m.message_id)
+    await m.reply(err.text(lang) if err else t(lang, "msg_sent_to_review"))
 
 
 def _edited_text(lang: str, sid: int, status: str) -> str:

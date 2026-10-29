@@ -499,6 +499,13 @@ class DB:
         )
         return {k: (row[k] or 0) if k not in ("first_at", "last_at") else row[k] for k in row.keys()}
 
+    async def last_choice(self, user_id: int) -> bool | None:
+        """投稿人上一次提交时选的是不是匿名；还没提交过返回 None。"""
+        row = await self._one(
+            "SELECT anonymous FROM submissions WHERE user_id=? AND submitted_at IS NOT NULL "
+            "ORDER BY submitted_at DESC, id DESC LIMIT 1", (user_id,))
+        return bool(row[0]) if row else None
+
     # ---------- 等待回复的提示 ----------
 
     async def add_prompt(self, chat_id: int, message_id: int, kind: str, sid: int, user_id: int,

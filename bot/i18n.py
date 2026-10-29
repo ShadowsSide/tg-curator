@@ -67,8 +67,9 @@ T: dict[str, dict[str, str]] = {
             "发送后选择 <b>署名</b> 或 <b>匿名</b>，审核通过后会发布到频道，结果会通知你。\n\n"
             "<b>修改投稿</b>（审核结果出来之前都可以改）：\n"
             "· 直接用 Telegram 的“编辑”修改你发出的那条消息，机器人会自动同步（换图也可以）\n"
-            "· 或者<b>回复</b>你的投稿，发送 <code>/edit 新内容</code>；回复时只发 /edit 会把当前内容发给你，方便复制修改\n\n"
-            "<b>和审核员沟通</b>：回复审核员的消息或你的投稿，发送 <code>/msg 内容</code>\n\n"
+            "· 或者<b>回复</b>你的投稿，发送 <code>/edit 新内容</code>；回复时只发 /edit 会把当前内容发给你，方便复制修改\n"
+            "· 要加图：<b>回复</b>你的投稿发图片或视频，选“加到这条投稿”；要删图：点投稿下面的“删除图片 / 视频”\n\n"
+            "<b>和审核员沟通</b>：直接<b>回复</b>审核员发来的消息即可；也可以回复你的投稿，发送 <code>/msg 内容</code>\n\n"
             "/me 查看我的投稿统计"
         ),
         "en": (
@@ -79,9 +80,11 @@ T: dict[str, dict[str, str]] = {
             "<b>Editing</b> (possible until the review is done):\n"
             "· Use Telegram's “Edit” on the message you sent; the bot syncs it automatically (you can even swap the image)\n"
             "· Or <b>reply</b> to your submission with <code>/edit new content</code>; replying with just /edit sends "
-            "you the current content so you can copy and change it\n\n"
-            "<b>Talking to the reviewers</b>: reply to their message or your submission with "
-            "<code>/msg message</code>\n\n"
+            "you the current content so you can copy and change it\n"
+            "· To add photos, <b>reply</b> to your submission with them and choose “Add to that submission”; "
+            "to remove one, tap “Remove a photo / video” under your submission\n\n"
+            "<b>Talking to the reviewers</b>: just <b>reply</b> to the reviewer's message; or reply to your submission "
+            "with <code>/msg message</code>\n\n"
             "/me shows your submission stats"
         ),
     },
@@ -109,6 +112,7 @@ T: dict[str, dict[str, str]] = {
     },
     "btn_sign": {"zh": "👤 署名投稿", "en": "👤 Signed"},
     "btn_anon": {"zh": "🕶 匿名投稿", "en": "🕶 Anonymous"},
+    "btn_last": {"zh": "{label}（上次）", "en": "{label} (last time)"},
     "btn_cancel": {"zh": "取消", "en": "Cancel"},
     "invalid_sub": {"zh": "无效的投稿", "en": "Invalid submission"},
     "spam_blocked_keyword": {
@@ -420,8 +424,8 @@ T: dict[str, dict[str, str]] = {
 
     # ---------- 审核：命令 ----------
     "review_help": {
-        "zh": '🛠 <b>审核群命令</b>\n/stats 发送最新审核统计\n/queue 定时发布队列\n/active [天数] 投稿人活跃度排行（默认 30 天）\n/user &lt;用户ID&gt; 查看某位投稿人\n\n<b>处理投稿</b>（控制消息上的 ✏️ 修改、💬 联系投稿人 按钮作用相同；命令要回复投稿的预览或控制消息使用）\n/edit 新内容 —— 替换正文或说明文字，格式原样保留\n/edit —— 不带内容：把当前文字（含格式）发出来，方便复制后修改\n/msg 内容 —— 发消息给投稿人（以“审核员”身份），投稿人也可以用 /msg 回复\n/no [理由] —— 拒绝，理由会发给投稿人\n/ban [理由] —— 封禁投稿人，并自动拒绝其所有未处理来稿\n/cancel —— 放弃正在等你回复的操作（点了 修改、联系投稿人 等按钮后）\n\n<b>按用户处理</b>\n/ban &lt;用户ID&gt; [理由] · /unban &lt;用户ID&gt;',
-        "en": "🛠 <b>Review group commands</b>\n/stats post the latest review summary\n/queue scheduled posts\n/active [days] contributor ranking (default 30 days)\n/user &lt;user ID&gt; show one contributor\n\n<b>Handling a submission</b> (the ✏️ Edit and 💬 Message submitter buttons do the same; reply to the submission's preview or control message to use a command)\n/edit new content — replace the text or caption, keeping formatting\n/edit — on its own: show the current text with formatting so you can copy it\n/msg message — message the submitter (shown as “Reviewer”); they can answer with /msg too\n/no [reason] — reject; the reason is sent to the submitter\n/ban [reason] — ban the submitter and reject all their open submissions\n/cancel — drop what's waiting for your reply (after tapping Edit, Message submitter and so on)\n\n<b>By user</b>\n/ban &lt;user ID&gt; [reason] · /unban &lt;user ID&gt;",
+        "zh": '🛠 <b>审核群命令</b>\n/stats 发送最新审核统计\n/queue 定时发布队列\n/active [天数] 投稿人活跃度排行（默认 30 天）\n/user &lt;用户ID&gt; 查看某位投稿人\n\n<b>处理投稿</b>（控制消息上的 ✏️ 修改、💬 联系投稿人 按钮作用相同；命令要回复投稿的预览或控制消息使用）\n/edit 新内容 —— 替换正文或说明文字，格式原样保留\n/edit —— 不带内容：把当前文字（含格式）发出来，方便复制后修改\n/msg 内容 —— 发消息给投稿人（以“审核员”身份），投稿人直接回复就能答复\n/no [理由] —— 拒绝，理由会发给投稿人\n/ban [理由] —— 封禁投稿人，并自动拒绝其所有未处理来稿\n/cancel —— 放弃正在等你回复的操作（点了 修改、联系投稿人 等按钮后）\n\n<b>按用户处理</b>\n/ban &lt;用户ID&gt; [理由] · /unban &lt;用户ID&gt;',
+        "en": "🛠 <b>Review group commands</b>\n/stats post the latest review summary\n/queue scheduled posts\n/active [days] contributor ranking (default 30 days)\n/user &lt;user ID&gt; show one contributor\n\n<b>Handling a submission</b> (the ✏️ Edit and 💬 Message submitter buttons do the same; reply to the submission's preview or control message to use a command)\n/edit new content — replace the text or caption, keeping formatting\n/edit — on its own: show the current text with formatting so you can copy it\n/msg message — message the submitter (shown as “Reviewer”); they answer by simply replying\n/no [reason] — reject; the reason is sent to the submitter\n/ban [reason] — ban the submitter and reject all their open submissions\n/cancel — drop what's waiting for your reply (after tapping Edit, Message submitter and so on)\n\n<b>By user</b>\n/ban &lt;user ID&gt; [reason] · /unban &lt;user ID&gt;",
     },
     "no_permission": {"zh": "⛔ 你没有审核权限", "en": "⛔ You don't have reviewer permission"},
     "reply_to_submission": {
@@ -480,8 +484,9 @@ T: dict[str, dict[str, str]] = {
               "<code>/msg message</code>",
     },
     "msg_usage_user": {
-        "zh": "请<b>回复</b>审核员的消息或你的投稿，发送 <code>/msg 内容</code>。",
-        "en": "Please <b>reply</b> to the reviewer's message or your submission with <code>/msg message</code>.",
+        "zh": "请<b>回复</b>审核员的消息或你的投稿，发送 <code>/msg 内容</code>（回复审核员的消息时不写 /msg 也可以）。",
+        "en": "Please <b>reply</b> to the reviewer's message or your submission with <code>/msg message</code> "
+              "(when replying to the reviewer, /msg is optional).",
     },
     "msg_empty": {"zh": "请在 /msg 后面写上要说的话。", "en": "Please write your message after /msg."},
     "msg_not_submitted": {
@@ -497,11 +502,6 @@ T: dict[str, dict[str, str]] = {
         "en": "⚠️ Couldn't reach the submitter (they may have blocked the bot): {error}",
     },
     "msg_failed": {"zh": "⚠️ 发送失败：{error}", "en": "⚠️ Failed to send: {error}"},
-    "msg_hint_user": {
-        "zh": "要回复审核员，请回复这条消息并以 <code>/msg</code> 开头，例如 <code>/msg 好的，我马上补充</code>。",
-        "en": "To answer the reviewer, reply to their message starting with <code>/msg</code>, e.g. "
-              "<code>/msg OK, I'll add it</code>.",
-    },
     "msg_hint_admin": {
         "zh": "要回复投稿人，请回复这条消息并以 <code>/msg</code> 开头，或者点控制消息上的 💬 联系投稿人。",
         "en": "To answer the submitter, reply to this message starting with <code>/msg</code>, "

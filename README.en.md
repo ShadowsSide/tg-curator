@@ -23,7 +23,7 @@ Built with Python 3.12 + [aiogram 3](https://github.com/aiogram/aiogram) + SQLit
 - **Spam checks** (optional): keyword blacklist, a link limit (whitelisted domains don't count) and a cooldown for new submitters. By default a hit only puts a ⚠️ Possible spam note on the control message for reviewers to judge; it can also block the submission
 
 **Reviewer ↔ submitter messaging**
-- Both sides use `/msg message` as a reply to the relevant submission or message, and the bot relays it. Submitters always see the sender as “Reviewer”; neither side sees the other's account
+- Reviewers tap **💬 Message submitter** on the control message (or use `/msg message`); submitters simply reply to the reviewer's message (or use `/msg`). The bot relays it. Submitters always see the sender as “Reviewer”; neither side sees the other's account
 - Formatting is kept, and a single photo or file can be attached; the conversation is stored and the control message shows the message count
 - Possible any time during review, and for 3 days after it's published or rejected (`MSG_WINDOW_DAYS`); banned users can't send
 
@@ -153,13 +153,14 @@ Everything is configured in `.env`. See [`.env.example`](.env.example) for a ful
 
 | Action | Description |
 |---|---|
-| Send any content | Starts a submission, then choose signed or anonymous |
+| Send any content | Starts a submission, then choose signed or anonymous. Your previous choice is marked “(last time)” and shown first; you still tap it |
 | Edit the original message with Telegram's "Edit" | Changes the submission until it has been reviewed: text, formatting, or even the image |
 | Reply to your submission with a photo / video | The choice panel gets an extra **➕ Add to that submission** button that adds the new photos to it; or submit them as a new submission as usual. Only drafts and pending submissions can take more |
 | 🗑 Remove a photo / video | Shown on the bot's message while a draft or pending submission has 2 or more photos/videos; tap it and pick the one to remove. Nothing can be changed once the review has started (scheduled, published, rejected) |
 | `/edit new content` | Only works as a **reply** to your submission (or the bot's message about it); without a reply nothing is changed |
 | `/edit` (as a reply) | Shows the current content with formatting, so you can copy and change it |
-| `/msg message` | Message the reviewers: **reply** to the reviewer's message or your submission. Replying to the reviewer without `/msg` gets a reminder |
+| Reply to the reviewer's message | Sent to the reviewers as a message (text, a photo or a file), no `/msg` needed |
+| `/msg message` | Message the reviewers: **reply** to the reviewer's message or your submission |
 | `/me` | Your submission stats |
 
 ### Admins (review group)
@@ -272,6 +273,7 @@ The tests need no token and no network access:
 .venv/bin/python tests/live_spam_block_test.py  # end-to-end: spam block mode (~10 seconds)
 .venv/bin/python tests/live_prompt_test.py      # end-to-end: Edit, Message submitter and Custom reason buttons; old preview deletion (~10 seconds)
 .venv/bin/python tests/live_media_test.py       # end-to-end: reviewers' media panel; submitters adding and removing photos (~10 seconds)
+.venv/bin/python tests/live_choice_test.py      # end-to-end: remembering the last signed / anonymous choice (~8 seconds)
 ```
 
 GitHub Actions (`.github/workflows/test.yml`) first checks the code with pyflakes (undefined names, unused imports and variables, …), then runs all of these on every pull request and every push to `main`. To check locally:

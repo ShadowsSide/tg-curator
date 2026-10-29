@@ -7,7 +7,7 @@ from .. import spam
 from ..errors import Notice, notice
 from ..i18n import t
 from ..db import SUBMITTER_EDITABLE
-from ..keyboards import control_kb, media_count, user_kb
+from ..keyboards import control_kb, media_count
 from ..render import control_text, describe, extract_item, send_items
 from ..timeutil import now_ts
 
@@ -48,7 +48,7 @@ class SubmissionsMixin(CoreBase):
         if merge_to:
             await self.db.update(sid, merge_to=merge_to)
             text += t(lang, "choose_or_merge")
-        prompt = await first.reply(text, reply_markup=user_kb(await self.db.get(sid), lang))
+        prompt = await first.reply(text, reply_markup=await self.user_keyboard(await self.db.get(sid), lang))
         await self.db.update(sid, user_msg_id=prompt.message_id)
 
     async def _merge_target(self, first: Message, items: list[dict]) -> int | None:

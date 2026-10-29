@@ -87,16 +87,22 @@ def media_count(items: list[dict]) -> int:
     return len(items)
 
 
-def user_kb(sub: Submission, lang: str) -> InlineKeyboardMarkup | None:
+def user_kb(sub: Submission, lang: str, last_anon: bool | None = None) -> InlineKeyboardMarkup | None:
     """投稿人私聊里那条提示消息上的按钮。
     草稿：署名 / 匿名 / 取消；回复旧投稿发的图片还多一个“加到这条投稿”（sub.merge_to）。
+      last_anon：上次选的是匿名（True）还是署名（False），那个按钮标上“（上次）”并排在前面；None = 第一次投稿。
     草稿和待审核：有 2 个以上图片视频时多一个“删除图片”。其他状态没有按钮。"""
     sid = sub.id
     rows: list[list[InlineKeyboardButton]] = []
     if sub.status == "draft":
         if sub.merge_to:
             rows.append([_umb(t(lang, "btn_merge"), "merge", sid, sub.merge_to, GREEN)])
-        rows.append([_ub(t(lang, "btn_sign"), "sign", sid, style=BLUE), _ub(t(lang, "btn_anon"), "anon", sid, style=BLUE)])
+        choices = [(t(lang, "btn_sign"), "sign"), (t(lang, "btn_anon"), "anon")]
+        if last_anon:
+            choices.reverse()
+        if last_anon is not None:
+            choices[0] = (t(lang, "btn_last", label=choices[0][0]), choices[0][1])
+        rows.append([_ub(text, a, sid, style=BLUE) for text, a in choices])
     if sub.status in ("draft", "pending") and media_count(sub.items) > 1:
         rows.append([_umb(t(lang, "btn_user_media"), "mdel", sid)])
     if sub.status == "draft":

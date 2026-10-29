@@ -185,6 +185,11 @@ class CoreBase:
         await self._swap_control_kb(sid, media_kb(sub, self.lang))
         return None
 
+    async def user_keyboard(self, sub: Submission, lang: str) -> InlineKeyboardMarkup | None:
+        """投稿人提示消息上的按钮；草稿要标出上次选的署名 / 匿名。"""
+        last = await self.db.last_choice(sub.user_id) if sub.status == "draft" else None
+        return user_kb(sub, lang, last)
+
     async def refresh_user_kb(self, sid: int) -> None:
         """更新投稿人私聊里那条提示消息上的按钮（图片数量变了，“删除图片”可能出现或消失）。"""
         sub = await self.db.get(sid)
@@ -193,7 +198,7 @@ class CoreBase:
         try:
             await self.bot.edit_message_reply_markup(
                 chat_id=sub.user_id, message_id=sub.user_msg_id,
-                reply_markup=user_kb(sub, await self.user_lang(sub.user_id)))
+                reply_markup=await self.user_keyboard(sub, await self.user_lang(sub.user_id)))
         except TelegramAPIError as e:  # 按钮没变、消息太旧等
             if "not modified" not in str(e):
                 log.info("更新投稿人 #%s 的按钮失败：%s", sid, e)

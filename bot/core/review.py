@@ -163,8 +163,49 @@ class ReviewMixin(CoreBase):
         await self.refresh_stats()
         return rejected
 
+    async def purge_review_messages(self, user_id: int) -> Notice:
+        """删除被封禁用户的全部投稿在审核群里的消息（含已发布的）；数据库里的投稿记录保留，/user 统计不变。
+        按整条投稿分批，每次最多 100 条（deleteMessages 的上限）；删成功的投稿才清掉记录，失败的可以再点一次重试。"""
+        user = await self.db.get_user(user_id)
+        if not user or not user.banned:
+            return notice("toast_not_banned")
+        traces = await self.db.review_traces(self.s.review_chat_id, user_id)
+        if not traces:
+            return notice("purge_nothing")
+        done = failed = 0
+        for sids, ids in _delete_batches(traces):
+            try:
+                for i in range(0, len(ids), DELETE_LIMIT):
+                    await self.bot.delete_messages(self.s.review_chat_id, ids[i:i + DELETE_LIMIT])
+            except TelegramAPIError as e:
+                log.warning("删除审核群消息失败（投稿 %s）：%s", sids, e)
+                failed += len(sids)
+                continue
+            await self.db.forget_review_messages(self.s.review_chat_id, sids)
+            done += len(sids)
+        if failed:
+            return notice("purge_partial", n=done, failed=failed)
+        return notice("purge_done", n=done)
+
     async def unban_user(self, user_id: int) -> bool:
         if not await self.db.unban(user_id):
             return False
         await self.notify_user(user_id, t(await self.user_lang(user_id), "notify_unbanned"))
         return True
+
+
+DELETE_LIMIT = 100  # deleteMessages 一次最多删 100 条
+
+
+def _delete_batches(traces: dict[int, list[int]]):
+    """把各条投稿的消息拼成尽量满的批次，同一条投稿不拆到两批（超过上限的单条投稿自成一批，删除时再分段）。"""
+    sids: list[int] = []
+    ids: list[int] = []
+    for sid, mids in traces.items():
+        if ids and len(ids) + len(mids) > DELETE_LIMIT:
+            yield sids, ids
+            sids, ids = [], []
+        sids.append(sid)
+        ids += mids
+    if ids:
+        yield sids, ids

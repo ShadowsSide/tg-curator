@@ -356,6 +356,13 @@ T: dict[str, dict[str, str]] = {
     "toast_rejected": {"zh": "已拒绝（需要附理由请用 /no 回复）", "en": "Rejected (reply with /no to give a reason)"},
     "toast_unbanned": {"zh": "已解除封禁，已通知投稿人", "en": "Unbanned; the submitter has been notified"},
     "toast_not_banned": {"zh": "这个投稿人现在没有被封禁", "en": "This submitter isn't banned now"},
+    "purge_done": {"zh": "已删除 TA 在审核群的 {n} 条稿件", "en": "Deleted their {n} submission(s) from the review group"},
+    "purge_partial": {
+        "zh": "已删除 {n} 条稿件；{failed} 条删除失败（机器人可能没有删除消息的权限），可以再试一次",
+        "en": "Deleted {n} submission(s); {failed} couldn't be deleted (the bot may lack the delete-messages right). "
+              "You can try again",
+    },
+    "purge_nothing": {"zh": "TA 在审核群里没有可删除的稿件", "en": "They have nothing left to delete in the review group"},
     "toast_already_banned": {"zh": "这个投稿人已经被封禁了", "en": "This submitter is already banned"},
     "toast_banned": {
         "zh": "已封禁，并拒绝 {n} 条未处理来稿",

@@ -70,6 +70,7 @@ CREATE TABLE IF NOT EXISTS review_messages (
     message_id INTEGER PRIMARY KEY,
     sid        INTEGER NOT NULL
 );
+CREATE INDEX IF NOT EXISTS idx_rm_sid ON review_messages(sid);  -- 按投稿找它在审核群的消息（封禁后删除）
 
 -- 审核员与投稿人通过机器人转达的沟通记录（/msg）
 CREATE TABLE IF NOT EXISTS conversations (
@@ -406,6 +407,34 @@ class DB:
 
     async def unlink_review_messages(self, message_ids: Iterable[int]) -> None:
         await self.conn.executemany("DELETE FROM review_messages WHERE message_id=?", [(m,) for m in message_ids])
+        await self.conn.commit()
+
+    async def review_traces(self, chat_id: int, user_id: int) -> dict[int, list[int]]:
+        """这个用户的投稿在审核群里还留着的消息：{投稿编号: [消息编号]}。
+        包括预览、控制消息、改稿后的预览、转达的 /msg（都在 review_messages 里）和等待回复的提示（连同它要一起删的消息）。"""
+        traces: dict[int, set[int]] = {}
+        rows = await self._all(
+            """SELECT rm.sid, rm.message_id FROM review_messages rm JOIN submissions s ON s.id = rm.sid WHERE s.user_id=?
+               UNION SELECT id, review_msg_id FROM submissions WHERE user_id=? AND review_msg_id IS NOT NULL""",
+            (user_id, user_id),
+        )
+        for sid, mid in rows:
+            traces.setdefault(sid, set()).add(mid)
+        prompts = await self._all(
+            "SELECT p.sid, p.message_id, p.cleanup FROM prompts p JOIN submissions s ON s.id = p.sid "
+            "WHERE s.user_id=? AND p.chat_id=?", (user_id, chat_id),
+        )
+        for sid, mid, cleanup in prompts:
+            traces.setdefault(sid, set()).update([mid, *json.loads(cleanup or "[]")])
+        return {sid: sorted(ids) for sid, ids in sorted(traces.items())}
+
+    async def forget_review_messages(self, chat_id: int, sids: list[int]) -> None:
+        """这些投稿在审核群里的消息已经删掉了：清掉对应记录（投稿本身保留，控制消息编号置空，之后不再刷新）。"""
+        marks = ", ".join("?" * len(sids))
+        await self.conn.execute(f"DELETE FROM review_messages WHERE sid IN ({marks})", sids)
+        await self.conn.execute(f"DELETE FROM prompts WHERE chat_id=? AND sid IN ({marks})", (chat_id, *sids))
+        await self.conn.execute(
+            f"UPDATE submissions SET review_msg_id=NULL, edit_preview=NULL WHERE id IN ({marks})", sids)
         await self.conn.commit()
 
     async def sid_by_review_message(self, message_id: int) -> int | None:

@@ -89,27 +89,19 @@ Built with Python 3.12 + [aiogram 3](https://github.com/aiogram/aiogram) + SQLit
 
 ### 2. Deploy
 
+The prebuilt image (`ghcr.io/shadowsside/tg-curator`, amd64 / arm64) is used by default, so the server only needs two files:
+
 ```bash
-git clone https://github.com/ShadowsSide/tg-curator.git
-cd tg-curator
-cp .env.en.example .env     # fill in BOT_TOKEN, CHANNEL_ID and REVIEW_CHAT_ID (LANGUAGE=en is already set)
-docker compose up -d --build
+mkdir tg-curator && cd tg-curator
+curl -fsSLO https://raw.githubusercontent.com/ShadowsSide/tg-curator/main/docker-compose.yml
+curl -fsSL https://raw.githubusercontent.com/ShadowsSide/tg-curator/main/.env.en.example -o .env   # fill in BOT_TOKEN, CHANNEL_ID and REVIEW_CHAT_ID (LANGUAGE=en is already set)
+docker compose up -d
 docker compose logs -f
 ```
 
-To use the prebuilt image instead of building on your server, add this to `.env`:
+Image tags: `latest` is the newest build of the main branch, `vX.Y.Z` are releases, and `sha-xxxxxxx` points to a specific build, which is handy for rolling back. To use another tag or image, set `IMAGE` in `.env`.
 
-```bash
-IMAGE=ghcr.io/shadowsside/tg-curator:latest
-```
-
-and run:
-
-```bash
-docker compose pull && docker compose up -d --no-build
-```
-
-Image tags: `latest` is the newest build of the main branch, `vX.Y.Z` are releases, and `sha-xxxxxxx` points to a specific build, which is handy for rolling back.
+To build from source instead, clone the whole repository and run `docker compose -f docker-compose.yml -f docker-compose.build.yml up -d --build`.
 
 ### 3. Updating and backups
 
@@ -117,8 +109,7 @@ Image tags: `latest` is the newest build of the main branch, `vX.Y.Z` are releas
 
 ```bash
 docker compose cp bot:/app/data/bot.db ./backup-$(date +%F).db   # 1. back up the database
-git pull && docker compose up -d --build                         # 2. update (build yourself)
-docker compose pull && docker compose up -d --no-build           # 2. or: update (prebuilt image)
+docker compose pull && docker compose up -d                      # 2. update to the latest image
 ```
 
 The database lives in the `bot-data` Docker volume.
@@ -154,7 +145,7 @@ Options most deployments adjust as needed.
 | `REMINDER_INTERVAL_MINUTES` | `60` | Interval of the review summary, aligned to the clock; `0` turns it off |
 | `REMINDER_QUIET_HOURS` | — | Quiet hours with no summaries, e.g. `0-8` |
 | `PROXY` | — | Proxy, e.g. `socks5://host:port` |
-| `IMAGE` | `tg-curator:latest` | Set this when using a prebuilt image |
+| `IMAGE` | `ghcr.io/shadowsside/tg-curator:latest` | Set this to use another image, e.g. a pinned version, your fork's image or one on Docker Hub |
 
 > Inside Docker, `127.0.0.1` means the container itself. To use a proxy running on the host, use the host's IP address or `host.docker.internal` (Docker Desktop).
 
@@ -339,7 +330,7 @@ scripts/          multi-arch image build script
 
 ### Publishing images (for your own fork)
 
-On every push to `main` or `v*` tag, GitHub Actions builds amd64 + arm64 images and publishes them to `ghcr.io/<owner>/tg-curator`.
+On every push to `main` or `v*` tag, GitHub Actions builds amd64 + arm64 images and publishes them to `ghcr.io/<owner>/tg-curator`. To run your own image, set `IMAGE=ghcr.io/<owner>/tg-curator:latest` in `.env`; otherwise this repository's image is pulled.
 
 To publish to Docker Hub as well, add the variable `DOCKERHUB_USERNAME` and the secret `DOCKERHUB_TOKEN` (a Docker Hub access token with Read & Write permission) under **Settings → Secrets and variables → Actions** in your repository.
 

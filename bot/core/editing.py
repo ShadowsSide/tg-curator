@@ -93,11 +93,16 @@ class EditingMixin(CoreBase):
             limit = 4096 if it["type"] == "text" else 1024
             if u16len(it.get("text", "")) > limit:
                 return notice("too_long", n=u16len(it["text"]), limit=limit)
+        # 媒体自带的剧透有变化（Telegram 编辑里开关了剧透，或加 / 换 / 删了带剧透的图）时，剧透设置跟着变；
+        # 没变化就保留当前设置，不覆盖审核员手动切换的结果
+        has_spoiler = any(it.get("spoiler") for it in items)
+        follow = {"spoiler": int(has_spoiler)} if has_spoiler != any(it.get("spoiler") for it in sub.items) else {}
         # 第一次修改前的原稿单独保存；状态变了（比如刚好被发布）就不改
         ok = await self.db.update_if(
             sub.id, allowed, items=items, original_items=sub.original_items or sub.items,
             edited_by=editor, edited_at=now_ts(),
             spam_flags=spam.check(items, self.s.spam_rules) or None,  # 改稿后可能加了广告链接，重新检查
+            **follow,
         )
         if not ok:
             return notice("edit_race")

@@ -33,7 +33,7 @@ Built with Python 3.12 + [aiogram 3](https://github.com/aiogram/aiogram) + SQLit
 **Reviewing**
 - Each submission gets a preview in the review group (exactly what the channel will show), followed by a control message with colored buttons
 - Publish now · Schedule · Reject · Ban submitter
-- Publishing options: 🙈 **spoiler** (blur the media) and 🔕 **silent** (subscribers get a notification without sound)
+- Publishing options: 🙈 **spoiler** (blur the media) and 🔕 **silent** (subscribers get a notification without sound). The spoiler starts on if the submitter blurred their own media, and follows them if they turn it on or off in a later edit
 - Pick a common reject reason with one tap (`REJECT_TEMPLATES`)
 - **✏️ Edit**, **✏️ Custom reason / time**: tap the button, then just reply to the bot's prompt, no commands to remember; send `/cancel` to give up
 - **🖼 Media**: while pending, add, replace or remove photos and videos (up to 10); text submissions can get photos too

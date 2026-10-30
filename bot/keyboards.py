@@ -140,7 +140,7 @@ def control_kb(sub: Submission, lang: str) -> InlineKeyboardMarkup | None:
     elif sub.status == "failed":
         rows.append([_rb(t(lang, "btn_retry"), "retry", sid, style=GREEN), reject])
     if sub.status in ("pending", "scheduled", "failed"):
-        tools = [_rb(t(lang, "btn_edit"), "edit", sid), _rb(t(lang, "btn_msg"), "msg", sid)]
+        tools = [_rb(t(lang, "btn_edit"), "edit", sid)]  # 联系投稿人只用 /msg，不做按钮
         if sub.status == "pending":  # 审核员只能在待审核时改媒体
             tools.append(_rb(t(lang, "btn_media"), "media", sid))
         rows.append(tools)

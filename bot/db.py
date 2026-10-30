@@ -86,11 +86,11 @@ CREATE TABLE IF NOT EXISTS conversations (
 CREATE INDEX IF NOT EXISTS idx_conv_sid  ON conversations(sid);
 CREATE INDEX IF NOT EXISTS idx_conv_user ON conversations(user_msg_id);
 
--- 等待回复的提示消息（点了“修改”“联系投稿人”等按钮后，机器人发出的“请回复本消息……”）
+-- 等待回复的提示消息（点了“修改”“自定义理由”等按钮后，机器人发出的“请回复本消息……”）
 CREATE TABLE IF NOT EXISTS prompts (
     chat_id    INTEGER NOT NULL,
     message_id INTEGER NOT NULL,      -- 提示消息
-    kind       TEXT    NOT NULL,      -- 等什么：time / edit / msg / reason / madd / mrep，见 handlers/review.py
+    kind       TEXT    NOT NULL,      -- 等什么：time / edit / reason / madd / mrep，见 handlers/review.py（msg 已去掉，旧记录会作废）
     sid        INTEGER NOT NULL,
     arg        INTEGER NOT NULL DEFAULT 0,  -- 附加参数：mrep = 替换第几个媒体
     user_id    INTEGER NOT NULL,      -- 点按钮的人；只有他的回复算数

@@ -25,7 +25,7 @@ Built with Python 3.12 + [aiogram 3](https://github.com/aiogram/aiogram) + SQLit
 - **Spam checks** (optional): keyword blacklist, a link limit (whitelisted domains don't count) and a cooldown for new submitters. By default a hit only puts a ⚠️ Possible spam note on the control message for reviewers to judge; it can also block the submission
 
 **Reviewer ↔ submitter messaging**
-- Reviewers tap **💬 Message submitter** on the control message (or use `/msg message`); submitters simply reply to the reviewer's message (or use `/msg`). The bot relays it. Submitters always see the sender as “Reviewer”; neither side sees the other's account
+- Both sides use `/msg message`: reviewers reply to the submission's preview or control message, submitters reply to the reviewer's message or their own submission, and the bot relays it. A plain reply without `/msg` only gets a hint and isn't relayed. Submitters always see the sender as “Reviewer”; neither side sees the other's account
 - Formatting is kept, and a single photo or file can be attached; the conversation is stored and the control message shows the message count
 - Possible any time during review, and for 3 days after it's published or rejected (`MSG_WINDOW_DAYS`); banned users can't send
 
@@ -34,7 +34,7 @@ Built with Python 3.12 + [aiogram 3](https://github.com/aiogram/aiogram) + SQLit
 - Publish now · Schedule · Reject · Ban submitter
 - Publishing options: 🙈 **spoiler** (blur the media) and 🔕 **silent** (subscribers get a notification without sound)
 - Pick a common reject reason with one tap (`REJECT_TEMPLATES`)
-- **✏️ Edit**, **💬 Message submitter**, **✏️ Custom reason / time**: tap the button, then just reply to the bot's prompt, no commands to remember; send `/cancel` to give up
+- **✏️ Edit**, **✏️ Custom reason / time**: tap the button, then just reply to the bot's prompt, no commands to remember; send `/cancel` to give up
 - **🖼 Media**: while pending, add, replace or remove photos and videos (up to 10); text submissions can get photos too
 - Commands work as well: `/edit` to change a post, `/no reason` to reject, `/ban reason` to ban. Banning also rejects every open submission from that user
 - Safe against accidental taps: Publish now, Reject and Ban need a second tap to confirm
@@ -68,7 +68,7 @@ Built with Python 3.12 + [aiogram 3](https://github.com/aiogram/aiogram) + SQLit
                                         ▼
                      Review group: preview + control message
                                         │
-Before deciding: 🙈 Spoiler · 🔕 Silent · ✏️ Edit · 🖼 Media · 💬 Message submitter
+ Before deciding: 🙈 Spoiler · 🔕 Silent · ✏️ Edit · 🖼 Media; /msg the submitter
                                         │
             ┌───────────────────────────┼───────────────────────────┐
      ✅ Publish now                ⏰ Schedule             ❌ Reject / 🚫 Ban
@@ -188,17 +188,16 @@ Spam checks, messaging window, stats scope and so on; the defaults are usually f
 | 🗑 Remove a photo / video | Shown on the bot's message while a draft or pending submission has 2 or more photos/videos; tap it and pick the one to remove. Nothing can be changed once the review has started (scheduled, published, rejected) |
 | `/edit new content` | Only works as a **reply** to your submission (or the bot's message about it); without a reply nothing is changed |
 | `/edit` (as a reply) | Shows the current content with formatting, so you can copy and change it |
-| Reply to the reviewer's message | Sent to the reviewers as a message (text, a photo or a file), no `/msg` needed |
 | `/msg message` | Message the reviewers: **reply** to the reviewer's message or your submission |
 | `/me` | Your submission stats |
 
 ### Admins (review group)
 
-Buttons on the control message: **✅ Publish now**, **⏰ Schedule**, **❌ Reject**, **🚫 Ban submitter**, **✏️ Edit**, **💬 Message submitter**, **🖼 Media**, plus the **🙈 Spoiler** and **🔕 Silent** toggles.
+Buttons on the control message: **✅ Publish now**, **⏰ Schedule**, **❌ Reject**, **🚫 Ban submitter**, **✏️ Edit**, **🖼 Media**, plus the **🙈 Spoiler** and **🔕 Silent** toggles.
 
 #### Reply prompts
 
-**✏️ Edit**, **💬 Message submitter**, **✏️ Custom reason** on the reason panel and **✏️ Custom time** on the schedule panel post a “please reply to this message…” prompt. Just reply to it, no commands to remember:
+**✏️ Edit**, **✏️ Custom reason** on the reason panel and **✏️ Custom time** on the schedule panel post a “please reply to this message…” prompt. Just reply to it, no commands to remember:
 - Only the reply of whoever tapped the button counts (anonymous admins excepted); send `/cancel` to give up (as a reply to a prompt it drops that one; on its own it drops all your open prompts)
 - **Edit** first posts the current content with formatting so you can copy and change it; the prompt and that copy are deleted once you're done
 - **Custom reason** rejects as soon as you send the reason, with no extra confirmation
@@ -315,7 +314,7 @@ bot/
     editing.py      editing (/edit and Telegram's built-in edit)
     review.py       publish, schedule, reject, ban, spoiler / silent toggles
     messaging.py    /msg messaging
-    prompts.py      reply prompts (Edit, Message submitter, custom reason / time)
+    prompts.py      reply prompts (Edit, custom reason / time, adding / replacing media)
     stats.py        review summary, activity, scheduled queue
     scheduler.py    background jobs: scheduled publishing, draft cleanup, summary reminders
   render.py       sending content (single / album, signature, spoiler, silent) and message texts

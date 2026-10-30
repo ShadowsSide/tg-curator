@@ -26,7 +26,7 @@ REVIEWER_MEDIA = ("pending",)  # 审核员只能在待审核时改媒体
 
 
 # 按钮 → 提示的种类；FOLD 里的按钮来自面板（理由面板、媒体面板），发提示时把控制消息恢复原样
-PROMPT_KIND = {"custom": "time", "edit": "edit", "msg": "msg", "creason": "reason", "madd": "madd", "mrep": "mrep"}
+PROMPT_KIND = {"custom": "time", "edit": "edit", "creason": "reason", "madd": "madd", "mrep": "mrep"}
 FOLD = ("creason", "madd", "mrep")
 
 
@@ -135,6 +135,9 @@ def build_router(settings: Settings) -> Router:
             # 按钮提示最多 200 字符，理由是用户配置的，可能很长
             ok = t(lang, "toast_rejected_with", reason=reason[:150]) if reason else t(lang, "toast_rejected")
             await cq.answer(err.text(lang) if err else ok, show_alert=bool(err))
+        elif action == "msg":  # 升级前的控制消息上还留着已去掉的 💬 按钮：收起它，提示改用 /msg
+            await core.refresh_control(sid)
+            await cq.answer(notice("msg_usage_admin").text(lang), show_alert=True)
         elif action == "ban":
             sub = await core.get_submission(sid)
             if not sub:
@@ -195,11 +198,9 @@ def build_router(settings: Settings) -> Router:
         sid, lang, who = prompt.sid, core.lang, m.from_user
         body = m.text or m.caption or ""
         entities = ent.dump(m.entities or m.caption_entities)
-        if prompt.kind == "msg":
-            item = message_item(m, body, entities)
-            if item is None:  # 空消息或不支持的类型（比如投票）
-                return notice("prompt_text_needed"), ""
-            return await core.relay_to_user(sid, who, item), t(lang, "msg_sent_to_user")
+        if prompt.kind not in PROMPT_KIND.values():
+            # 已经去掉的提示种类（升级前发出的“联系投稿人”提示）：作废，提示改用 /msg
+            return notice("msg_usage_admin"), ""
         if not body.strip():
             return notice("prompt_text_needed"), ""
         if prompt.kind == "time":

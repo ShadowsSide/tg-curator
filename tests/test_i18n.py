@@ -62,10 +62,17 @@ def _sub(status="pending", **kw):
 def test_signature_italic_via_plain_name_no_link():
     alice = User(user_id=42, username="alice", full_name="Alice 🌸", banned=False, ban_reason=None, banned_at=None,
                  banned_by=None, lang=None, first_seen=0, last_seen=0)
+    via = {"type": "italic", "offset": 0, "length": 3}
     for lang, anon in (("zh", "匿名"), ("en", "Anonymous")):
-        assert signature(_sub(anonymous=False), alice, lang) == ("via Alice 🌸", [{"type": "italic", "offset": 0, "length": 3}])
-        assert signature(_sub(anonymous=True), alice, lang) == (f"via {anon}", [{"type": "italic", "offset": 0, "length": 3}])
-    assert signature(_sub(anonymous=False), None, "zh")[0] == "via 42"  # 没有用户资料时退回 ID
+        # 频道：名字不带链接
+        assert signature(_sub(anonymous=False), alice, lang, link=False) == ("via Alice 🌸", [via])
+        # 审核群预览：名字是投稿人链接（UTF-16 长度：🌸 占 2）
+        assert signature(_sub(anonymous=False), alice, lang, link=True) == ("via Alice 🌸", [
+            via, {"type": "text_link", "offset": 4, "length": 8, "url": "https://t.me/alice"}])
+        for link in (False, True):
+            assert signature(_sub(anonymous=True), alice, lang, link=link) == (f"via {anon}", [via])
+    assert signature(_sub(anonymous=False), None, "zh", link=True) == ("via 42", [
+        via, {"type": "text_link", "offset": 4, "length": 2, "url": "tg://user?id=42"}])  # 没有用户资料时退回 ID
 
 def _texts(markup):
     return [b.text for row in markup.inline_keyboard for b in row] if markup else []

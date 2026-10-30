@@ -360,6 +360,12 @@ async def scenario():
     check("review preview keeps all entities incl. custom emoji + date_time",
           pv and set(norm(rich_ents)) <= set(norm(pv["params"].get("entities"))) and "parse_mode" not in pv["params"],
           pv and pv["params"].get("entities"))
+    name_link = {"type": "text_link", "offset": u16(rich + "\n\nvia "), "length": 5, "url": "https://t.me/alice"}
+    sig_ents = [{"type": "italic", "offset": u16(rich + "\n\n"), "length": 3}, name_link]
+    check("review preview signature: italic via + name linked to the submitter",
+          pv and pv["params"]["text"].endswith("\n\nvia Alice")
+          and set(norm(sig_ents)) <= set(norm(pv["params"].get("entities"))),
+          pv and pv["params"].get("entities"))
     n = len(log); cb("r:pub_ok:5:0", REVIEW, ADMIN)
     rejected = await wait_for(lambda e: e.get("error") and str(e["params"].get("chat_id")) == str(CHANNEL), since=n)
     pub = await wait_for(lambda e: is_send(e, "sendMessage", CHANNEL, "热门"), since=n)
@@ -368,7 +374,7 @@ async def scenario():
     want_ents = [e for e in rich_ents if e["type"] != "custom_emoji"] + [
         {"type": "italic", "offset": u16(rich + "\n\n"), "length": 3}]
     check("channel rejected custom emoji → bot retried with plain emoji", rejected and pub)
-    check("channel post: exact text + entities (UTF-16 offsets) + signature link",
+    check("channel post: exact text + entities (UTF-16 offsets) + signature without link",
           pub and pub["params"]["text"] == want_text and norm(pub["params"].get("entities")) == norm(want_ents),
           pub and {"text_ok": pub["params"]["text"] == want_text, "got": pub["params"].get("entities")})
     check("link preview setting preserved", pub and (pub["params"].get("link_preview_options") or {}).get("is_disabled"))

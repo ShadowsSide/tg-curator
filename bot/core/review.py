@@ -58,7 +58,7 @@ class ReviewMixin(CoreBase):
         sub = await self.db.get(sid)
         try:
             sent = await send_items(
-                self.bot, self.s.channel_id, sub.items, sig=await self._signature(sub),
+                self.bot, self.s.channel_id, sub.items, sig=await self._signature(sub, link=False),
                 spoiler=sub.spoiler, silent=sub.silent,
             )
         except TelegramRetryAfter as e:

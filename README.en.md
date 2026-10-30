@@ -20,7 +20,7 @@ Built with Python 3.12 + [aiogram 3](https://github.com/aiogram/aiogram) + SQLit
 **Submitting**
 - Text, photos, videos, GIFs, files, audio and voice messages. Albums of several photos or videos are merged into one submission
 - Submitters choose to post **signed** (with their name) or **anonymously**. Either way, admins can always see who sent it. Their previous choice is shown first
-- Channel posts end with *via* the submitter's name or *via* Anonymous (“via” in italics, the name without a link)
+- Channel posts end with *via* the submitter's name or *via* Anonymous (“via” in italics; the name links to the submitter in the review-group preview, but not in the channel)
 - **Formatting is kept exactly as sent**: links, bold, quotes, spoiler text, code, date/time and emoji all come through to the channel unchanged
 - Submitters can **edit their post** until the review starts, either with Telegram's built-in "Edit" or by **replying** to it with `/edit`; they can also **add or remove photos** (reply to their submission with a photo to add it)
 - **Spam checks** (optional): keyword blacklist, a link limit (whitelisted domains don't count) and a cooldown for new submitters. By default a hit only puts a ⚠️ Possible spam note on the control message for reviewers to judge; it can also block the submission

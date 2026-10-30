@@ -125,7 +125,7 @@ class SubmissionsMixin(CoreBase):
         user = await self.db.get_user(sub.user_id)
         # 预览就是频道里最终的样子（含落款），方便审核
         preview = await send_items(
-            self.bot, self.s.review_chat_id, sub.items, sig=await self._signature(sub), spoiler=False,
+            self.bot, self.s.review_chat_id, sub.items, sig=await self._signature(sub, link=True), spoiler=False,
         )
         ctrl = await self.bot.send_message(
             self.s.review_chat_id,

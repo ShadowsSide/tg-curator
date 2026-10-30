@@ -104,14 +104,18 @@ def user_link(user: User | None, user_id: int) -> str:
 Signature = tuple[str, list[ent.Entity]]
 
 
-def signature(sub: Submission, user: User | None, lang: str) -> Signature:
-    """落款（纯文本 + entities）：斜体的“via” + 正常字体的投稿人名字（不加链接）或“匿名”。"""
+def signature(sub: Submission, user: User | None, lang: str, *, link: bool) -> Signature:
+    """落款（纯文本 + entities）：斜体的“via” + 正常字体的投稿人名字或“匿名”。
+    link=True（审核群预览）时名字是投稿人链接；发到频道的不带链接。"""
     via = t(lang, "sign_via")
+    entities = [{"type": "italic", "offset": 0, "length": ent.u16len(via)}]
     if sub.anonymous:
-        name = t(lang, "sign_anon")
-    else:
-        name = (user.full_name if user and user.full_name else "") or str(sub.user_id)
-    return f"{via} {name}", [{"type": "italic", "offset": 0, "length": ent.u16len(via)}]
+        return f"{via} {t(lang, 'sign_anon')}", entities
+    name = (user.full_name if user and user.full_name else "") or str(sub.user_id)
+    if link:
+        url = f"https://t.me/{user.username}" if user and user.username else f"tg://user?id={sub.user_id}"
+        entities.append({"type": "text_link", "offset": ent.u16len(via) + 1, "length": ent.u16len(name), "url": url})
+    return f"{via} {name}", entities
 
 
 def _strip_custom_emoji(items: list[dict[str, Any]], sig: Signature) -> tuple[list[dict[str, Any]], Signature]:

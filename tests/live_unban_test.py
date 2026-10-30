@@ -36,7 +36,7 @@ async def scenario():
     # 1. 用按钮封禁：被拒绝的那条控制消息上出现“解除封禁”
     n = len(log); lt.cb("r:ban_ok:1:0", REVIEW, ADMIN, message_id=ctrl1)
     banned = await ctrl_edit(ctrl1, n)
-    check("after ban → control message shows 🔓 Unban", banned and buttons(banned) == {"🔓 解除封禁": "r:unban:1:0"},
+    check("after ban → control message shows 🔓 Unban", banned and buttons(banned) == {"🔓 解除封禁": "r:unban:1:0", "🗑 删除 TA 的稿件": "r:purge:1:0"},
           banned and buttons(banned))
 
     # 2. 点“解除封禁”先出确认面板，返回不解封
@@ -48,7 +48,7 @@ async def scenario():
     back = await ctrl_edit(ctrl1, n)
     told = await wait_for(lambda e: is_send(e, "sendMessage", USER, "恢复"), timeout=0.5, since=n)
     check("Back → still banned, button still there, submitter not told",
-          back and buttons(back) == {"🔓 解除封禁": "r:unban:1:0"} and not told)
+          back and buttons(back) == {"🔓 解除封禁": "r:unban:1:0", "🗑 删除 TA 的稿件": "r:purge:1:0"} and not told)
 
     # 3. 确认：解封、通知投稿人、按钮收起
     n = len(log); lt.cb("r:unban_ok:1:0", REVIEW, ADMIN, message_id=ctrl1)
@@ -68,7 +68,7 @@ async def scenario():
     await wait_for(lambda e: is_send(e, "sendMessage", REVIEW, "已封禁"), since=n)
     shown = await ctrl_edit(ctrl2, n)
     check("/ban replying to a published submission → its control message shows 🔓 Unban",
-          shown and buttons(shown) == {"🔓 解除封禁": "r:unban:2:0"}, shown and buttons(shown))
+          shown and buttons(shown) == {"🔓 解除封禁": "r:unban:2:0", "🗑 删除 TA 的稿件": "r:purge:2:0"}, shown and buttons(shown))
 
     # 5. /unban 用 ID 解封：控制消息上的按钮成了旧的；点它只提示“没有被封禁”并收起，不出确认面板、不再通知
     n = len(log); gm(f"/unban {USER}")
@@ -116,8 +116,8 @@ async def scenario():
     ctrl3 = await ctrl_edit(c3["result"]["message_id"], n)
     check("card confirm Ban → banned, submitter told, card shows banned + 🔓, open submission rejected with 🔓",
           t and "1" in t["params"]["text"] and told and after and "已封禁" in after["params"].get("text", "")
-          and buttons(after) == {"🔓 解除封禁": f"au:unban:{USER}"}
-          and ctrl3 and buttons(ctrl3) == {"🔓 解除封禁": "r:unban:3:0"}, after and buttons(after))
+          and buttons(after) == {"🔓 解除封禁": f"au:unban:{USER}", "🗑 删除 TA 在审核群的稿件（3 条）": f"au:purge:{USER}"}
+          and ctrl3 and buttons(ctrl3) == {"🔓 解除封禁": "r:unban:3:0", "🗑 删除 TA 的稿件": "r:purge:3:0"}, after and buttons(after))
 
     # 10. 非审核员点卡片按钮：没有权限，什么都不变
     n = len(log); lt.cb(f"au:unban_ok:{USER}", REVIEW, 7777, message_id=card_id)
@@ -143,7 +143,7 @@ async def scenario():
     t = await toast(n, "已经被封禁")
     after = await ctrl_edit(card_id, n)
     check("stale card Ban → “already banned” alert, card refreshed to 🔓, no confirm panel",
-          t and t["params"].get("show_alert") and after and buttons(after) == {"🔓 解除封禁": f"au:unban:{USER}"},
+          t and t["params"].get("show_alert") and after and buttons(after) == {"🔓 解除封禁": f"au:unban:{USER}", "🗑 删除 TA 在审核群的稿件（3 条）": f"au:purge:{USER}"},
           after and buttons(after))
 
     # 13. 没投过稿的人：卡片也能预先封禁，封禁后卡片写明已封禁

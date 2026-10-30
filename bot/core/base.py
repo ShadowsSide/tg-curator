@@ -132,9 +132,10 @@ class CoreBase:
         chat = str(self.s.review_chat_id).removeprefix("-100")
         return f"https://t.me/c/{chat}/{sub.review_msg_id}"
 
-    async def _signature(self, sub: Submission):
+    async def _signature(self, sub: Submission, *, link: bool):
+        """link：审核群预览里名字带投稿人链接；发到频道的不带。"""
         user = await self.db.get_user(sub.user_id)
-        return signature(sub, user, self.s.sign_template, self.s.anon_signature)
+        return signature(sub, user, self.lang, link=link)
 
     async def notify(self, sub: Submission, key: str, **kw) -> None:
         """用投稿人自己的语言通知他，回复在他的投稿提示消息下面。"""

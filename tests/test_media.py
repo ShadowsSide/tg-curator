@@ -218,10 +218,10 @@ def test_keyboards():
         ("madd", 0), ("mrep", 1), ("mrep", 2), ("mrm", 1), ("mrm", 2), ("back", 0)]
     assert ("madd", 0) not in acts(media_kb(sub([photo(str(i)) for i in range(10)]), "zh"))  # 满 10 个不能再加
 
-    # 投稿人被封禁：控制消息最后一行是“解除封禁”，不论投稿状态；没被封禁就没有
+    # 投稿人被封禁：控制消息最后一行是“解除封禁”和“删除 TA 的稿件”，不论投稿状态；没被封禁就没有
     for status in ("pending", "scheduled", "failed", "published", "rejected"):
-        assert acts(control_kb(sub([photo("a")], status), "zh", banned=True))[-1] == ("unban", 0), status
-        assert ("unban", 0) not in acts(control_kb(sub([photo("a")], status), "zh")), status
+        assert acts(control_kb(sub([photo("a")], status), "zh", banned=True))[-2:] == [("unban", 0), ("purge", 0)], status
+        assert not {("unban", 0), ("purge", 0)} & set(acts(control_kb(sub([photo("a")], status), "zh"))), status
     assert control_kb(sub([photo("a")], "published"), "zh") is None  # 已发布、没被封禁：没有按钮
 
     two = [photo("a"), photo("b")]

@@ -91,7 +91,7 @@ def build_router(settings: Settings) -> Router:
             await core.show_reject_reasons(sid)
             await cq.answer(t(lang, "toast_pick_reason"))
             return
-        if step == "confirm" and action == "unban" and not await _banned_submitter(core, sid):
+        if step == "confirm" and action in ("unban", "purge") and not await _banned_submitter(core, sid):
             # 早就解封了（比如用了 /unban），控制消息上的按钮是旧的：不出确认面板，直接收起
             await core.refresh_control(sid)
             await cq.answer(t(lang, "toast_not_banned"), show_alert=True)
@@ -159,12 +159,17 @@ def build_router(settings: Settings) -> Router:
             ok = bool(sub) and await core.unban_user(sub.user_id)
             await core.refresh_control(sid)
             await cq.answer(t(lang, "toast_unbanned" if ok else "toast_not_banned"), show_alert=not ok)
+        elif action == "purge":
+            sub = await core.get_submission(sid)
+            res = await core.purge_review_messages(sub.user_id) if sub else notice("sub_not_found", sid=sid)
+            await core.refresh_control(sid)  # 删成功时这条控制消息已经没了（不会再刷新）；没删掉就收起确认面板
+            await cq.answer(res.text(lang), show_alert=True)
         else:
             await cq.answer()
 
     @router.callback_query(AdminUserCB.filter())
     async def on_user_card(cq: CallbackQuery, callback_data: AdminUserCB, core: Core) -> None:
-        """/user 卡片上的封禁 / 解封：先确认；状态已经变了（别人刚封禁 / 解封过）就只刷新卡片。"""
+        """/user 卡片上的封禁 / 解封 / 删除稿件：先确认；状态已经变了（别人刚封禁 / 解封过）就只刷新卡片。"""
         uid, a, lang = callback_data.uid, callback_data.a, core.lang
         action = a.removesuffix("_ok")
         user = await core.get_user(uid)
@@ -172,7 +177,9 @@ def build_router(settings: Settings) -> Router:
         toast, alert = None, False
         if action in ("ban", "unban") and banned == (action == "ban"):  # 已经是想要的状态了
             toast, alert = t(lang, "toast_already_banned" if banned else "toast_not_banned"), True
-        elif a in ("ban", "unban"):
+        elif action == "purge" and not banned:  # 删除只对被封禁的人；已经被解封了，按钮是旧的
+            toast, alert = t(lang, "toast_not_banned"), True
+        elif a in ("ban", "unban", "purge"):
             await cq.message.edit_reply_markup(reply_markup=user_confirm_kb(uid, a, lang))
             await cq.answer(t(lang, "toast_confirm"))
             return
@@ -182,6 +189,9 @@ def build_router(settings: Settings) -> Router:
         elif a == "unban_ok":
             await core.unban_user(uid)
             toast, alert = t(lang, "toast_unbanned"), False
+        elif a == "purge_ok":
+            res = await core.purge_review_messages(uid)
+            toast, alert = res.text(lang), res.key != "purge_done"
         text, kb = await core.user_card(uid)
         try:
             await cq.message.edit_text(text, reply_markup=kb, link_preview_options=NO_PREVIEW)

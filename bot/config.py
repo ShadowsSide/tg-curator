@@ -43,8 +43,6 @@ class Settings:
     db_path: str
     album_delay: float
     max_pending_per_user: int
-    sign_template: str
-    anon_signature: str
     schedule_presets: tuple[str, ...]
     reminder_interval_min: int
     reminder_only_when_pending: bool
@@ -86,10 +84,7 @@ def _choice(value: str, allowed: tuple[str, ...], name: str) -> str:
 
 def load_settings() -> Settings:
     language = _choice(_env("LANGUAGE", "zh"), LANGS, "LANGUAGE")
-    # 落款没配置时用对应语言的默认值；配置成空字符串表示不要落款
-    sign = os.environ.get("SIGN_TEMPLATE")
-    anon = os.environ.get("ANON_SIGNATURE")
-    reasons = os.environ.get("REJECT_TEMPLATES")  # 同上：没配置用默认理由，配置成空字符串表示不要理由面板
+    reasons = os.environ.get("REJECT_TEMPLATES")  # 没配置用对应语言的默认理由，配置成空字符串表示不要理由面板
     return Settings(
         bot_token=_env("BOT_TOKEN", required=True),
         channel_id=_chat_id(_env("CHANNEL_ID", required=True)),
@@ -98,8 +93,6 @@ def load_settings() -> Settings:
         db_path=_env("DB_PATH", "/app/data/bot.db"),
         album_delay=float(_env("ALBUM_DELAY", "1.5")),
         max_pending_per_user=int(_env("MAX_PENDING_PER_USER", "5")),
-        sign_template=sign.strip() if sign is not None else t(language, "default_sign"),
-        anon_signature=anon.strip() if anon is not None else t(language, "default_anon"),
         schedule_presets=tuple(
             p.strip() for p in _env("SCHEDULE_PRESETS", "09:00,12:00,18:00,21:00").split(",") if p.strip()
         ),

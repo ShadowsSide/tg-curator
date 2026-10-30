@@ -21,7 +21,7 @@ from .timeutil import next_occurrence
 GREEN, BLUE, RED = ButtonStyle.SUCCESS, ButtonStyle.PRIMARY, ButtonStyle.DANGER
 
 # 需要二次确认的操作：点按钮先显示确认面板，确认按钮的动作是 "<动作>_ok"
-CONFIRMABLE = {"pub": GREEN, "reject": RED, "ban": RED, "mrm": RED, "unban": BLUE}
+CONFIRMABLE = {"pub": GREEN, "reject": RED, "ban": RED, "mrm": RED, "unban": BLUE, "purge": RED}
 CONFIRMED = "_ok"
 
 
@@ -55,9 +55,10 @@ class UserMediaCB(CallbackData, prefix="um"):
 
 class ReviewCB(CallbackData, prefix="r"):
     a: str  # spoiler / silent / pub / sched / preset / custom / back / unsched / reject / ban / unban / retry
+    #         purge：删除被封禁投稿人在审核群的全部稿件消息
     #         edit / creason：发一条提示，回复它来修改稿件 / 写拒绝理由
     #         media：媒体面板；madd / mrep：发提示，回复图片视频来添加 / 替换第 v 个；mrm / mrm_ok：删除第 v 个
-    #         pub_ok / reject_ok / ban_ok / unban_ok：确认面板上的“确认”，见 CONFIRMABLE
+    #         pub_ok / reject_ok / ban_ok / unban_ok / purge_ok：确认面板上的“确认”，见 CONFIRMABLE
     #         reason：拒绝理由面板上选了一项
     # v：preset = 定时的时间戳；reason / reject / reject_ok = 第几个拒绝理由（从 1 开始，0 = 不附理由）
     sid: int
@@ -65,20 +66,25 @@ class ReviewCB(CallbackData, prefix="r"):
 
 
 class AdminUserCB(CallbackData, prefix="au"):
-    """/user 卡片上的按钮：按用户（不是按投稿）封禁 / 解封。单独一类，ReviewCB 的 sid 是投稿编号。"""
-    a: str  # ban / unban：出确认面板；ban_ok / unban_ok：执行；back：收起确认面板
+    """/user 卡片上的按钮：按用户（不是按投稿）封禁 / 解封 / 删除审核群里的稿件。单独一类，ReviewCB 的 sid 是投稿编号。"""
+    a: str  # ban / unban / purge：出确认面板；ban_ok / unban_ok / purge_ok：执行；back：收起确认面板
     uid: int
 
 
-def user_card_kb(uid: int, banned: bool, lang: str) -> InlineKeyboardMarkup:
-    """/user 卡片：没被封禁显示“封禁”，被封禁显示“解除封禁”。"""
+def user_card_kb(uid: int, banned: bool, lang: str, purgeable: int = 0) -> InlineKeyboardMarkup:
+    """/user 卡片：没被封禁显示“封禁”，被封禁显示“解除封禁”；
+    被封禁且审核群里还有 TA 的 purgeable 条稿件时，再加一行“删除稿件”。"""
     if banned:
         button = InlineKeyboardButton(text=t(lang, "btn_unban"), style=CONFIRMABLE["unban"],
                                       callback_data=AdminUserCB(a="unban", uid=uid).pack())
     else:
         button = InlineKeyboardButton(text=t(lang, "btn_ban_user"), style=CONFIRMABLE["ban"],
                                       callback_data=AdminUserCB(a="ban", uid=uid).pack())
-    return InlineKeyboardMarkup(inline_keyboard=[[button]])
+    rows = [[button]]
+    if banned and purgeable:
+        rows.append([InlineKeyboardButton(text=t(lang, "btn_purge_n", n=purgeable), style=CONFIRMABLE["purge"],
+                                          callback_data=AdminUserCB(a="purge", uid=uid).pack())])
+    return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
 def user_confirm_kb(uid: int, action: str, lang: str) -> InlineKeyboardMarkup:
@@ -145,7 +151,7 @@ def user_media_kb(sub: Submission, lang: str) -> InlineKeyboardMarkup:
 
 
 def control_kb(sub: Submission, lang: str, banned: bool = False) -> InlineKeyboardMarkup | None:
-    """控制消息的按钮。banned：投稿人已被封禁，最后一行显示“解除封禁”。"""
+    """控制消息的按钮。banned：投稿人已被封禁，最后一行显示“解除封禁”和“删除 TA 的稿件”。"""
     sid = sub.id
     rows: list[list[InlineKeyboardButton]] = []
     if sub.status in ("pending", "scheduled", "failed"):
@@ -172,7 +178,8 @@ def control_kb(sub: Submission, lang: str, banned: bool = False) -> InlineKeyboa
             tools.append(_rb(t(lang, "btn_media"), "media", sid))
         rows.append(tools)
     if banned:
-        rows.append([_rb(t(lang, "btn_unban"), "unban", sid, style=BLUE)])
+        rows.append([_rb(t(lang, "btn_unban"), "unban", sid, style=BLUE),
+                     _rb(t(lang, "btn_purge"), "purge", sid, style=RED)])
     return InlineKeyboardMarkup(inline_keyboard=rows) if rows else None
 
 

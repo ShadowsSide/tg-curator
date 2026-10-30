@@ -43,8 +43,8 @@ T: dict[str, dict[str, str]] = {
         "en": "This submission doesn't exist",
     },
     "status_changed": {"zh": "状态已变化，请刷新", "en": "The status has changed, please refresh"},
-    "default_sign": {"zh": "投稿人：{name}", "en": "Submitted by {name}"},
-    "default_anon": {"zh": "匿名投稿", "en": "Anonymous submission"},
+    "sign_via": {"zh": "via", "en": "via"},  # 频道落款：via（斜体）+ 名字
+    "sign_anon": {"zh": "匿名", "en": "Anonymous"},
     "default_reject_templates": {
         "zh": "重复投稿|与频道主题不符|内容质量不足|含广告或推广",
         "en": "Duplicate|Off-topic|Low quality|Advertising",
@@ -337,6 +337,10 @@ T: dict[str, dict[str, str]] = {
                         "en": "🚫 Confirm ban (also rejects all their open submissions)"},
     "btn_unban": {"zh": "🔓 解除封禁", "en": "🔓 Unban"},
     "btn_ban_user": {"zh": "🚫 封禁", "en": "🚫 Ban"},
+    "btn_purge": {"zh": "🗑 删除 TA 的稿件", "en": "🗑 Delete their posts"},
+    "btn_purge_n": {"zh": "🗑 删除 TA 在审核群的稿件（{n} 条）", "en": "🗑 Delete their posts in this group ({n})"},
+    "btn_confirm_purge": {"zh": "🗑 确认删除（审核群里 TA 的全部稿件，不可恢复）",
+                          "en": "🗑 Confirm delete (all their posts in this group; can't be undone)"},
     "btn_confirm_unban": {"zh": "🔓 确认解封（会通知投稿人）", "en": "🔓 Confirm unban (the submitter is notified)"},
 
     # ---------- 审核：按钮反馈 ----------
@@ -356,6 +360,13 @@ T: dict[str, dict[str, str]] = {
     "toast_rejected": {"zh": "已拒绝（需要附理由请用 /no 回复）", "en": "Rejected (reply with /no to give a reason)"},
     "toast_unbanned": {"zh": "已解除封禁，已通知投稿人", "en": "Unbanned; the submitter has been notified"},
     "toast_not_banned": {"zh": "这个投稿人现在没有被封禁", "en": "This submitter isn't banned now"},
+    "purge_done": {"zh": "已删除 TA 在审核群的 {n} 条稿件", "en": "Deleted their {n} submission(s) from the review group"},
+    "purge_partial": {
+        "zh": "已删除 {n} 条稿件；{failed} 条删除失败（机器人可能没有删除消息的权限），可以再试一次",
+        "en": "Deleted {n} submission(s); {failed} couldn't be deleted (the bot may lack the delete-messages right). "
+              "You can try again",
+    },
+    "purge_nothing": {"zh": "TA 在审核群里没有可删除的稿件", "en": "They have nothing left to delete in the review group"},
     "toast_already_banned": {"zh": "这个投稿人已经被封禁了", "en": "This submitter is already banned"},
     "toast_banned": {
         "zh": "已封禁，并拒绝 {n} 条未处理来稿",

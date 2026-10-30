@@ -360,15 +360,21 @@ async def scenario():
     check("review preview keeps all entities incl. custom emoji + date_time",
           pv and set(norm(rich_ents)) <= set(norm(pv["params"].get("entities"))) and "parse_mode" not in pv["params"],
           pv and pv["params"].get("entities"))
+    name_link = {"type": "text_link", "offset": u16(rich + "\n\nvia "), "length": 5, "url": "https://t.me/alice"}
+    sig_ents = [{"type": "italic", "offset": u16(rich + "\n\n"), "length": 3}, name_link]
+    check("review preview signature: italic via + name linked to the submitter",
+          pv and pv["params"]["text"].endswith("\n\nvia Alice")
+          and set(norm(sig_ents)) <= set(norm(pv["params"].get("entities"))),
+          pv and pv["params"].get("entities"))
     n = len(log); cb("r:pub_ok:5:0", REVIEW, ADMIN)
     rejected = await wait_for(lambda e: e.get("error") and str(e["params"].get("chat_id")) == str(CHANNEL), since=n)
     pub = await wait_for(lambda e: is_send(e, "sendMessage", CHANNEL, "热门"), since=n)
-    sig_text = "投稿人：Alice"
+    sig_text = "via Alice"  # 落款：斜体的 via + 不带链接的名字
     want_text = rich + "\n\n" + sig_text
     want_ents = [e for e in rich_ents if e["type"] != "custom_emoji"] + [
-        {"type": "text_link", "offset": u16(rich + "\n\n投稿人："), "length": 5, "url": "https://t.me/alice"}]
+        {"type": "italic", "offset": u16(rich + "\n\n"), "length": 3}]
     check("channel rejected custom emoji → bot retried with plain emoji", rejected and pub)
-    check("channel post: exact text + entities (UTF-16 offsets) + signature link",
+    check("channel post: exact text + entities (UTF-16 offsets) + signature without link",
           pub and pub["params"]["text"] == want_text and norm(pub["params"].get("entities")) == norm(want_ents),
           pub and {"text_ok": pub["params"]["text"] == want_text, "got": pub["params"].get("entities")})
     check("link preview setting preserved", pub and (pub["params"].get("link_preview_options") or {}).get("is_disabled"))
@@ -394,9 +400,10 @@ async def scenario():
     new_pv = await wait_for(lambda e: is_send(e, "sendPhoto", REVIEW), since=n)
     body = "🎉 新的说明，详见官网"
     shifted = [{**e, "offset": e["offset"] - 6} for e in edit_ents]
+    anon_via = {"type": "italic", "offset": u16(body + "\n\n"), "length": 3}
     check("/edit → confirmation + new preview replying to control msg",
-          ok_msg and new_pv and new_pv["params"]["caption"] == body + "\n\n匿名投稿"
-          and norm(new_pv["params"].get("caption_entities")) == norm(shifted)
+          ok_msg and new_pv and new_pv["params"]["caption"] == body + "\n\nvia 匿名"
+          and norm(new_pv["params"].get("caption_entities")) == norm(shifted + [anon_via])
           and new_pv["params"].get("reply_parameters", {}).get("message_id") == ctrl6["result"]["message_id"],
           new_pv and {"caption": new_pv["params"].get("caption"), "ents": new_pv["params"].get("caption_entities")})
     e = await wait_for(lambda e: e["method"] == "editMessageText" and "✏️ 已修改（Admin" in e["params"].get("text", ""),
@@ -412,8 +419,8 @@ async def scenario():
     pub6 = await wait_for(lambda e: is_send(e, "sendPhoto", CHANNEL), since=n)
     p6 = pub6["params"] if pub6 else {}
     check("edited photo published: new caption, formatting, caption-above, spoiler",
-          p6.get("caption") == body + "\n\n匿名投稿"
-          and norm(p6.get("caption_entities")) == norm([x for x in shifted if x["type"] != "custom_emoji"])
+          p6.get("caption") == body + "\n\nvia 匿名"
+          and norm(p6.get("caption_entities")) == norm([x for x in shifted if x["type"] != "custom_emoji"] + [anon_via])
           and str(p6.get("show_caption_above_media")).lower() == "true" and str(p6.get("has_spoiler")).lower() == "true",
           p6)
 

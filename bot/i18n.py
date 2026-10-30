@@ -43,8 +43,8 @@ T: dict[str, dict[str, str]] = {
         "en": "This submission doesn't exist",
     },
     "status_changed": {"zh": "状态已变化，请刷新", "en": "The status has changed, please refresh"},
-    "default_sign": {"zh": "投稿人：{name}", "en": "Submitted by {name}"},
-    "default_anon": {"zh": "匿名投稿", "en": "Anonymous submission"},
+    "sign_via": {"zh": "via", "en": "via"},  # 频道落款：via（斜体）+ 名字
+    "sign_anon": {"zh": "匿名", "en": "Anonymous"},
     "default_reject_templates": {
         "zh": "重复投稿|与频道主题不符|内容质量不足|含广告或推广",
         "en": "Duplicate|Off-topic|Low quality|Advertising",

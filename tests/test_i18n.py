@@ -11,7 +11,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from bot.db import Submission, User  # noqa: E402
 from bot.i18n import LANGS, PRIVATE_COMMANDS, REVIEW_COMMANDS, T, normalize, t  # noqa: E402
 from bot.keyboards import control_kb, media_kb, schedule_kb, user_kb, user_card_kb, user_confirm_kb, user_media_kb  # noqa: E402
-from bot.render import control_text, describe, stats_text  # noqa: E402
+from bot.render import control_text, describe, signature, stats_text  # noqa: E402
 
 CJK = re.compile(r"[一-鿿]")
 TZ = ZoneInfo("Asia/Shanghai")
@@ -28,10 +28,8 @@ def test_every_key_has_all_languages_with_same_placeholders():
 
 
 def test_english_texts_have_no_chinese():
-    allowed = {"default_sign", "default_anon"}  # 这两个是按语言取值，英文版本身也不含中文
     for key, entry in T.items():
-        if key not in allowed:
-            assert not CJK.search(entry["en"]), f"{key}: Chinese in English text"
+        assert not CJK.search(entry["en"]), f"{key}: Chinese in English text"
 
 
 def test_commands_match_between_languages():
@@ -59,6 +57,15 @@ def _sub(status="pending", **kw):
     base.update(kw)
     return Submission(**base)
 
+
+
+def test_signature_italic_via_plain_name_no_link():
+    alice = User(user_id=42, username="alice", full_name="Alice 🌸", banned=False, ban_reason=None, banned_at=None,
+                 banned_by=None, lang=None, first_seen=0, last_seen=0)
+    for lang, anon in (("zh", "匿名"), ("en", "Anonymous")):
+        assert signature(_sub(anonymous=False), alice, lang) == ("via Alice 🌸", [{"type": "italic", "offset": 0, "length": 3}])
+        assert signature(_sub(anonymous=True), alice, lang) == (f"via {anon}", [{"type": "italic", "offset": 0, "length": 3}])
+    assert signature(_sub(anonymous=False), None, "zh")[0] == "via 42"  # 没有用户资料时退回 ID
 
 def _texts(markup):
     return [b.text for row in markup.inline_keyboard for b in row] if markup else []

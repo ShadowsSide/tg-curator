@@ -134,7 +134,7 @@ class CoreBase:
 
     async def _signature(self, sub: Submission):
         user = await self.db.get_user(sub.user_id)
-        return signature(sub, user, self.s.sign_template, self.s.anon_signature)
+        return signature(sub, user, self.lang)
 
     async def notify(self, sub: Submission, key: str, **kw) -> None:
         """用投稿人自己的语言通知他，回复在他的投稿提示消息下面。"""

@@ -157,7 +157,7 @@ class CoreBase:
                 text=control_text(sub, user, self.s.tz, self.post_url(sub), self.lang),
                 chat_id=self.s.review_chat_id,
                 message_id=sub.review_msg_id,
-                reply_markup=control_kb(sub, self.lang),
+                reply_markup=control_kb(sub, self.lang, banned=bool(user and user.banned)),
                 link_preview_options=NO_PREVIEW,
             )
         except TelegramBadRequest as e:

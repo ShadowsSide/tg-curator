@@ -25,7 +25,7 @@ Built with Python 3.12 + [aiogram 3](https://github.com/aiogram/aiogram) + SQLit
 - **Spam checks** (optional): keyword blacklist, a link limit (whitelisted domains don't count) and a cooldown for new submitters. By default a hit only puts a ⚠️ Possible spam note on the control message for reviewers to judge; it can also block the submission
 
 **Reviewer ↔ submitter messaging**
-- Reviewers tap **💬 Message submitter** on the control message (or use `/msg message`); submitters simply reply to the reviewer's message (or use `/msg`). The bot relays it. Submitters always see the sender as “Reviewer”; neither side sees the other's account
+- Both sides use `/msg message`: reviewers reply to the submission's preview or control message, submitters reply to the reviewer's message or their own submission, and the bot relays it. A plain reply without `/msg` only gets a hint and isn't relayed. Submitters always see the sender as “Reviewer”; neither side sees the other's account
 - Formatting is kept, and a single photo or file can be attached; the conversation is stored and the control message shows the message count
 - Possible any time during review, and for 3 days after it's published or rejected (`MSG_WINDOW_DAYS`); banned users can't send
 
@@ -34,10 +34,11 @@ Built with Python 3.12 + [aiogram 3](https://github.com/aiogram/aiogram) + SQLit
 - Publish now · Schedule · Reject · Ban submitter
 - Publishing options: 🙈 **spoiler** (blur the media) and 🔕 **silent** (subscribers get a notification without sound)
 - Pick a common reject reason with one tap (`REJECT_TEMPLATES`)
-- **✏️ Edit**, **💬 Message submitter**, **✏️ Custom reason / time**: tap the button, then just reply to the bot's prompt, no commands to remember; send `/cancel` to give up
+- **✏️ Edit**, **✏️ Custom reason / time**: tap the button, then just reply to the bot's prompt, no commands to remember; send `/cancel` to give up
 - **🖼 Media**: while pending, add, replace or remove photos and videos (up to 10); text submissions can get photos too
 - Commands work as well: `/edit` to change a post, `/no reason` to reject, `/ban reason` to ban. Banning also rejects every open submission from that user
-- Safe against accidental taps: Publish now, Reject and Ban need a second tap to confirm
+- Safe against accidental taps: Publish now, Reject, Ban and Unban need a second tap to confirm
+- `/user` shows a contributor with a button to ban or unban them directly
 - Safe against double actions: if two admins press "Publish" at the same time, the post is still published only once
 - **Only answers in private chats and the review group**: it never replies in other groups, and leaves any other group or channel it's added to. The publishing channel and its linked discussion group are whitelisted and never left
 
@@ -68,7 +69,7 @@ Built with Python 3.12 + [aiogram 3](https://github.com/aiogram/aiogram) + SQLit
                                         ▼
                      Review group: preview + control message
                                         │
-Before deciding: 🙈 Spoiler · 🔕 Silent · ✏️ Edit · 🖼 Media · 💬 Message submitter
+ Before deciding: 🙈 Spoiler · 🔕 Silent · ✏️ Edit · 🖼 Media; /msg the submitter
                                         │
             ┌───────────────────────────┼───────────────────────────┐
      ✅ Publish now                ⏰ Schedule             ❌ Reject / 🚫 Ban
@@ -188,17 +189,16 @@ Spam checks, messaging window, stats scope and so on; the defaults are usually f
 | 🗑 Remove a photo / video | Shown on the bot's message while a draft or pending submission has 2 or more photos/videos; tap it and pick the one to remove. Nothing can be changed once the review has started (scheduled, published, rejected) |
 | `/edit new content` | Only works as a **reply** to your submission (or the bot's message about it); without a reply nothing is changed |
 | `/edit` (as a reply) | Shows the current content with formatting, so you can copy and change it |
-| Reply to the reviewer's message | Sent to the reviewers as a message (text, a photo or a file), no `/msg` needed |
 | `/msg message` | Message the reviewers: **reply** to the reviewer's message or your submission |
 | `/me` | Your submission stats |
 
 ### Admins (review group)
 
-Buttons on the control message: **✅ Publish now**, **⏰ Schedule**, **❌ Reject**, **🚫 Ban submitter**, **✏️ Edit**, **💬 Message submitter**, **🖼 Media**, plus the **🙈 Spoiler** and **🔕 Silent** toggles.
+Buttons on the control message: **✅ Publish now**, **⏰ Schedule**, **❌ Reject**, **🚫 Ban submitter**, **✏️ Edit**, **🖼 Media**, plus the **🙈 Spoiler** and **🔕 Silent** toggles. Once a submitter is banned, their control messages show **🔓 Unban**.
 
 #### Reply prompts
 
-**✏️ Edit**, **💬 Message submitter**, **✏️ Custom reason** on the reason panel and **✏️ Custom time** on the schedule panel post a “please reply to this message…” prompt. Just reply to it, no commands to remember:
+**✏️ Edit**, **✏️ Custom reason** on the reason panel and **✏️ Custom time** on the schedule panel post a “please reply to this message…” prompt. Just reply to it, no commands to remember:
 - Only the reply of whoever tapped the button counts (anonymous admins excepted); send `/cancel` to give up (as a reply to a prompt it drops that one; on its own it drops all your open prompts)
 - **Edit** first posts the current content with formatting so you can copy and change it; the prompt and that copy are deleted once you're done
 - **Custom reason** rejects as soon as you send the reason, with no extra confirmation
@@ -212,7 +212,7 @@ Every edit posts a new preview. The review group keeps only the original preview
 
 #### Confirmation and reject reasons
 
-To avoid accidental taps, **Publish now, Reject and Ban** first switch to “Confirm / Back” buttons and only act on the second tap. Scheduling, retrying and the `/no` and `/ban` commands need no confirmation.
+To avoid accidental taps, **Publish now, Reject, Ban and Unban** first switch to “Confirm / Back” buttons and only act on the second tap. Scheduling, retrying and the `/no` and `/ban` commands need no confirmation.
 
 **❌ Reject** first asks for a reason (`REJECT_TEMPLATES`; defaults: Duplicate, Off-topic, Low quality, Advertising; or “No reason”). The confirm button shows the chosen reason, and the reason is sent to the submitter. For a reason of your own, tap **✏️ Custom reason** or use `/no reason`.
 
@@ -227,11 +227,11 @@ The commands below do the same as the buttons, for those who prefer commands. Us
 | `/msg message` | Message the submitter as “Reviewer”; also works as a reply to a relayed submitter message |
 | `/no [reason]` | Rejects the submission; the reason is sent to the submitter |
 | `/ban [reason]` | Bans the submitter and rejects all their open submissions |
-| `/unban <user ID>` | Lifts a ban |
+| `/unban <user ID>` | Lifts a ban (same as 🔓 Unban on the control message) |
 | `/stats` | Posts the latest review summary |
 | `/queue` | Lists scheduled posts |
 | `/active [days]` | Contributor activity ranking (default: 30 days) |
-| `/user <user ID>` | Shows one contributor's stats |
+| `/user <user ID>` | Shows one contributor's stats, with a 🚫 Ban / 🔓 Unban button below (asks to confirm); works for users with no submissions too, to ban in advance |
 | `/cancel` | Drops prompts waiting for your reply: as a reply to a prompt it drops that one; on its own it drops all of yours |
 
 `/ban` and `/unban` also accept a user ID (`/ban <user ID> reason`) for users with nothing under review, or to ban someone in advance. Each scheduled post in `/queue` has a “view” link that jumps to its control message.
@@ -239,10 +239,11 @@ The commands below do the same as the buttons, for those who prefer commands. Us
 ## Known limitations and risks
 
 **Review actions**
-- **More taps**: Publish now, Reject and Ban always need a second tap, and Reject first asks for a reason by default (Reject → reason → Confirm, three taps). Set `REJECT_TEMPLATES=` to skip the reason; the confirmation itself can't be turned off
+- **More taps**: Publish now, Reject, Ban and Unban always need a second tap, and Reject first asks for a reason by default (Reject → reason → Confirm, three taps). Set `REJECT_TEMPLATES=` to skip the reason; the confirmation itself can't be turned off
 - **The confirm panel can be reset**: if the control message refreshes while you're about to confirm (the submitter edits, someone sends `/msg`, …), the buttons go back to normal and you need to tap again. Nothing runs by accident
 - **Changing `REJECT_TEMPLATES` can shift old panels**: buttons store the reason's position. After reordering the reasons and restarting, a panel opened before the restart picks the reason by the new order; an out-of-range position means “No reason”. Finish any rejection in progress before changing it
 - **Reasons can't contain `|`**: it's the separator
+- **Old 🔓 buttons don't disappear by themselves**: a ban only refreshes the control messages it rejects. After `/unban <user ID>`, the 🔓 on those messages stays until someone taps it; it then says the user isn't banned and removes itself (the submitter isn't notified again). This avoids refreshing all of that user's control messages at once and hitting rate limits
 - **The review group hits rate limits sooner**: the confirm and reason panels each edit the control message once more, so with heavy review traffic Telegram's limits come sooner. The bot waits and retries automatically, but actions get slower
 
 **Changing photos and videos**
@@ -315,7 +316,7 @@ bot/
     editing.py      editing (/edit and Telegram's built-in edit)
     review.py       publish, schedule, reject, ban, spoiler / silent toggles
     messaging.py    /msg messaging
-    prompts.py      reply prompts (Edit, Message submitter, custom reason / time)
+    prompts.py      reply prompts (Edit, custom reason / time, adding / replacing media)
     stats.py        review summary, activity, scheduled queue
     scheduler.py    background jobs: scheduled publishing, draft cleanup, summary reminders
   render.py       sending content (single / album, signature, spoiler, silent) and message texts

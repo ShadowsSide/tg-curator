@@ -1,4 +1,5 @@
-"""“按钮 + 回复”流程：✏️ 修改、💬 联系投稿人、✏️ 自定义理由、/cancel；改稿后删掉上一份修改预览。
+"""“按钮 + 回复”流程：✏️ 修改、✏️ 自定义理由、/cancel；改稿后删掉上一份修改预览；
+联系投稿人只用 /msg：数据库里以前的“联系投稿人”提示，回复后作废，不会被当成拒绝理由。
 
 用法（项目根目录下）：python tests/live_prompt_test.py
 复用 live_test.py 的模拟 Bot API 服务器。约 15 秒。
@@ -6,13 +7,16 @@
 import asyncio
 import json
 import os
+import sqlite3
 import sys
+import tempfile
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import live_test as lt  # noqa: E402
 from live_test import ADMIN, REVIEW, USER, buttons, check, is_send, log, submit, wait_for  # noqa: E402
 
 OTHER_ADMIN = 8
+DB = os.path.join(tempfile.mkdtemp(), "bot.db")  # 用来模拟升级前留下的提示记录
 
 
 def reply_from(user_id, text, reply_to):
@@ -57,10 +61,10 @@ async def scenario():
     ctrl1 = c1["result"]["message_id"]
     first_preview = c1["params"]["reply_parameters"]["message_id"]
 
-    # 1. 控制消息上有 ✏️ 修改、💬 联系投稿人
+    # 1. 控制消息上有 ✏️ 修改，没有 💬 联系投稿人（只用 /msg）
     b = buttons(c1)
-    check("control message has Edit + Message submitter buttons",
-          b.get("✏️ 修改") == "r:edit:1:0" and b.get("💬 联系投稿人") == "r:msg:1:0", b)
+    check("control message has Edit but no Message submitter button",
+          b.get("✏️ 修改") == "r:edit:1:0" and not any(v.startswith("r:msg:") for v in b.values()), b)
 
     # 2. 点“修改”：先发当前内容，再发强制回复的提示；别的审核员回复提示不算数
     n0 = len(log); lt.cb("r:edit:1:0", REVIEW, ADMIN, message_id=ctrl1)
@@ -114,8 +118,8 @@ async def scenario():
     n = len(log)
     lt.cb("r:edit:1:0", REVIEW, ADMIN, message_id=ctrl1)
     p1 = await wait_for(lambda e: is_prompt(e, "修改后的正文"), since=n)
-    lt.cb("r:msg:1:0", REVIEW, ADMIN, message_id=ctrl1)
-    p2 = await wait_for(lambda e: is_prompt(e, "转给投稿人"), since=n)
+    lt.cb("r:edit:2:0", REVIEW, ADMIN, message_id=c2["result"]["message_id"])
+    p2 = await wait_for(lambda e: is_prompt(e, "修改后的正文") and e is not p1, since=n)
     n = len(log); lt.gm("/cancel")
     await wait_for(lambda e: is_send(e, "sendMessage", REVIEW, "已取消"), since=n)
     await asyncio.sleep(0.5)
@@ -134,13 +138,20 @@ async def scenario():
     done = await wait_for(lambda e: is_send(e, "sendMessage", REVIEW, "已修改"), since=n)
     check("too long → error, prompt kept; the next reply works", err and done)
 
-    # 8. 联系投稿人：回复的内容以“审核员”身份转给投稿人
-    n = len(log); lt.cb("r:msg:1:0", REVIEW, ADMIN, message_id=ctrl1)
-    p = await wait_for(lambda e: is_prompt(e, "转给投稿人"), since=n)
-    n = len(log); lt.gm("请补充来源", reply_to=p["result"]["message_id"])
-    to_user = await wait_for(lambda e: is_send(e, "sendMessage", USER, "请补充来源"), since=n)
-    ok = await wait_for(lambda e: is_send(e, "sendMessage", REVIEW, "已发送给投稿人"), since=n)
-    check("Message submitter → relayed as “Reviewer”", to_user and ok and "审核员" in to_user["params"]["text"])
+    # 8. 以前发出的“联系投稿人”提示（数据库里 kind=msg）：回复它不会转给投稿人，也不会被当成拒绝理由，提示作废
+    old_prompt = 990001
+    with sqlite3.connect(DB) as db:
+        db.execute("INSERT INTO prompts(chat_id, message_id, kind, sid, arg, user_id, cleanup, created_at) "
+                   "VALUES(?, ?, 'msg', 1, 0, ?, '[]', ?)", (REVIEW, old_prompt, ADMIN, lt.now()))
+    n = len(log); lt.gm("请补充来源", reply_to=old_prompt)
+    told = await wait_for(lambda e: is_send(e, "sendMessage", REVIEW, "/msg"), since=n)
+    gone = await wait_for(lambda e: e["method"] == "deleteMessages" and str(old_prompt) in str(e["params"]), since=n)
+    leaked = await wait_for(lambda e: is_send(e, "sendMessage", USER, "请补充来源"), timeout=0.5, since=n)
+    with sqlite3.connect(DB) as db:
+        left = db.execute("SELECT COUNT(*) FROM prompts WHERE message_id=?", (old_prompt,)).fetchone()[0]
+    rejected = await wait_for(lambda e: is_send(e, "sendMessage", USER, "未通过"), timeout=0.5, since=n)
+    check("old “message submitter” prompt → told to use /msg, prompt dropped, nothing relayed, not rejected",
+          told and gone and not leaked and not rejected and left == 0)
 
     # 9. 自定义理由：拒绝 → ✏️ 自定义理由 → 回复理由，立即拒绝，不再确认
     ctrl2 = c2["result"]["message_id"]
@@ -159,4 +170,4 @@ async def scenario():
 
 
 if __name__ == "__main__":
-    asyncio.run(lt.main(scenario))
+    asyncio.run(lt.main(scenario, extra_env={"DB_PATH": DB}))

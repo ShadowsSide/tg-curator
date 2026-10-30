@@ -196,7 +196,7 @@ def test_core_submitter_removes_own_media():
 
 def test_keyboards():
     from bot.db import Submission
-    from bot.keyboards import ReviewCB, UserCB, UserMediaCB, media_kb, user_kb, user_media_kb
+    from bot.keyboards import ReviewCB, UserCB, UserMediaCB, control_kb, media_kb, user_kb, user_media_kb
 
     def sub(items, status="pending", **kw):
         return Submission(id=5, user_id=42, items=items, anonymous=False, spoiler=False, silent=False, status=status,
@@ -217,6 +217,12 @@ def test_keyboards():
     assert acts(media_kb(sub([photo("a"), video("b")]), "zh")) == [
         ("madd", 0), ("mrep", 1), ("mrep", 2), ("mrm", 1), ("mrm", 2), ("back", 0)]
     assert ("madd", 0) not in acts(media_kb(sub([photo(str(i)) for i in range(10)]), "zh"))  # 满 10 个不能再加
+
+    # 投稿人被封禁：控制消息最后一行是“解除封禁”，不论投稿状态；没被封禁就没有
+    for status in ("pending", "scheduled", "failed", "published", "rejected"):
+        assert acts(control_kb(sub([photo("a")], status), "zh", banned=True))[-1] == ("unban", 0), status
+        assert ("unban", 0) not in acts(control_kb(sub([photo("a")], status), "zh")), status
+    assert control_kb(sub([photo("a")], "published"), "zh") is None  # 已发布、没被封禁：没有按钮
 
     two = [photo("a"), photo("b")]
     assert acts(user_kb(sub([photo("a")], "draft"), "zh"), UserCB) == [("sign", 0), ("anon", 0), ("cancel", 0)]

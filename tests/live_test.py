@@ -518,11 +518,11 @@ async def scenario():
 
     relay_id = to_user["result"]["message_id"]
     n = len(log); pm("直接回复不带命令", reply_to_message=reply_to(relay_id, by_bot=True))
-    relayed = await wait_for(lambda e: is_send(e, "sendMessage", REVIEW, "直接回复不带命令"), since=n)
-    ok = await wait_for(lambda e: is_send(e, "sendMessage", USER, "已发送给审核员"), since=n)
+    hint = await wait_for(lambda e: is_send(e, "sendMessage", USER, "<code>/msg</code>"), since=n)
     new_sub = await wait_for(lambda e: is_send(e, "sendMessage", USER, "请选择投稿方式"), timeout=0.5, since=n)
-    check("submitter plain reply to reviewer → relayed to reviewers (no /msg needed), not a new submission",
-          relayed and "投稿人" in relayed["params"]["text"] and ok and not new_sub)
+    leaked = await wait_for(lambda e: is_send(e, "sendMessage", REVIEW, "直接回复不带命令"), timeout=0.5, since=n)
+    check("submitter plain reply to reviewer → hint to use /msg; not relayed, not a new submission",
+          hint and not new_sub and not leaked)
 
     n = len(log); pm("/msg 出处是官网", reply_to_message=reply_to(relay_id, by_bot=True))
     to_rev = await wait_for(lambda e: is_send(e, "sendMessage", REVIEW, "出处是官网"), since=n)

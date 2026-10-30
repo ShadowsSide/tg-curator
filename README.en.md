@@ -37,7 +37,7 @@ Built with Python 3.12 + [aiogram 3](https://github.com/aiogram/aiogram) + SQLit
 - **✏️ Edit**, **✏️ Custom reason / time**: tap the button, then just reply to the bot's prompt, no commands to remember; send `/cancel` to give up
 - **🖼 Media**: while pending, add, replace or remove photos and videos (up to 10); text submissions can get photos too
 - Commands work as well: `/edit` to change a post, `/no reason` to reject, `/ban reason` to ban. Banning also rejects every open submission from that user
-- Safe against accidental taps: Publish now, Reject and Ban need a second tap to confirm
+- Safe against accidental taps: Publish now, Reject, Ban and Unban need a second tap to confirm
 - Safe against double actions: if two admins press "Publish" at the same time, the post is still published only once
 - **Only answers in private chats and the review group**: it never replies in other groups, and leaves any other group or channel it's added to. The publishing channel and its linked discussion group are whitelisted and never left
 
@@ -193,7 +193,7 @@ Spam checks, messaging window, stats scope and so on; the defaults are usually f
 
 ### Admins (review group)
 
-Buttons on the control message: **✅ Publish now**, **⏰ Schedule**, **❌ Reject**, **🚫 Ban submitter**, **✏️ Edit**, **🖼 Media**, plus the **🙈 Spoiler** and **🔕 Silent** toggles.
+Buttons on the control message: **✅ Publish now**, **⏰ Schedule**, **❌ Reject**, **🚫 Ban submitter**, **✏️ Edit**, **🖼 Media**, plus the **🙈 Spoiler** and **🔕 Silent** toggles. Once a submitter is banned, their control messages show **🔓 Unban**.
 
 #### Reply prompts
 
@@ -211,7 +211,7 @@ Every edit posts a new preview. The review group keeps only the original preview
 
 #### Confirmation and reject reasons
 
-To avoid accidental taps, **Publish now, Reject and Ban** first switch to “Confirm / Back” buttons and only act on the second tap. Scheduling, retrying and the `/no` and `/ban` commands need no confirmation.
+To avoid accidental taps, **Publish now, Reject, Ban and Unban** first switch to “Confirm / Back” buttons and only act on the second tap. Scheduling, retrying and the `/no` and `/ban` commands need no confirmation.
 
 **❌ Reject** first asks for a reason (`REJECT_TEMPLATES`; defaults: Duplicate, Off-topic, Low quality, Advertising; or “No reason”). The confirm button shows the chosen reason, and the reason is sent to the submitter. For a reason of your own, tap **✏️ Custom reason** or use `/no reason`.
 
@@ -226,7 +226,7 @@ The commands below do the same as the buttons, for those who prefer commands. Us
 | `/msg message` | Message the submitter as “Reviewer”; also works as a reply to a relayed submitter message |
 | `/no [reason]` | Rejects the submission; the reason is sent to the submitter |
 | `/ban [reason]` | Bans the submitter and rejects all their open submissions |
-| `/unban <user ID>` | Lifts a ban |
+| `/unban <user ID>` | Lifts a ban (same as 🔓 Unban on the control message) |
 | `/stats` | Posts the latest review summary |
 | `/queue` | Lists scheduled posts |
 | `/active [days]` | Contributor activity ranking (default: 30 days) |
@@ -238,10 +238,11 @@ The commands below do the same as the buttons, for those who prefer commands. Us
 ## Known limitations and risks
 
 **Review actions**
-- **More taps**: Publish now, Reject and Ban always need a second tap, and Reject first asks for a reason by default (Reject → reason → Confirm, three taps). Set `REJECT_TEMPLATES=` to skip the reason; the confirmation itself can't be turned off
+- **More taps**: Publish now, Reject, Ban and Unban always need a second tap, and Reject first asks for a reason by default (Reject → reason → Confirm, three taps). Set `REJECT_TEMPLATES=` to skip the reason; the confirmation itself can't be turned off
 - **The confirm panel can be reset**: if the control message refreshes while you're about to confirm (the submitter edits, someone sends `/msg`, …), the buttons go back to normal and you need to tap again. Nothing runs by accident
 - **Changing `REJECT_TEMPLATES` can shift old panels**: buttons store the reason's position. After reordering the reasons and restarting, a panel opened before the restart picks the reason by the new order; an out-of-range position means “No reason”. Finish any rejection in progress before changing it
 - **Reasons can't contain `|`**: it's the separator
+- **Old 🔓 buttons don't disappear by themselves**: a ban only refreshes the control messages it rejects. After `/unban <user ID>`, the 🔓 on those messages stays until someone taps it; it then says the user isn't banned and removes itself (the submitter isn't notified again). This avoids refreshing all of that user's control messages at once and hitting rate limits
 - **The review group hits rate limits sooner**: the confirm and reason panels each edit the control message once more, so with heavy review traffic Telegram's limits come sooner. The bot waits and retries automatically, but actions get slower
 
 **Changing photos and videos**

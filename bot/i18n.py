@@ -335,6 +335,8 @@ T: dict[str, dict[str, str]] = {
     "btn_confirm_mrm": {"zh": "🗑 确认删除", "en": "🗑 Confirm remove"},
     "btn_confirm_ban": {"zh": "🚫 确认封禁（同时拒绝其所有未处理来稿）",
                         "en": "🚫 Confirm ban (also rejects all their open submissions)"},
+    "btn_unban": {"zh": "🔓 解除封禁", "en": "🔓 Unban"},
+    "btn_confirm_unban": {"zh": "🔓 确认解封（会通知投稿人）", "en": "🔓 Confirm unban (the submitter is notified)"},
 
     # ---------- 审核：按钮反馈 ----------
     "toast_state_locked": {"zh": "当前状态不能修改", "en": "Can't change this in the current state"},
@@ -351,6 +353,8 @@ T: dict[str, dict[str, str]] = {
     "toast_scheduled": {"zh": "已定时：{when}", "en": "Scheduled: {when}"},
     "toast_unscheduled": {"zh": "已取消定时，回到待审核", "en": "Unscheduled, back to pending review"},
     "toast_rejected": {"zh": "已拒绝（需要附理由请用 /no 回复）", "en": "Rejected (reply with /no to give a reason)"},
+    "toast_unbanned": {"zh": "已解除封禁，已通知投稿人", "en": "Unbanned; the submitter has been notified"},
+    "toast_not_banned": {"zh": "这个投稿人现在没有被封禁", "en": "This submitter isn't banned now"},
     "toast_banned": {
         "zh": "已封禁，并拒绝 {n} 条未处理来稿",
         "en": "Banned; {n} open submission(s) rejected",

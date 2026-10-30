@@ -51,6 +51,8 @@ def test_route_every_review_action():
         (("pub_ok", 0, True), ("run", "pub", 0)),
         (("ban", 0, True), ("confirm", "ban", 0)),
         (("ban_ok", 0, True), ("run", "ban", 0)),
+        (("unban", 0, True), ("confirm", "unban", 0)),  # 解封会通知投稿人，也要确认
+        (("unban_ok", 0, True), ("run", "unban", 0)),
         (("mrm", 2, True), ("confirm", "mrm", 2)),  # 删除媒体：v 是第几个，原样带到确认按钮
         (("mrm_ok", 2, True), ("run", "mrm", 2)),
         (("madd", 0, True), ("run", "madd", 0)),

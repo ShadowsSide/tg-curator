@@ -54,6 +54,12 @@ def _split_user(args: str) -> tuple[int | None, str | None]:
     return None, None
 
 
+async def _banned_submitter(core: Core, sid: int) -> bool:
+    sub = await core.get_submission(sid)
+    user = await core.get_user(sub.user_id) if sub else None
+    return bool(user and user.banned)
+
+
 async def _replied_sid(m: Message, core: Core) -> int | None:
     """命令针对的投稿：回复的那条投稿消息（预览、控制消息、转来的留言）。"""
     reply = explicit_reply(m)
@@ -83,6 +89,11 @@ def build_router(settings: Settings) -> Router:
         if step == "reasons":
             await core.show_reject_reasons(sid)
             await cq.answer(t(lang, "toast_pick_reason"))
+            return
+        if step == "confirm" and action == "unban" and not await _banned_submitter(core, sid):
+            # 早就解封了（比如用了 /unban），控制消息上的按钮是旧的：不出确认面板，直接收起
+            await core.refresh_control(sid)
+            await cq.answer(t(lang, "toast_not_banned"), show_alert=True)
             return
         if step == "confirm":
             await core.show_confirm(sid, action, v)
@@ -142,6 +153,11 @@ def build_router(settings: Settings) -> Router:
                 return
             rejected = await core.ban_user(sub.user_id, who)
             await cq.answer(t(lang, "toast_banned", n=len(rejected)))
+        elif action == "unban":
+            sub = await core.get_submission(sid)
+            ok = bool(sub) and await core.unban_user(sub.user_id)
+            await core.refresh_control(sid)
+            await cq.answer(t(lang, "toast_unbanned" if ok else "toast_not_banned"), show_alert=not ok)
         else:
             await cq.answer()
 
@@ -318,6 +334,8 @@ def build_router(settings: Settings) -> Router:
                 return
 
         rejected = await core.ban_user(user_id, m.from_user, reason)
+        if sid is not None and sid not in rejected:  # 回复的那条（已发布 / 已拒绝）也显示“解除封禁”
+            await core.refresh_control(sid)
         user = await core.get_user(user_id)
         text = t(core.lang, "banned_reply", link=user_link(user, user_id), uid=user_id)
         if reason:
@@ -329,15 +347,17 @@ def build_router(settings: Settings) -> Router:
     @router.message(Command("unban"))
     async def unban_cmd(m: Message, command: CommandObject, core: Core) -> None:
         uid = _user_id_arg(command)
-        if uid is None:
-            sid = await _replied_sid(m, core)
-            uid = (await core.get_submission(sid)).user_id if sid is not None else None
+        sid = await _replied_sid(m, core) if uid is None else None
+        if sid is not None:
+            uid = (await core.get_submission(sid)).user_id
         if uid is None:
             await m.reply(t(core.lang, "usage_unban"))
             return
         if not await core.unban_user(uid):
             await m.reply(t(core.lang, "not_banned", uid=uid))
             return
+        if sid is not None:  # 收起回复的那条控制消息上的“解除封禁”；别的控制消息上的旧按钮点了再收起
+            await core.refresh_control(sid)
         await m.reply(t(core.lang, "unbanned_reply", uid=uid))
 
     @router.message(F.reply_to_message)

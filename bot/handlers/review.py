@@ -135,9 +135,6 @@ def build_router(settings: Settings) -> Router:
             # 按钮提示最多 200 字符，理由是用户配置的，可能很长
             ok = t(lang, "toast_rejected_with", reason=reason[:150]) if reason else t(lang, "toast_rejected")
             await cq.answer(err.text(lang) if err else ok, show_alert=bool(err))
-        elif action == "msg":  # 升级前的控制消息上还留着已去掉的 💬 按钮：收起它，提示改用 /msg
-            await core.refresh_control(sid)
-            await cq.answer(notice("msg_usage_admin").text(lang), show_alert=True)
         elif action == "ban":
             sub = await core.get_submission(sid)
             if not sub:
@@ -199,7 +196,7 @@ def build_router(settings: Settings) -> Router:
         body = m.text or m.caption or ""
         entities = ent.dump(m.entities or m.caption_entities)
         if prompt.kind not in PROMPT_KIND.values():
-            # 已经去掉的提示种类（升级前发出的“联系投稿人”提示）：作废，提示改用 /msg
+            # 已经去掉的提示种类（例如以前的“联系投稿人”提示）：作废，不能落到下面的“拒绝理由”分支
             return notice("msg_usage_admin"), ""
         if not body.strip():
             return notice("prompt_text_needed"), ""

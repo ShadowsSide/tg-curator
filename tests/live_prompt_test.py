@@ -1,5 +1,5 @@
 """“按钮 + 回复”流程：✏️ 修改、✏️ 自定义理由、/cancel；改稿后删掉上一份修改预览；
-联系投稿人只用 /msg：旧消息上留下的 💬 按钮、升级前发出的“联系投稿人”提示都会作废。
+联系投稿人只用 /msg：数据库里以前的“联系投稿人”提示，回复后作废，不会被当成拒绝理由。
 
 用法（项目根目录下）：python tests/live_prompt_test.py
 复用 live_test.py 的模拟 Bot API 服务器。约 15 秒。
@@ -138,18 +138,7 @@ async def scenario():
     done = await wait_for(lambda e: is_send(e, "sendMessage", REVIEW, "已修改"), since=n)
     check("too long → error, prompt kept; the next reply works", err and done)
 
-    # 8. 升级前的控制消息上还留着 💬 按钮：点了提示改用 /msg，并收起这个按钮
-    n = len(log); lt.cb("r:msg:1:0", REVIEW, ADMIN, message_id=ctrl1)
-    t = await wait_for(lambda e: e["method"] == "answerCallbackQuery" and "/msg" in e["params"].get("text", ""), since=n)
-    refreshed = await wait_for(lambda e: e["method"] == "editMessageText"
-                               and str(e["params"].get("message_id")) == str(ctrl1), since=n)
-    check("old 💬 button → told to use /msg, control message refreshed without it",
-          t and t["params"].get("show_alert") and refreshed
-          and not any(v.startswith("r:msg:") for v in buttons(refreshed).values()), refreshed and buttons(refreshed))
-    no_prompt = not any(is_prompt(e, "") for e in log[n:])
-    check("old 💬 button posts no prompt", no_prompt)
-
-    # 升级前发出的“联系投稿人”提示（数据库里 kind=msg）：回复它不会转给投稿人，提示作废
+    # 8. 以前发出的“联系投稿人”提示（数据库里 kind=msg）：回复它不会转给投稿人，也不会被当成拒绝理由，提示作废
     old_prompt = 990001
     with sqlite3.connect(DB) as db:
         db.execute("INSERT INTO prompts(chat_id, message_id, kind, sid, arg, user_id, cleanup, created_at) "
@@ -160,8 +149,9 @@ async def scenario():
     leaked = await wait_for(lambda e: is_send(e, "sendMessage", USER, "请补充来源"), timeout=0.5, since=n)
     with sqlite3.connect(DB) as db:
         left = db.execute("SELECT COUNT(*) FROM prompts WHERE message_id=?", (old_prompt,)).fetchone()[0]
-    check("old “message submitter” prompt → told to use /msg, prompt dropped, nothing relayed",
-          told and gone and not leaked and left == 0)
+    rejected = await wait_for(lambda e: is_send(e, "sendMessage", USER, "未通过"), timeout=0.5, since=n)
+    check("old “message submitter” prompt → told to use /msg, prompt dropped, nothing relayed, not rejected",
+          told and gone and not leaked and not rejected and left == 0)
 
     # 9. 自定义理由：拒绝 → ✏️ 自定义理由 → 回复理由，立即拒绝，不再确认
     ctrl2 = c2["result"]["message_id"]

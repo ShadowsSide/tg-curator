@@ -133,7 +133,7 @@ DROPPED_COLUMNS = [
 JSON_COLUMNS = ("items", "original_items", "spam_flags", "edit_preview")  # 存成 JSON 文本的列
 
 OPEN_STATES = ("pending", "scheduled", "failed")  # 已提交、尚未发布或拒绝
-SUBMITTER_EDITABLE = ("draft", "pending")  # 投稿人自己能修改的状态：审核结果出来之前
+SUBMITTER_EDITABLE = ("draft", "pending")  # 投稿人自己能修改的状态：审核开始（定时、发布、拒绝）之前
 
 SPOILERABLE = {"photo", "video", "animation"}
 

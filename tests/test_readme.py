@@ -75,7 +75,7 @@ def test_config_groups_match_and_cover_config_py():
     en = config_groups(EN, "## Configuration", "## Usage")
     assert zh == en and len(zh) == 3, (zh, en)
     src = (ROOT / "bot" / "config.py").read_text(encoding="utf-8")
-    read = set(re.findall(r'(?:_env|os\.environ\.get)\("([A-Z_]+)"', src))
+    read = set(re.findall(r'(?:_env|_num|os\.environ\.get)\("([A-Z_]+)"', src))
     listed = [v for g in zh for v in g]
     assert len(listed) == len(set(listed)), "a variable is listed twice"
     assert set(listed) == read - UNLISTED_VARS | EXTRA_VARS, set(listed) ^ (read - UNLISTED_VARS | EXTRA_VARS)

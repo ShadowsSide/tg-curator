@@ -19,6 +19,7 @@ from aiogram.enums import ChatMemberStatus
 from aiogram.exceptions import TelegramAPIError
 from aiogram.types import CallbackQuery, Message, TelegramObject
 
+from .errors import ConfigError
 from .i18n import t
 
 log = logging.getLogger(__name__)
@@ -46,7 +47,7 @@ class ReviewerPolicy:
             elif token.lstrip("-").isdigit():
                 ids.add(int(token))
             else:
-                raise RuntimeError(f"REVIEWERS 里有无法识别的值 {token!r}（可用：admins、all、用户 ID）")
+                raise ConfigError("cfg_reviewers", value=token)
         return cls(everyone, admins, frozenset(ids))
 
 

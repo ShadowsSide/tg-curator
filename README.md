@@ -97,6 +97,8 @@ docker compose up -d
 docker compose logs -f
 ```
 
+启动时会检查配置：必填项没填或格式不对、Telegram 不认 token、找不到频道或审核群、两个 ID 填反、机器人不是频道管理员或没有“发布消息”权限，日志里会出现一行“配置错误：……”，容器状态显示 `unhealthy`。这时机器人不运行，也不会反复重启；改好 `.env` 后执行 `docker compose up -d`。网络不通不算配置错误，容器会自动重启重试。
+
 镜像标签：`latest` 对应 main 分支的最新版本；`vX.Y.Z` 是发布版本；`sha-xxxxxxx` 对应某次具体构建，方便回滚。要换标签或换成别的镜像，在 `.env` 里设置 `IMAGE`。
 
 想从源码自己构建：clone 整个仓库，然后执行 `docker compose -f docker-compose.yml -f docker-compose.build.yml up -d --build`。

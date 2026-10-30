@@ -9,13 +9,15 @@ import html
 import logging
 
 from aiogram import Bot
-from aiogram.exceptions import TelegramAPIError, TelegramBadRequest
-from aiogram.types import InlineKeyboardMarkup, LinkPreviewOptions, Message, ReplyParameters, User as TgUser
+from aiogram.enums import ChatMemberStatus, ChatType
+from aiogram.exceptions import (TelegramAPIError, TelegramBadRequest, TelegramForbiddenError, TelegramNotFound,
+                                TelegramUnauthorizedError)
+from aiogram.types import ChatFullInfo, InlineKeyboardMarkup, LinkPreviewOptions, Message, ReplyParameters, User as TgUser
 
 from ..album import AlbumCollector
 from ..config import Settings
 from ..db import DB, Submission, User
-from ..errors import Notice, notice
+from ..errors import ConfigError, Notice, notice
 from ..i18n import normalize, t
 from ..keyboards import confirm_kb, control_kb, media_count, media_kb, reasons_kb, schedule_kb, user_kb
 from ..render import control_text, signature
@@ -56,7 +58,24 @@ class CoreBase:
     # ---------- lifecycle ----------
 
     async def init(self) -> None:
-        chat = await self.bot.get_chat(self.s.channel_id)
+        """启动时核对三个必填项：Telegram 明确拒绝时抛出 ConfigError；网络问题照常抛出，交给 Docker 重启重试。"""
+        try:
+            me = await self.bot.get_me()
+        except (TelegramUnauthorizedError, TelegramNotFound):
+            raise ConfigError("cfg_token_rejected") from None
+        chat = await self._config_chat(self.s.channel_id, "cfg_channel_not_found")
+        if chat.type != ChatType.CHANNEL:
+            raise ConfigError("cfg_channel_type", value=self.s.channel_id)
+        try:
+            member = await self.bot.get_chat_member(chat.id, me.id)
+        except (TelegramBadRequest, TelegramForbiddenError):
+            member = None
+        if not (member and member.status == ChatMemberStatus.ADMINISTRATOR and member.can_post_messages):
+            raise ConfigError("cfg_channel_admin", value=self.s.channel_id)
+        review = await self._config_chat(self.s.review_chat_id, "cfg_review_not_found")
+        if review.type not in (ChatType.GROUP, ChatType.SUPERGROUP):
+            raise ConfigError("cfg_review_type", value=self.s.review_chat_id)
+
         self.channel_chat_id = chat.id
         self.channel_linked_chat_id = chat.linked_chat_id
         if chat.username:
@@ -64,6 +83,12 @@ class CoreBase:
         else:
             self.channel_post_base = f"https://t.me/c/{str(chat.id).removeprefix('-100')}/"
         await self.db.reset_stuck_publishing()
+
+    async def _config_chat(self, chat_id: int | str, missing: str) -> ChatFullInfo:
+        try:
+            return await self.bot.get_chat(chat_id)
+        except (TelegramBadRequest, TelegramForbiddenError, TelegramNotFound):
+            raise ConfigError(missing, value=chat_id) from None
 
     def start_background(self) -> None:
         self._tasks = [

@@ -99,6 +99,8 @@ docker compose up -d
 docker compose logs -f
 ```
 
+The configuration is checked at startup. If a required value is missing or malformed, Telegram rejects the token, the channel or review group can't be found, the two IDs are swapped, or the bot isn't a channel admin with the “Post messages” right, the log shows one “Configuration error: …” line and the container is marked `unhealthy`. The bot then stays idle instead of restarting over and over; fix `.env` and run `docker compose up -d`. Network errors are not configuration errors: the container restarts and tries again.
+
 Image tags: `latest` is the newest build of the main branch, `vX.Y.Z` are releases, and `sha-xxxxxxx` points to a specific build, which is handy for rolling back. To use another tag or image, set `IMAGE` in `.env`.
 
 To build from source instead, clone the whole repository and run `docker compose -f docker-compose.yml -f docker-compose.build.yml up -d --build`.

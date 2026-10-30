@@ -50,6 +50,49 @@ T: dict[str, dict[str, str]] = {
         "en": "Duplicate|Off-topic|Low quality|Advertising",
     },
 
+    # ---------- 启动时的配置检查（写在日志里，按 LANGUAGE） ----------
+    "cfg_error": {
+        "zh": "配置错误：{msg}（机器人不会运行，修改 .env 后执行 docker compose up -d）",
+        "en": "Configuration error: {msg} (the bot won't run; fix .env and run docker compose up -d)",
+    },
+    "cfg_missing": {"zh": "没有填写 {name}", "en": "{name} is not set"},
+    "cfg_number": {"zh": "{name} 必须是数字，当前是 {value!r}", "en": "{name} must be a number, got {value!r}"},
+    "cfg_choice": {"zh": "{name} 只能是 {allowed}，当前是 {value!r}", "en": "{name} must be one of {allowed}, got {value!r}"},
+    "cfg_tz": {"zh": "TZ 不是有效的时区：{value!r}（例如 Asia/Shanghai、UTC）",
+               "en": "TZ is not a valid time zone: {value!r} (e.g. Asia/Shanghai, UTC)"},
+    "cfg_quiet_hours": {"zh": "REMINDER_QUIET_HOURS 格式不对：{value!r}（例如 0-8）",
+                        "en": "REMINDER_QUIET_HOURS is malformed: {value!r} (e.g. 0-8)"},
+    "cfg_reviewers": {"zh": "REVIEWERS 里有无法识别的值 {value!r}（可用：admins、all、用户 ID）",
+                      "en": "REVIEWERS has an unknown value {value!r} (use admins, all or user IDs)"},
+    "cfg_token_format": {
+        "zh": "BOT_TOKEN 格式不对，应该像 123456:ABC-DEF，请从 @BotFather 复制完整的 token",
+        "en": "BOT_TOKEN is malformed; it looks like 123456:ABC-DEF, copy the whole token from @BotFather",
+    },
+    "cfg_token_rejected": {
+        "zh": "Telegram 不认这个 BOT_TOKEN：token 填错了，或者已经在 @BotFather 重新生成过",
+        "en": "Telegram rejected BOT_TOKEN: it's wrong, or it was regenerated in @BotFather",
+    },
+    "cfg_channel_not_found": {
+        "zh": "找不到 CHANNEL_ID 对应的频道 {value}：ID 写错了，或者机器人还没加入这个频道",
+        "en": "Can't find the channel CHANNEL_ID={value}: the ID is wrong, or the bot hasn't been added to it",
+    },
+    "cfg_channel_type": {
+        "zh": "CHANNEL_ID={value} 不是频道，是不是和 REVIEW_CHAT_ID 填反了？",
+        "en": "CHANNEL_ID={value} is not a channel. Did you swap it with REVIEW_CHAT_ID?",
+    },
+    "cfg_channel_admin": {
+        "zh": "机器人不是频道 {value} 的管理员，或者没有“发布消息”权限",
+        "en": "The bot is not an admin of the channel {value}, or lacks the “Post messages” right",
+    },
+    "cfg_review_not_found": {
+        "zh": "找不到 REVIEW_CHAT_ID 对应的群 {value}：ID 写错了，或者机器人还没加进这个群",
+        "en": "Can't find the group REVIEW_CHAT_ID={value}: the ID is wrong, or the bot hasn't been added to it",
+    },
+    "cfg_review_type": {
+        "zh": "REVIEW_CHAT_ID={value} 不是群组，是不是和 CHANNEL_ID 填反了？",
+        "en": "REVIEW_CHAT_ID={value} is not a group. Did you swap it with CHANNEL_ID?",
+    },
+
     # ---------- 内容类型 ----------
     "type_text": {"zh": "文字", "en": "text"},
     "type_photo": {"zh": "{n} 张图片", "en": "{n} photo(s)"},

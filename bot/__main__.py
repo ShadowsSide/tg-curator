@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import logging
 import os
+import signal
 
 from aiogram import Bot, Dispatcher
 from aiogram.client.default import DefaultBotProperties
@@ -15,10 +17,14 @@ from aiogram.types import BotCommand, BotCommandScopeAllPrivateChats, BotCommand
 from .config import Settings, load_settings
 from .core import Core
 from .db import DB
+from .errors import ConfigError
 from .guard import ChatGuard
 from .handlers import review, user
-from .i18n import LANGS, PRIVATE_COMMANDS, REVIEW_COMMANDS
+from .i18n import LANGS, PRIVATE_COMMANDS, REVIEW_COMMANDS, t
 from .ratelimit import RetryAfterMiddleware
+
+# 配置错误时写下错误说明；Dockerfile 的健康检查看到这个文件就显示 unhealthy
+CONFIG_ERROR_FILE = os.getenv("CONFIG_ERROR_FILE", "/tmp/config-error")
 
 
 async def set_commands(bot: Bot, review_chat_id: int, default_lang: str) -> None:
@@ -41,11 +47,7 @@ def make_session(settings: Settings) -> AiohttpSession:
     return AiohttpSession(api=api, proxy=settings.proxy or None)
 
 
-async def main() -> None:
-    logging.basicConfig(
-        level=os.getenv("LOG_LEVEL", "INFO"),
-        format="%(asctime)s %(levelname)s %(name)s: %(message)s",
-    )
+async def run() -> None:
     settings = load_settings()
     for name in ("REVIEW_TOPICS", "USER_TOPICS"):
         if os.getenv(name):
@@ -53,34 +55,64 @@ async def main() -> None:
 
     db = DB(settings.db_path)
     await db.connect()
-
     bot = Bot(
         settings.bot_token,
         session=make_session(settings),
         default=DefaultBotProperties(parse_mode=ParseMode.HTML),
     )
-    bot.session.middleware(RetryAfterMiddleware())  # 被限流时自动等待重试
-    core = Core(bot, db, settings)
-    await core.init()
-    await set_commands(bot, settings.review_chat_id, settings.language)
-
-    dp = Dispatcher(storage=MemoryStorage())
-    dp["core"] = core
-    # 只处理私聊和审核群；必须在所有处理函数之前，放在 update 外层中间件
-    keep = {c for c in (core.channel_chat_id, core.channel_linked_chat_id) if c}  # 发布频道 + 关联群组
-    dp.update.outer_middleware(ChatGuard(settings.review_chat_id, keep, settings.leave_unknown_chats))
-    dp.include_routers(review.build_router(settings), user.build_router())
-
-    core.start_background()
     try:
-        # my_chat_member：机器人被拉进其他群时收到通知，才能自动退出
-        allowed = sorted(set(dp.resolve_used_update_types()) | {"my_chat_member"})
-        await dp.start_polling(bot, allowed_updates=allowed)
+        bot.session.middleware(RetryAfterMiddleware())  # 被限流时自动等待重试
+        core = Core(bot, db, settings)
+        await core.init()
+        await set_commands(bot, settings.review_chat_id, settings.language)
+
+        dp = Dispatcher(storage=MemoryStorage())
+        dp["core"] = core
+        # 只处理私聊和审核群；必须在所有处理函数之前，放在 update 外层中间件
+        keep = {c for c in (core.channel_chat_id, core.channel_linked_chat_id) if c}  # 发布频道 + 关联群组
+        dp.update.outer_middleware(ChatGuard(settings.review_chat_id, keep, settings.leave_unknown_chats))
+        dp.include_routers(review.build_router(settings), user.build_router())
+
+        core.start_background()
+        try:
+            # my_chat_member：机器人被拉进其他群时收到通知，才能自动退出
+            allowed = sorted(set(dp.resolve_used_update_types()) | {"my_chat_member"})
+            await dp.start_polling(bot, allowed_updates=allowed)
+        finally:
+            await core.stop_background()
     finally:
-        await core.stop_background()
         await db.close()
         await bot.session.close()
 
+
+async def wait_for_fix(error: ConfigError) -> None:
+    """配置错误重启也修不好：退出的话 Docker 会不停重启、刷屏，所以报一次错后待机，直到容器被停止或重建。
+    服务器重启后容器照常启动，再检查一次。"""
+    lang = os.getenv("LANGUAGE", "").strip().lower()
+    lang = lang if lang in LANGS else "zh"
+    text = t(lang, "cfg_error", msg=error.notice.text(lang))
+    logging.error(text)
+    with contextlib.suppress(OSError):
+        with open(CONFIG_ERROR_FILE, "w", encoding="utf-8") as f:
+            f.write(text + "\n")
+    stop = asyncio.Event()
+    loop = asyncio.get_running_loop()
+    for sig in (signal.SIGTERM, signal.SIGINT):  # 容器里是 1 号进程，不处理的话 docker stop 要等 10 秒强杀
+        loop.add_signal_handler(sig, stop.set)
+    await stop.wait()
+
+
+async def main() -> None:
+    logging.basicConfig(
+        level=os.getenv("LOG_LEVEL", "INFO"),
+        format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+    )
+    with contextlib.suppress(FileNotFoundError):  # 上次留下的（容器重启后 /tmp 还在）
+        os.remove(CONFIG_ERROR_FILE)
+    try:
+        await run()
+    except ConfigError as e:
+        await wait_for_fix(e)
 
 if __name__ == "__main__":
     asyncio.run(main())

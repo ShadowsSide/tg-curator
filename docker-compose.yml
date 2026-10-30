@@ -1,10 +1,8 @@
 services:
   bot:
-    build: .
-    # 默认在本机构建（自动匹配 amd64 / arm64）。
-    # 如果用预构建的多架构镜像，在 .env 里设置 IMAGE=ghcr.io/<你>/tg-curator:latest，
-    # 然后 docker compose pull && docker compose up -d --no-build
-    image: ${IMAGE:-tg-curator:latest}
+    # 默认使用 GitHub Actions 构建的多架构镜像（amd64 / arm64）。
+    # 换成 fork、Docker Hub 或固定版本：在 .env 里设置 IMAGE；自己构建：见 docker-compose.build.yml
+    image: ${IMAGE:-ghcr.io/shadowsside/tg-curator:latest}
     restart: unless-stopped
     env_file: .env
     volumes:

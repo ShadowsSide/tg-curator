@@ -2,8 +2,11 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass
-from zoneinfo import ZoneInfo
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
+from aiogram.utils.token import TokenValidationError, validate_token
+
+from .errors import ConfigError
 from .i18n import LANGS, t
 from .spam import SpamRules
 
@@ -11,8 +14,31 @@ from .spam import SpamRules
 def _env(name: str, default: str = "", *, required: bool = False) -> str:
     value = os.getenv(name, default).strip()
     if required and not value:
-        raise RuntimeError(f"缺少环境变量 {name}")
+        raise ConfigError("cfg_missing", name=name)
     return value
+
+
+def _num(name: str, default: str = "", *, kind: type = int, required: bool = False) -> int | float:
+    value = _env(name, default, required=required)
+    try:
+        return kind(value)
+    except ValueError:
+        raise ConfigError("cfg_number", name=name, value=value) from None
+
+
+def _token(value: str) -> str:
+    try:
+        validate_token(value)
+    except TokenValidationError:
+        raise ConfigError("cfg_token_format") from None
+    return value
+
+
+def _tz(value: str) -> ZoneInfo:
+    try:
+        return ZoneInfo(value)
+    except (ZoneInfoNotFoundError, ValueError):
+        raise ConfigError("cfg_tz", value=value) from None
 
 
 def _bool(value: str) -> bool:
@@ -30,8 +56,11 @@ def _templates(value: str) -> tuple[str, ...]:
 def _quiet_hours(value: str) -> tuple[int, int] | None:
     if not value:
         return None
-    start, end = value.split("-", 1)
-    return int(start) % 24, int(end) % 24
+    try:
+        start, end = value.split("-", 1)
+        return int(start) % 24, int(end) % 24
+    except ValueError:
+        raise ConfigError("cfg_quiet_hours", value=value) from None
 
 
 @dataclass(frozen=True)
@@ -78,7 +107,7 @@ def _choice(value: str, allowed: tuple[str, ...], name: str) -> str:
     """取值必须是 allowed 之一（不区分大小写），否则启动时报错。"""
     value = value.lower()
     if value not in allowed:
-        raise RuntimeError(f"{name} 只能是 {' / '.join(allowed)}，当前是 {value!r}")
+        raise ConfigError("cfg_choice", name=name, allowed=" / ".join(allowed), value=value)
     return value
 
 
@@ -86,17 +115,17 @@ def load_settings() -> Settings:
     language = _choice(_env("LANGUAGE", "zh"), LANGS, "LANGUAGE")
     reasons = os.environ.get("REJECT_TEMPLATES")  # 没配置用对应语言的默认理由，配置成空字符串表示不要理由面板
     return Settings(
-        bot_token=_env("BOT_TOKEN", required=True),
+        bot_token=_token(_env("BOT_TOKEN", required=True)),
         channel_id=_chat_id(_env("CHANNEL_ID", required=True)),
-        review_chat_id=int(_env("REVIEW_CHAT_ID", required=True)),
-        tz=ZoneInfo(_env("TZ", "Asia/Shanghai")),
+        review_chat_id=_num("REVIEW_CHAT_ID", required=True),
+        tz=_tz(_env("TZ", "Asia/Shanghai")),
         db_path=_env("DB_PATH", "/app/data/bot.db"),
-        album_delay=float(_env("ALBUM_DELAY", "1.5")),
-        max_pending_per_user=int(_env("MAX_PENDING_PER_USER", "5")),
+        album_delay=_num("ALBUM_DELAY", "1.5", kind=float),
+        max_pending_per_user=_num("MAX_PENDING_PER_USER", "5"),
         schedule_presets=tuple(
             p.strip() for p in _env("SCHEDULE_PRESETS", "09:00,12:00,18:00,21:00").split(",") if p.strip()
         ),
-        reminder_interval_min=int(_env("REMINDER_INTERVAL_MINUTES", "60")),
+        reminder_interval_min=_num("REMINDER_INTERVAL_MINUTES", "60"),
         reminder_only_when_pending=_bool(_env("REMINDER_ONLY_WHEN_PENDING", "true")),
         quiet_hours=_quiet_hours(_env("REMINDER_QUIET_HOURS", "")),
         stats_scope=_env("STATS_SCOPE", "today"),
@@ -106,10 +135,10 @@ def load_settings() -> Settings:
         language=language,
         user_language=_choice(_env("USER_LANGUAGE", "auto"), ("auto", *LANGS), "USER_LANGUAGE"),
         leave_unknown_chats=_bool(_env("LEAVE_UNKNOWN_CHATS", "true")),
-        msg_window_days=int(_env("MSG_WINDOW_DAYS", "3")),
+        msg_window_days=_num("MSG_WINDOW_DAYS", "3"),
         reviewers=_env("REVIEWERS", "admins"),
         reject_templates=_templates(reasons if reasons is not None else t(language, "default_reject_templates")),
-        spam_rules=SpamRules.parse(_env("SPAM_KEYWORDS"), int(_env("MAX_LINKS", "0")), _env("LINK_WHITELIST")),
+        spam_rules=SpamRules.parse(_env("SPAM_KEYWORDS"), _num("MAX_LINKS", "0"), _env("LINK_WHITELIST")),
         spam_action=_choice(_env("SPAM_ACTION", "flag"), ("flag", "block"), "SPAM_ACTION"),
-        new_user_cooldown_min=max(int(_env("NEW_USER_COOLDOWN_MINUTES", "0")), 0),
+        new_user_cooldown_min=max(_num("NEW_USER_COOLDOWN_MINUTES", "0"), 0),
     )

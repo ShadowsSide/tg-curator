@@ -2,6 +2,7 @@
 
 - 标题层级、表格行、代码块数量一致（英文版开头多一段语言说明，不算）
 - 配置表的分组和每组的变量、顺序一致，并且正好是 bot/config.py 读取的变量（加 compose 用的 IMAGE）
+- 配置表里 IMAGE 的默认值就是 docker-compose.yml 默认拉取的镜像，部署命令下载的文件都在仓库里
 - 审核群和私聊的命令表都列出了机器人注册的命令（/start、/help 除外）
 - 开头的章节跳转链接正好对应每个二级标题，顺序一致，锚点按 GitHub 的规则生成
 - .env.example（中文）和 .env.en.example（英文）的分组、变量、顺序都和 README 配置表一致，示例值也一致（LANGUAGE、TZ、REMINDER_QUIET_HOURS 除外：英文版用 en、UTC、不设免打扰）
@@ -74,7 +75,7 @@ def test_config_groups_match_and_cover_config_py():
     en = config_groups(EN, "## Configuration", "## Usage")
     assert zh == en and len(zh) == 3, (zh, en)
     src = (ROOT / "bot" / "config.py").read_text(encoding="utf-8")
-    read = set(re.findall(r'(?:_env|os\.environ\.get)\("([A-Z_]+)"', src))
+    read = set(re.findall(r'(?:_env|_num|os\.environ\.get)\("([A-Z_]+)"', src))
     listed = [v for g in zh for v in g]
     assert len(listed) == len(set(listed)), "a variable is listed twice"
     assert set(listed) == read - UNLISTED_VARS | EXTRA_VARS, set(listed) ^ (read - UNLISTED_VARS | EXTRA_VARS)
@@ -104,6 +105,15 @@ def test_toc_links_every_section():
         heads = [line[3:] for line in lines if line.startswith("## ")]
         assert [text for text, _ in links] == heads, (links, heads)
         assert [a for _, a in links] == [anchor(h) for h in heads], links
+
+
+def test_image_default_and_deploy_files():
+    compose = (ROOT / "docker-compose.yml").read_text(encoding="utf-8")
+    image = re.search(r"image: \$\{IMAGE:-([^}]+)\}", compose).group(1)
+    for lines in (ZH, EN):
+        assert f"| `IMAGE` | `{image}` |" in "\n".join(lines), image
+        for name in re.findall(r"curl .*/tg-curator/main/(\S+)", "\n".join(lines)):
+            assert (ROOT / name).is_file(), name
 
 
 def env_groups(lines):

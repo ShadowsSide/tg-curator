@@ -41,9 +41,17 @@ def chat(cid):
 MOCK = {# 限流注入："方法名:chat_id" → 依次返回的 retry_after 秒数列表，每次调用消耗一个
         "flood": {},
         # 失败注入："方法名:chat_id" → 依次返回的错误描述列表（HTTP 400），每次调用消耗一个
-        "fail": {},
+        "fail": {},  # 也可以是 (HTTP 状态码, 错误描述)
         # 审核群管理员（getChatMember 返回 creator），其他人返回普通成员
         "admins": {7}}
+BOT_ID = 1
+BOT_ADMIN = {"status": "administrator", "user": {"id": BOT_ID, "is_bot": True, "first_name": "TestBot"},
+             "can_be_edited": False, "is_anonymous": False, "can_post_messages": True,
+             **{k: False for k in ("can_manage_chat", "can_delete_messages", "can_manage_video_chats",
+                                   "can_restrict_members", "can_promote_members", "can_change_info",
+                                   "can_invite_users", "can_post_stories", "can_edit_stories", "can_delete_stories",
+                                   "can_send_welcome_messages")}}
+MOCK["bot_member"] = BOT_ADMIN  # 机器人在频道里的身份
 markups: dict = {}  # (chat_id, message_id) → 当前按钮：和 Telegram 一样，按钮没变时编辑会报 “message is not modified”
 
 
@@ -77,8 +85,9 @@ async def handle(request: web.Request):
     fail = MOCK["fail"].get(f"{method}:{params.get('chat_id')}")
     if fail:
         description = fail.pop(0)
+        code, description = description if isinstance(description, tuple) else (400, description)
         log.append({"method": method, "params": params, "result": None, "error": True, "t": time.time()})
-        return web.json_response({"ok": False, "error_code": 400, "description": description}, status=400)
+        return web.json_response({"ok": False, "error_code": code, "description": description}, status=code)
     if m == "getupdates":
         offset = int(params.get("offset") or 0)
         timeout = min(float(params.get("timeout") or 0), 2)
@@ -108,7 +117,7 @@ async def handle(request: web.Request):
         markups[key] = params.get("reply_markup")
 
     if m == "getme":
-        result = {"id": 1, "is_bot": True, "first_name": "TestBot", "username": "test_bot"}
+        result = {"id": BOT_ID, "is_bot": True, "first_name": "TestBot", "username": "test_bot"}
     elif m == "getchat":
         info = {"accent_color_id": 0, "max_reaction_count": 11,
                 "accepted_gift_types": {k: False for k in ("unlimited_gifts", "limited_gifts", "unique_gifts",
@@ -120,8 +129,12 @@ async def handle(request: web.Request):
     elif m == "getchatmember":
         uid_ = int(params["user_id"])
         member_user = {"id": uid_, "is_bot": False, "first_name": f"U{uid_}"}
-        result = ({"status": "creator", "user": member_user, "is_anonymous": False} if uid_ in MOCK["admins"]
-                  else {"status": "member", "user": member_user})
+        if uid_ == BOT_ID:  # 机器人自己：频道管理员，能发消息（启动时会检查）
+            result = MOCK["bot_member"]
+        elif uid_ in MOCK["admins"]:
+            result = {"status": "creator", "user": member_user, "is_anonymous": False}
+        else:
+            result = {"status": "member", "user": member_user}
     elif m == "copymessages":
         result = [{"message_id": make_msg(params["chat_id"])["message_id"]} for _ in params["message_ids"]]
     elif m == "sendmediagroup":

@@ -1,0 +1,6 @@
+# 在本机从源码构建（需要 clone 整个仓库），自动匹配本机架构：
+#   docker compose -f docker-compose.yml -f docker-compose.build.yml up -d --build
+services:
+  bot:
+    build: .
+    image: tg-curator:local

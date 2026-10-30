@@ -24,3 +24,11 @@ class Notice:
 
 def notice(key: str, **params: Any) -> Notice:
     return Notice(key, params)
+
+
+class ConfigError(Exception):
+    """配置错误（缺少必填项、格式不对、Telegram 不认）：重启也修不好，启动时报错后待机，见 __main__。"""
+
+    def __init__(self, key: str, **params: Any):
+        super().__init__(key)
+        self.notice = Notice(key, params)

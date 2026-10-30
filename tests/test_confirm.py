@@ -6,7 +6,8 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from bot.i18n import LANGS  # noqa: E402
-from bot.keyboards import CONFIRMABLE, CONFIRMED, ReviewCB, confirm_kb, route  # noqa: E402
+from bot.keyboards import (CONFIRMABLE, CONFIRMED, AdminUserCB, ReviewCB, confirm_kb, route,  # noqa: E402
+                           user_card_kb, user_confirm_kb)
 from bot.permissions import ReviewerCheck, ReviewerPolicy  # noqa: E402
 
 REVIEW = -1001
@@ -32,6 +33,22 @@ def test_confirmed_action_maps_back_to_original():
     for action in CONFIRMABLE:
         assert (action + CONFIRMED).removesuffix(CONFIRMED) == action
         assert action + CONFIRMED not in CONFIRMABLE  # 确认后的动作不会再弹一次确认
+
+
+def test_user_card_buttons():
+    """/user 卡片：没被封禁 → “封禁”，被封禁 → “解除封禁”；确认面板的确认按钮带 _ok，返回是 back。"""
+    uid = 9_876_543_210  # 新用户的 ID 可能超过 32 位
+    for lang in LANGS:
+        for banned, action in ((False, "ban"), (True, "unban")):
+            (button,), = user_card_kb(uid, banned, lang).inline_keyboard
+            assert AdminUserCB.unpack(button.callback_data) == AdminUserCB(a=action, uid=uid)
+            assert button.style == CONFIRMABLE[action]
+            (confirm,), (back,) = user_confirm_kb(uid, action, lang).inline_keyboard
+            assert AdminUserCB.unpack(confirm.callback_data) == AdminUserCB(a=action + CONFIRMED, uid=uid)
+            assert AdminUserCB.unpack(back.callback_data).a == "back"
+            assert len(confirm.callback_data.encode()) <= 64
+    # 和控制消息的按钮互不混淆：前缀不同
+    assert user_card_kb(1, False, "zh").inline_keyboard[0][0].callback_data.startswith("au:")
 
 
 def test_route_every_review_action():

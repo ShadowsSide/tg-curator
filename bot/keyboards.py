@@ -64,6 +64,32 @@ class ReviewCB(CallbackData, prefix="r"):
     v: int = 0
 
 
+class AdminUserCB(CallbackData, prefix="au"):
+    """/user 卡片上的按钮：按用户（不是按投稿）封禁 / 解封。单独一类，ReviewCB 的 sid 是投稿编号。"""
+    a: str  # ban / unban：出确认面板；ban_ok / unban_ok：执行；back：收起确认面板
+    uid: int
+
+
+def user_card_kb(uid: int, banned: bool, lang: str) -> InlineKeyboardMarkup:
+    """/user 卡片：没被封禁显示“封禁”，被封禁显示“解除封禁”。"""
+    if banned:
+        button = InlineKeyboardButton(text=t(lang, "btn_unban"), style=CONFIRMABLE["unban"],
+                                      callback_data=AdminUserCB(a="unban", uid=uid).pack())
+    else:
+        button = InlineKeyboardButton(text=t(lang, "btn_ban_user"), style=CONFIRMABLE["ban"],
+                                      callback_data=AdminUserCB(a="ban", uid=uid).pack())
+    return InlineKeyboardMarkup(inline_keyboard=[[button]])
+
+
+def user_confirm_kb(uid: int, action: str, lang: str) -> InlineKeyboardMarkup:
+    """/user 卡片的二次确认面板，和控制消息上的确认面板用同样的文字和颜色。"""
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text=t(lang, f"btn_confirm_{action}"), style=CONFIRMABLE[action],
+                              callback_data=AdminUserCB(a=action + CONFIRMED, uid=uid).pack())],
+        [InlineKeyboardButton(text=t(lang, "btn_back"), callback_data=AdminUserCB(a="back", uid=uid).pack())],
+    ])
+
+
 def _rb(text: str, a: str, sid: int, v: int = 0, style: ButtonStyle | None = None) -> InlineKeyboardButton:
     return InlineKeyboardButton(text=text, callback_data=ReviewCB(a=a, sid=sid, v=v).pack(), style=style)
 

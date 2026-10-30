@@ -10,7 +10,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from bot.db import Submission, User  # noqa: E402
 from bot.i18n import LANGS, PRIVATE_COMMANDS, REVIEW_COMMANDS, T, normalize, t  # noqa: E402
-from bot.keyboards import control_kb, media_kb, schedule_kb, user_kb, user_media_kb  # noqa: E402
+from bot.keyboards import control_kb, media_kb, schedule_kb, user_kb, user_card_kb, user_confirm_kb, user_media_kb  # noqa: E402
 from bot.render import control_text, describe, stats_text  # noqa: E402
 
 CJK = re.compile(r"[一-鿿]")
@@ -73,6 +73,9 @@ def test_english_review_ui_has_no_chinese():
         assert not any(CJK.search(x) for x in _texts(control_kb(sub, "en", banned=True))), status
     assert not any(CJK.search(x) for x in _texts(schedule_kb(7, ("09:00", "21:00"), TZ, "en")))
     assert not any(CJK.search(x) for x in _texts(media_kb(_sub(), "en")))
+    for banned in (False, True):
+        assert not any(CJK.search(x) for x in _texts(user_card_kb(42, banned, "en")))
+        assert not any(CJK.search(x) for x in _texts(user_confirm_kb(42, "unban" if banned else "ban", "en")))
     for status in ("draft", "pending"):
         assert not any(CJK.search(x) for x in _texts(user_kb(_sub(status, merge_to=3), "en"))), status
     assert not any(CJK.search(x) for x in _texts(user_media_kb(_sub(), "en")))

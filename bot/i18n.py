@@ -336,6 +336,7 @@ T: dict[str, dict[str, str]] = {
     "btn_confirm_ban": {"zh": "🚫 确认封禁（同时拒绝其所有未处理来稿）",
                         "en": "🚫 Confirm ban (also rejects all their open submissions)"},
     "btn_unban": {"zh": "🔓 解除封禁", "en": "🔓 Unban"},
+    "btn_ban_user": {"zh": "🚫 封禁", "en": "🚫 Ban"},
     "btn_confirm_unban": {"zh": "🔓 确认解封（会通知投稿人）", "en": "🔓 Confirm unban (the submitter is notified)"},
 
     # ---------- 审核：按钮反馈 ----------
@@ -355,6 +356,7 @@ T: dict[str, dict[str, str]] = {
     "toast_rejected": {"zh": "已拒绝（需要附理由请用 /no 回复）", "en": "Rejected (reply with /no to give a reason)"},
     "toast_unbanned": {"zh": "已解除封禁，已通知投稿人", "en": "Unbanned; the submitter has been notified"},
     "toast_not_banned": {"zh": "这个投稿人现在没有被封禁", "en": "This submitter isn't banned now"},
+    "toast_already_banned": {"zh": "这个投稿人已经被封禁了", "en": "This submitter is already banned"},
     "toast_banned": {
         "zh": "已封禁，并拒绝 {n} 条未处理来稿",
         "en": "Banned; {n} open submission(s) rejected",

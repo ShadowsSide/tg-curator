@@ -4,6 +4,7 @@ import html
 
 from aiogram import F, Router
 from aiogram.dispatcher.event.bases import SkipHandler
+from aiogram.exceptions import TelegramBadRequest
 from aiogram.filters import Command, CommandObject
 from aiogram.types import CallbackQuery, Message
 
@@ -14,7 +15,7 @@ from ..db import Prompt
 from ..errors import Notice, notice
 from ..permissions import ReviewerCheck, ReviewerOnly, ReviewerPolicy
 from ..i18n import t
-from ..keyboards import ReviewCB, route
+from ..keyboards import AdminUserCB, ReviewCB, route, user_confirm_kb
 from ..render import dump_link_preview, extract_item, message_item, user_link
 from ..timeutil import parse_time
 
@@ -161,6 +162,34 @@ def build_router(settings: Settings) -> Router:
         else:
             await cq.answer()
 
+    @router.callback_query(AdminUserCB.filter())
+    async def on_user_card(cq: CallbackQuery, callback_data: AdminUserCB, core: Core) -> None:
+        """/user 卡片上的封禁 / 解封：先确认；状态已经变了（别人刚封禁 / 解封过）就只刷新卡片。"""
+        uid, a, lang = callback_data.uid, callback_data.a, core.lang
+        action = a.removesuffix("_ok")
+        user = await core.get_user(uid)
+        banned = bool(user and user.banned)
+        toast, alert = None, False
+        if action in ("ban", "unban") and banned == (action == "ban"):  # 已经是想要的状态了
+            toast, alert = t(lang, "toast_already_banned" if banned else "toast_not_banned"), True
+        elif a in ("ban", "unban"):
+            await cq.message.edit_reply_markup(reply_markup=user_confirm_kb(uid, a, lang))
+            await cq.answer(t(lang, "toast_confirm"))
+            return
+        elif a == "ban_ok":
+            rejected = await core.ban_user(uid, cq.from_user)
+            toast, alert = t(lang, "toast_banned", n=len(rejected)), False
+        elif a == "unban_ok":
+            await core.unban_user(uid)
+            toast, alert = t(lang, "toast_unbanned"), False
+        text, kb = await core.user_card(uid)
+        try:
+            await cq.message.edit_text(text, reply_markup=kb, link_preview_options=NO_PREVIEW)
+        except TelegramBadRequest as e:
+            if "not modified" not in str(e):
+                raise
+        await cq.answer(toast, show_alert=bool(toast) and alert)
+
     # ---------- 回复提示 ----------
 
     @router.message(F.reply_to_message)
@@ -268,7 +297,8 @@ def build_router(settings: Settings) -> Router:
         if uid is None:
             await m.answer(t(core.lang, "usage_user"))
             return
-        await m.answer(await core.user_text(uid, for_admin=True), link_preview_options=NO_PREVIEW)
+        text, kb = await core.user_card(uid)
+        await m.answer(text, reply_markup=kb, link_preview_options=NO_PREVIEW)
 
     @router.message(Command("no"))
     async def reject_cmd(m: Message, command: CommandObject, core: Core) -> None:

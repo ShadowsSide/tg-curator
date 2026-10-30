@@ -38,6 +38,7 @@ Built with Python 3.12 + [aiogram 3](https://github.com/aiogram/aiogram) + SQLit
 - **🖼 Media**: while pending, add, replace or remove photos and videos (up to 10); text submissions can get photos too
 - Commands work as well: `/edit` to change a post, `/no reason` to reject, `/ban reason` to ban. Banning also rejects every open submission from that user
 - Safe against accidental taps: Publish now, Reject, Ban and Unban need a second tap to confirm
+- `/user` shows a contributor with a button to ban or unban them directly
 - Safe against double actions: if two admins press "Publish" at the same time, the post is still published only once
 - **Only answers in private chats and the review group**: it never replies in other groups, and leaves any other group or channel it's added to. The publishing channel and its linked discussion group are whitelisted and never left
 
@@ -230,7 +231,7 @@ The commands below do the same as the buttons, for those who prefer commands. Us
 | `/stats` | Posts the latest review summary |
 | `/queue` | Lists scheduled posts |
 | `/active [days]` | Contributor activity ranking (default: 30 days) |
-| `/user <user ID>` | Shows one contributor's stats |
+| `/user <user ID>` | Shows one contributor's stats, with a 🚫 Ban / 🔓 Unban button below (asks to confirm); works for users with no submissions too, to ban in advance |
 | `/cancel` | Drops prompts waiting for your reply: as a reply to a prompt it drops that one; on its own it drops all of yours |
 
 `/ban` and `/unban` also accept a user ID (`/ban <user ID> reason`) for users with nothing under review, or to ban someone in advance. Each scheduled post in `/queue` has a “view” link that jumps to its control message.

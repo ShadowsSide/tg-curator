@@ -7,8 +7,10 @@ import logging
 from datetime import datetime
 
 from aiogram.exceptions import TelegramAPIError, TelegramBadRequest
+from aiogram.types import InlineKeyboardMarkup
 
 from ..i18n import t
+from ..keyboards import user_card_kb
 from ..render import describe, stats_text, user_link
 from ..timeutil import now_ts, start_of_today, utc_offset
 
@@ -92,23 +94,30 @@ class StatsMixin(CoreBase):
     async def user_text(self, user_id: int, for_admin: bool, lang: str | None = None) -> str:
         lang = lang or self.lang
         s = await self.db.user_summary(user_id)
-        if not s["total"]:
-            return t(lang, "no_records_admin", uid=user_id) if for_admin else t(lang, "no_records_self")
+        banned = ""
+        if for_admin:
+            user = await self.db.get_user(user_id)
+            if user and user.banned:
+                banned = (t(lang, "user_banned_line", when=self.fmt(user.banned_at, lang),
+                            by=html.escape(user.banned_by or "")) + _reason_line(lang, user.ban_reason))
+        if not s["total"]:  # 没投过稿也可能被预先封禁，管理员要看得到
+            return t(lang, "no_records_admin", uid=user_id) + banned if for_admin else t(lang, "no_records_self")
         reviewed = s["published"] + s["scheduled"] + s["rejected"]
         rate = f"{(s['published'] + s['scheduled']) / reviewed * 100:.0f}%" if reviewed else "-"
         head = t(lang, "me_head")
         if for_admin:
-            user = await self.db.get_user(user_id)
-            banned = ""
-            if user and user.banned:
-                banned = (t(lang, "user_banned_line", when=self.fmt(user.banned_at, lang),
-                            by=html.escape(user.banned_by or "")) + _reason_line(lang, user.ban_reason))
             head = f"📈 {user_link(user, user_id)}  <code>{user_id}</code>{banned}"
         return f"{head}\n" + t(
             lang, "user_summary", total=s["total"], published=s["published"], scheduled=s["scheduled"],
             pending=s["pending"], rejected=s["rejected"], rate=rate, anonymous=s["anonymous"],
             first=self.fmt(s["first_at"], lang), last=self.fmt(s["last_at"], lang),
         )
+
+    async def user_card(self, user_id: int) -> tuple[str, InlineKeyboardMarkup]:
+        """/user 的结果：投稿人统计，下面是按当前状态显示的“封禁”或“解除封禁”按钮。"""
+        user = await self.db.get_user(user_id)
+        return (await self.user_text(user_id, for_admin=True),
+                user_card_kb(user_id, bool(user and user.banned), self.lang))
 
     async def queue_text(self) -> str:
         subs = await self.db.upcoming_scheduled()

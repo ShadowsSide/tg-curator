@@ -1,5 +1,5 @@
 # 推送到 main 或打 v* 标签时，构建 amd64 + arm64 镜像并发布：
-#   - GHCR（始终）：ghcr.io/<owner>/tg-submit-bot
+#   - GHCR（始终）：ghcr.io/<owner>/tg-curator
 #   - Docker Hub（可选）：在仓库 Settings → Secrets and variables → Actions 中
 #       Variables 添加 DOCKERHUB_USERNAME，Secrets 添加 DOCKERHUB_TOKEN 后自动启用
 name: docker
@@ -43,8 +43,8 @@ jobs:
         uses: docker/metadata-action@v6
         with:
           images: |
-            ghcr.io/${{ github.repository_owner }}/tg-submit-bot
-            name=docker.io/${{ env.DOCKERHUB_USERNAME }}/tg-submit-bot,enable=${{ env.DOCKERHUB_USERNAME != '' }}
+            ghcr.io/${{ github.repository_owner }}/tg-curator
+            name=docker.io/${{ env.DOCKERHUB_USERNAME }}/tg-curator,enable=${{ env.DOCKERHUB_USERNAME != '' }}
           tags: |
             type=raw,value=latest,enable={{is_default_branch}}
             type=ref,event=tag

@@ -1,13 +1,15 @@
-# tg-submit-bot
+# Curator
 
-[![docker](https://github.com/ShadowsSide/tg-submit-bot/actions/workflows/docker.yml/badge.svg)](https://github.com/ShadowsSide/tg-submit-bot/actions/workflows/docker.yml)
-[![license](https://img.shields.io/github/license/ShadowsSide/tg-submit-bot)](LICENSE)
+[![docker](https://github.com/ShadowsSide/tg-curator/actions/workflows/docker.yml/badge.svg)](https://github.com/ShadowsSide/tg-curator/actions/workflows/docker.yml)
+[![license](https://img.shields.io/github/license/ShadowsSide/tg-curator)](LICENSE)
 ![python](https://img.shields.io/badge/python-3.12-blue)
 ![platform](https://img.shields.io/badge/platform-linux%2Famd64%20%7C%20linux%2Farm64-lightgrey)
 
 **简体中文** | [English](README.en.md)
 
-一个 Telegram 频道投稿机器人：用户私聊投稿，管理员在审核群里审核，通过后发布到频道。
+[功能](#功能) · [工作流程](#工作流程) · [快速开始](#快速开始) · [配置](#配置) · [使用](#使用) · [已知限制与风险](#已知限制与风险) · [常见问题](#常见问题) · [开发](#开发) · [License](#license)
+
+**Curator** 是一个 Telegram 频道投稿机器人：用户私聊投稿，管理员在审核群里审核，通过后发布到频道。
 
 基于 Python 3.12 + [aiogram 3](https://github.com/aiogram/aiogram) + SQLite，使用 Docker Compose 一键部署。采用长轮询方式运行，**不需要公网 IP，也不需要 HTTPS**。
 
@@ -84,8 +86,8 @@
 ### 2. 部署
 
 ```bash
-git clone https://github.com/ShadowsSide/tg-submit-bot.git
-cd tg-submit-bot
+git clone https://github.com/ShadowsSide/tg-curator.git
+cd tg-curator
 cp .env.example .env        # 填写 BOT_TOKEN、CHANNEL_ID、REVIEW_CHAT_ID
 docker compose up -d --build
 docker compose logs -f
@@ -94,7 +96,7 @@ docker compose logs -f
 如果不想在服务器上构建，可以直接使用预构建镜像：在 `.env` 里加上
 
 ```bash
-IMAGE=ghcr.io/shadowsside/tg-submit-bot:latest
+IMAGE=ghcr.io/shadowsside/tg-curator:latest
 ```
 
 然后执行：
@@ -150,7 +152,7 @@ docker compose pull && docker compose up -d --no-build           # 2. 或者：�
 | `REMINDER_INTERVAL_MINUTES` | `60` | 审核统计提醒的间隔（分钟），按整点对齐；`0` 表示关闭 |
 | `REMINDER_QUIET_HOURS` | — | 免打扰时段，例如 `0-8` |
 | `PROXY` | — | 代理，例如 `socks5://host:port` |
-| `IMAGE` | `tg-submit-bot:latest` | 使用预构建镜像时填写 |
+| `IMAGE` | `tg-curator:latest` | 使用预构建镜像时填写 |
 
 > 在 Docker 里运行时，`127.0.0.1` 指的是容器自己。要使用宿主机上的代理，请填宿主机 IP，或者 `host.docker.internal`（Docker Desktop）。
 
@@ -335,7 +337,7 @@ scripts/          多架构镜像构建脚本
 
 ### 发布镜像（Fork 后自用）
 
-推送到 `main` 或打 `v*` 标签时，GitHub Actions 会构建 amd64 + arm64 镜像，并发布到 `ghcr.io/<owner>/tg-submit-bot`。
+推送到 `main` 或打 `v*` 标签时，GitHub Actions 会构建 amd64 + arm64 镜像，并发布到 `ghcr.io/<owner>/tg-curator`。
 
 如果还想同时发布到 Docker Hub，在仓库的 **Settings → Secrets and variables → Actions** 里添加变量 `DOCKERHUB_USERNAME` 和密钥 `DOCKERHUB_TOKEN`（Docker Hub 访问令牌，需要 Read & Write 权限）。
 

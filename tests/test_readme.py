@@ -3,6 +3,7 @@
 - 标题层级、表格行、代码块数量一致（英文版开头多一段语言说明，不算）
 - 配置表的分组和每组的变量、顺序一致，并且正好是 bot/config.py 读取的变量（加 compose 用的 IMAGE）
 - 审核群和私聊的命令表都列出了机器人注册的命令（/start、/help 除外）
+- 开头的章节跳转链接正好对应每个二级标题，顺序一致，锚点按 GitHub 的规则生成
 - .env.example（中文）和 .env.en.example（英文）的分组、变量、顺序都和 README 配置表一致，示例值也一致（LANGUAGE、TZ、REMINDER_QUIET_HOURS 除外：英文版用 en、UTC、不设免打扰）
 """
 import os
@@ -89,6 +90,20 @@ def test_command_tables_list_registered_commands():
             want = {c for c, _ in registered["zh"]} - TRIVIAL_COMMANDS
             missing = want - commands(lines, a, b)
             assert not missing, f"{a}: missing {missing}"
+
+
+def anchor(heading):
+    """GitHub 给标题生成的锚点：转小写，去掉标点（保留字母、数字、汉字、- 和 _），空格换成 -。"""
+    return re.sub(r"[^\w\- ]", "", heading.strip().lower()).replace(" ", "-")
+
+
+def test_toc_links_every_section():
+    for lines in (ZH, EN):
+        toc = next(line for line in lines if line.startswith("[") and "](#" in line)
+        links = re.findall(r"\[([^\]]+)\]\(#([^)]+)\)", toc)
+        heads = [line[3:] for line in lines if line.startswith("## ")]
+        assert [text for text, _ in links] == heads, (links, heads)
+        assert [a for _, a in links] == [anchor(h) for h in heads], links
 
 
 def env_groups(lines):

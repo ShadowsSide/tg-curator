@@ -84,7 +84,7 @@ Built with Python 3.12 + [aiogram 3](https://github.com/aiogram/aiogram) + SQLit
 
 1. Create a bot with [@BotFather](https://t.me/BotFather) and copy its token. Leave privacy mode on (the default)
 2. Make the bot an admin of your **channel** with permission to post messages
-3. Create a **review group** and add the bot as a regular member. By default only the group's **admins and owner** can review (`REVIEWERS`); other members get a “no permission” notice
+3. Create a **review group** and add the bot as a regular member (to use 🗑 on a banned user's posts older than 48 hours, make it an admin with the “Delete messages” right). By default only the group's **admins and owner** can review (`REVIEWERS`); other members get a “no permission” notice
 4. Find the channel ID and review group ID (both are numbers starting with `-100`). You can use a bot such as [@RawDataBot](https://t.me/RawDataBot), or send a message in the group and open `https://api.telegram.org/bot<token>/getUpdates`. For the channel you can also use its `@username`
 
 ### 2. Deploy
@@ -193,7 +193,7 @@ Spam checks, messaging window, stats scope and so on; the defaults are usually f
 
 ### Admins (review group)
 
-Buttons on the control message: **✅ Publish now**, **⏰ Schedule**, **❌ Reject**, **🚫 Ban submitter**, **✏️ Edit**, **🖼 Media**, plus the **🙈 Spoiler** and **🔕 Silent** toggles. Once a submitter is banned, their control messages show **🔓 Unban**.
+Buttons on the control message: **✅ Publish now**, **⏰ Schedule**, **❌ Reject**, **🚫 Ban submitter**, **✏️ Edit**, **🖼 Media**, plus the **🙈 Spoiler** and **🔕 Silent** toggles. Once a submitter is banned, their control messages show **🔓 Unban** and **🗑 Delete their posts**: after you confirm, it deletes the previews, control messages and relayed messages of all their submissions (published ones too) from the review group. The submissions and stats stay in the database.
 
 #### Reply prompts
 
@@ -230,7 +230,7 @@ The commands below do the same as the buttons, for those who prefer commands. Us
 | `/stats` | Posts the latest review summary |
 | `/queue` | Lists scheduled posts |
 | `/active [days]` | Contributor activity ranking (default: 30 days) |
-| `/user <user ID>` | Shows one contributor's stats, with a 🚫 Ban / 🔓 Unban button below (asks to confirm); works for users with no submissions too, to ban in advance |
+| `/user <user ID>` | Shows one contributor's stats, with a 🚫 Ban / 🔓 Unban button below (asks to confirm); works for users with no submissions too, to ban in advance. If they're banned and still have posts in the review group, there's also a 🗑 delete button |
 | `/cancel` | Drops prompts waiting for your reply: as a reply to a prompt it drops that one; on its own it drops all of yours |
 
 `/ban` and `/unban` also accept a user ID (`/ban <user ID> reason`) for users with nothing under review, or to ban someone in advance. Each scheduled post in `/queue` has a “view” link that jumps to its control message.
@@ -242,7 +242,7 @@ The commands below do the same as the buttons, for those who prefer commands. Us
 - **The confirm panel can be reset**: if the control message refreshes while you're about to confirm (the submitter edits, someone sends `/msg`, …), the buttons go back to normal and you need to tap again. Nothing runs by accident
 - **Changing `REJECT_TEMPLATES` can shift old panels**: buttons store the reason's position. After reordering the reasons and restarting, a panel opened before the restart picks the reason by the new order; an out-of-range position means “No reason”. Finish any rejection in progress before changing it
 - **Reasons can't contain `|`**: it's the separator
-- **Old 🔓 buttons don't disappear by themselves**: a ban only refreshes the control messages it rejects. After `/unban <user ID>`, the 🔓 on those messages stays until someone taps it; it then says the user isn't banned and removes itself (the submitter isn't notified again). This avoids refreshing all of that user's control messages at once and hitting rate limits
+- **Old 🔓 / 🗑 buttons don't disappear by themselves**: a ban only refreshes the control messages it rejects. After `/unban <user ID>`, the 🔓 / 🗑 on those messages stay until someone taps them; tapping one then says the user isn't banned and removes them (the submitter isn't notified again). This avoids refreshing all of that user's control messages at once and hitting rate limits
 - **The review group hits rate limits sooner**: the confirm and reason panels each edit the control message once more, so with heavy review traffic Telegram's limits come sooner. The bot waits and retries automatically, but actions get slower
 
 **Changing photos and videos**

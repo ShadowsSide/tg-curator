@@ -114,10 +114,13 @@ class StatsMixin(CoreBase):
         )
 
     async def user_card(self, user_id: int) -> tuple[str, InlineKeyboardMarkup]:
-        """/user 的结果：投稿人统计，下面是按当前状态显示的“封禁”或“解除封禁”按钮。"""
+        """/user 的结果：投稿人统计，下面是按当前状态显示的“封禁”或“解除封禁”按钮；
+        被封禁且审核群里还有 TA 的稿件时，再加“删除稿件”按钮（显示条数）。"""
         user = await self.db.get_user(user_id)
+        banned = bool(user and user.banned)
+        purgeable = len(await self.db.review_traces(self.s.review_chat_id, user_id)) if banned else 0
         return (await self.user_text(user_id, for_admin=True),
-                user_card_kb(user_id, bool(user and user.banned), self.lang))
+                user_card_kb(user_id, banned, self.lang, purgeable))
 
     async def queue_text(self) -> str:
         subs = await self.db.upcoming_scheduled()

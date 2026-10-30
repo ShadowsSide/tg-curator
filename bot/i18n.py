@@ -337,6 +337,10 @@ T: dict[str, dict[str, str]] = {
                         "en": "🚫 Confirm ban (also rejects all their open submissions)"},
     "btn_unban": {"zh": "🔓 解除封禁", "en": "🔓 Unban"},
     "btn_ban_user": {"zh": "🚫 封禁", "en": "🚫 Ban"},
+    "btn_purge": {"zh": "🗑 删除 TA 的稿件", "en": "🗑 Delete their posts"},
+    "btn_purge_n": {"zh": "🗑 删除 TA 在审核群的稿件（{n} 条）", "en": "🗑 Delete their posts in this group ({n})"},
+    "btn_confirm_purge": {"zh": "🗑 确认删除（审核群里 TA 的全部稿件，不可恢复）",
+                          "en": "🗑 Confirm delete (all their posts in this group; can't be undone)"},
     "btn_confirm_unban": {"zh": "🔓 确认解封（会通知投稿人）", "en": "🔓 Confirm unban (the submitter is notified)"},
 
     # ---------- 审核：按钮反馈 ----------

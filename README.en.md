@@ -256,7 +256,8 @@ The commands below do the same as the buttons, for those who prefer commands. Us
 - **Bad values keep the bot from running**: with a non-number in `MAX_LINKS` or `NEW_USER_COOLDOWN_MINUTES`, or a `SPAM_ACTION` other than `flag` / `block`, the log shows one “Configuration error: …” line and the container is marked `unhealthy` until `.env` is fixed
 
 **Other**
-- **An album being collected during a restart is lost or split**: the items of an album arrive separately, and the bot waits `ALBUM_DELAY` seconds in memory to collect them. If it restarts within those seconds, the items that already arrived are lost and the ones arriving after the restart become a separate submission. The submitter needs to send it again
+- **An album being collected during a crash is lost**: the items of an album arrive separately, and the bot waits `ALBUM_DELAY` seconds in memory to collect them. On a normal stop (`docker stop`, updates) it handles the items that already arrived first, and the ones arriving after the restart join the same submission; but if it crashes, loses power or is killed within those seconds, the items that already arrived are lost and the submitter needs to send them again
+- **The late part of an album isn't always merged**: items arriving later than `ALBUM_DELAY` join the submission made from the same album for up to 10 minutes. If that submission is already being reviewed, was cancelled, or would go over 10 items, the late part becomes a separate submission and the prompt says why. When it joins a pending submission, the review group gets an updated preview and the control message shows “edited (submitter)”
 
 ## FAQ
 

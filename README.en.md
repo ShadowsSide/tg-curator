@@ -7,7 +7,7 @@
 
 [简体中文](README.md) | **English**
 
-[Features](#features) · [How it works](#how-it-works) · [Quick start](#quick-start) · [Configuration](#configuration) · [Usage](#usage) · [Known limitations and risks](#known-limitations-and-risks) · [FAQ](#faq) · [Development](#development) · [License](#license)
+[Features](#features) · [How it works](#how-it-works) · [Quick start](#quick-start) · [Configuration](#configuration) · [Usage](#usage) · [Known limitations and risks](#known-limitations-and-risks) · [FAQ](#faq) · [Development](#development)
 
 **Curator** is a Telegram channel submission bot: users send posts to the bot in a private chat, admins review them in a review group, and approved posts are published to the channel.
 
@@ -99,7 +99,8 @@ docker compose up -d
 docker compose logs -f
 ```
 
-The configuration is checked at startup. If a required value is missing or malformed, Telegram rejects the token, the channel or review group can't be found, the two IDs are swapped, or the bot isn't a channel admin with the “Post messages” right, the log shows one “Configuration error: …” line and the container is marked `unhealthy`. The bot then stays idle instead of restarting over and over; fix `.env` and run `docker compose up -d`. Network errors are not configuration errors: the container restarts and tries again.
+> [!NOTE]
+> The configuration is checked at startup. If a required value is missing or malformed, Telegram rejects the token, the channel or review group can't be found, the two IDs are swapped, or the bot isn't a channel admin with the “Post messages” right, the log shows one “Configuration error: …” line and the container is marked `unhealthy`. The bot then stays idle instead of restarting over and over; fix `.env` and run `docker compose up -d`. Network errors are not configuration errors: the container restarts and tries again.
 
 Image tags: `latest` is the newest build of the main branch, `vX.Y.Z` are releases, and `sha-xxxxxxx` points to a specific build, which is handy for rolling back. To use another tag or image, set `IMAGE` in `.env`.
 
@@ -107,7 +108,8 @@ To build from source instead, clone the whole repository and run `docker compose
 
 ### 3. Updating and backups
 
-**Back up the database before updating**: upgrades migrate the schema automatically, and some versions drop columns that are no longer used, which can't be undone.
+> [!WARNING]
+> **Back up the database before updating**: upgrades migrate the schema automatically, and some versions drop columns that are no longer used, which can't be undone.
 
 ```bash
 docker compose cp bot:/app/data/bot.db ./backup-$(date +%F).db   # 1. back up the database
@@ -149,6 +151,7 @@ Options most deployments adjust as needed.
 | `PROXY` | — | Proxy, e.g. `socks5://host:port` |
 | `IMAGE` | `ghcr.io/shadowsside/tg-curator:latest` | Set this to use another image, e.g. a pinned version, your fork's image or one on Docker Hub |
 
+> [!TIP]
 > Inside Docker, `127.0.0.1` means the container itself. To use a proxy running on the host, use the host's IP address or `host.docker.internal` (Docker Desktop).
 
 ### Advanced
@@ -250,7 +253,7 @@ The commands below do the same as the buttons, for those who prefer commands. Us
 - **Only URLs and hyperlinks count as links**: `@usernames`, emails and phone numbers don't
 - **Edits only update the flags, never block**: even with `SPAM_ACTION=block`, adding a keyword by editing after submitting just shows a flag for reviewers
 - **The cooldown only applies to submitters with nothing published yet**: one published post lifts it; it counts from the last submission, rejected ones included
-- **Bad values stop the bot from starting**: a non-number in `MAX_LINKS` or `NEW_USER_COOLDOWN_MINUTES`, or a `SPAM_ACTION` other than `flag` / `block`, makes the bot exit with an error at startup
+- **Bad values keep the bot from running**: with a non-number in `MAX_LINKS` or `NEW_USER_COOLDOWN_MINUTES`, or a `SPAM_ACTION` other than `flag` / `block`, the log shows one “Configuration error: …” line and the container is marked `unhealthy` until `.env` is fixed
 
 **Other**
 - **An album being collected during a restart is lost or split**: the items of an album arrive separately, and the bot waits `ALBUM_DELAY` seconds in memory to collect them. If it restarts within those seconds, the items that already arrived are lost and the ones arriving after the restart become a separate submission. The submitter needs to send it again
@@ -261,7 +264,10 @@ The commands below do the same as the buttons, for those who prefer commands. Us
 Telegram only lets bots with a username bought on Fragment send custom emoji to channels. When the channel refuses them, the bot automatically resends the post with the matching regular emoji. All other formatting is unaffected.
 
 **The log says `Conflict: terminated by other getUpdates request`.**
-Two processes are using the same token. Make sure only one instance is running, and use a separate bot for testing.
+Two processes are using the same token.
+
+> [!IMPORTANT]
+> Run only one instance per token, and use a separate bot for testing.
 
 **A post failed to publish. What now?**
 The control message shows the reason and a 🔁 Retry button. A common cause is that the caption plus the signature exceeds Telegram's length limit (1024 characters for media captions, 4096 for text). Shorten it with `/edit`, then retry.
@@ -337,7 +343,3 @@ On every push to `main` or `v*` tag, GitHub Actions builds amd64 + arm64 images 
 To publish to Docker Hub as well, add the variable `DOCKERHUB_USERNAME` and the secret `DOCKERHUB_TOKEN` (a Docker Hub access token with Read & Write permission) under **Settings → Secrets and variables → Actions** in your repository.
 
 You can also build and push locally: `scripts/build-multiarch.sh <image:tag>`.
-
-## License
-
-[MIT](LICENSE)

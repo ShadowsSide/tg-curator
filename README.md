@@ -7,7 +7,7 @@
 
 **简体中文** | [English](README.en.md)
 
-[功能](#功能) · [工作流程](#工作流程) · [快速开始](#快速开始) · [配置](#配置) · [使用](#使用) · [已知限制与风险](#已知限制与风险) · [常见问题](#常见问题) · [开发](#开发) · [License](#license)
+[功能](#功能) · [工作流程](#工作流程) · [快速开始](#快速开始) · [配置](#配置) · [使用](#使用) · [已知限制与风险](#已知限制与风险) · [常见问题](#常见问题) · [开发](#开发)
 
 **Curator** 是一个 Telegram 频道投稿机器人：用户私聊投稿，管理员在审核群里审核，通过后发布到频道。
 
@@ -97,7 +97,8 @@ docker compose up -d
 docker compose logs -f
 ```
 
-启动时会检查配置：必填项没填或格式不对、Telegram 不认 token、找不到频道或审核群、两个 ID 填反、机器人不是频道管理员或没有“发布消息”权限，日志里会出现一行“配置错误：……”，容器状态显示 `unhealthy`。这时机器人不运行，也不会反复重启；改好 `.env` 后执行 `docker compose up -d`。网络不通不算配置错误，容器会自动重启重试。
+> [!NOTE]
+> 启动时会检查配置：必填项没填或格式不对、Telegram 不认 token、找不到频道或审核群、两个 ID 填反、机器人不是频道管理员或没有“发布消息”权限，日志里会出现一行“配置错误：……”，容器状态显示 `unhealthy`。这时机器人不运行，也不会反复重启；改好 `.env` 后执行 `docker compose up -d`。网络不通不算配置错误，容器会自动重启重试。
 
 镜像标签：`latest` 对应 main 分支的最新版本；`vX.Y.Z` 是发布版本；`sha-xxxxxxx` 对应某次具体构建，方便回滚。要换标签或换成别的镜像，在 `.env` 里设置 `IMAGE`。
 
@@ -105,7 +106,8 @@ docker compose logs -f
 
 ### 3. 更新与备份
 
-**更新前先备份数据库**：升级时会自动迁移表结构，有的版本会删除不再使用的列，删了不能恢复。
+> [!WARNING]
+> **更新前先备份数据库**：升级时会自动迁移表结构，有的版本会删除不再使用的列，删了不能恢复。
 
 ```bash
 docker compose cp bot:/app/data/bot.db ./backup-$(date +%F).db   # 1. 备份数据库
@@ -147,6 +149,7 @@ docker compose pull && docker compose up -d                      # 2. 更新到�
 | `PROXY` | — | 代理，例如 `socks5://host:port` |
 | `IMAGE` | `ghcr.io/shadowsside/tg-curator:latest` | 换成其他镜像时填写，例如固定版本、自己 fork 的镜像或 Docker Hub 上的镜像 |
 
+> [!TIP]
 > 在 Docker 里运行时，`127.0.0.1` 指的是容器自己。要使用宿主机上的代理，请填宿主机 IP，或者 `host.docker.internal`（Docker Desktop）。
 
 ### 高级
@@ -248,7 +251,7 @@ docker compose pull && docker compose up -d                      # 2. 更新到�
 - **只检查网址和超链接**：`@用户名`、邮箱、电话号码不算链接
 - **改稿只更新标记，不拦截**：即使 `SPAM_ACTION=block`，投稿后再改稿加进关键词也只会出现标记，由审核员判断
 - **冷却只针对还没有稿件发布过的人**：只要发布过一条就不再受限；按“上次提交时间”计算，被拒绝的投稿也算
-- **配置写错会启动失败**：`MAX_LINKS`、`NEW_USER_COOLDOWN_MINUTES` 不是数字，或 `SPAM_ACTION` 不是 `flag` / `block` 时，机器人启动会报错退出
+- **配置写错时机器人不运行**：`MAX_LINKS`、`NEW_USER_COOLDOWN_MINUTES` 不是数字，或 `SPAM_ACTION` 不是 `flag` / `block` 时，日志里会出现一行“配置错误：……”，容器显示 `unhealthy`，改好 `.env` 后才会运行
 
 **其他**
 - **重启时正在收集的相册会丢失或被拆开**：相册的每一项是分开到达的，机器人在内存里等 `ALBUM_DELAY` 秒收齐后再处理。恰好在这几秒内重启，已经到达的那几项会丢失，重启后才到的会单独成为一条投稿。投稿人需要重新发送
@@ -259,7 +262,10 @@ docker compose pull && docker compose up -d                      # 2. 更新到�
 Telegram 只允许购买了 Fragment 用户名的机器人往频道发自定义 emoji。频道拒收时，机器人会自动换成对应的普通 emoji 重新发送，其他格式不受影响。
 
 **日志里出现 `Conflict: terminated by other getUpdates request`？**
-同一个 token 同时被两个进程使用了。请确保只运行一个实例；测试时请用单独的机器人。
+同一个 token 同时被两个进程使用了。
+
+> [!IMPORTANT]
+> 同一个 token 只能运行一个实例；测试时请用单独的机器人。
 
 **发布失败了怎么办？**
 控制消息会显示失败原因，并提供 🔁 重试 按钮。常见原因是说明文字加上落款后超过了 Telegram 的长度限制（媒体说明 1024 字，文字 4096 字），可以先用 `/edit` 缩短后再重试。
@@ -335,7 +341,3 @@ scripts/          多架构镜像构建脚本
 如果还想同时发布到 Docker Hub，在仓库的 **Settings → Secrets and variables → Actions** 里添加变量 `DOCKERHUB_USERNAME` 和密钥 `DOCKERHUB_TOKEN`（Docker Hub 访问令牌，需要 Read & Write 权限）。
 
 也可以在本地构建并推送：`scripts/build-multiarch.sh <镜像名:标签>`。
-
-## License
-
-[MIT](LICENSE)

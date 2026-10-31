@@ -1,17 +1,26 @@
 """投稿人一侧：收到内容、创建草稿、提交到审核群、取消。"""
 from __future__ import annotations
 
+import asyncio
+import logging
+
+from aiogram.exceptions import TelegramAPIError
 from aiogram.types import Message, User as TgUser
 
-from .. import spam
+from .. import media, spam
 from ..errors import Notice, notice
 from ..i18n import t
-from ..db import SUBMITTER_EDITABLE
+from ..db import SUBMITTER_EDITABLE, Submission
 from ..keyboards import control_kb, media_count
 from ..render import control_text, describe, extract_item, send_items
 from ..timeutil import now_ts
 
 from .base import CoreBase, NO_PREVIEW, _reply_to, _reason_line, explicit_reply
+
+log = logging.getLogger(__name__)
+
+# 相册后到的部分：这么久之内由同一个相册生成的投稿，会把它并进去（超过就当成新投稿）
+ALBUM_MERGE_WINDOW = 10 * 60
 
 
 class SubmissionsMixin(CoreBase):
@@ -21,7 +30,27 @@ class SubmissionsMixin(CoreBase):
         await self.db.touch_user(user.id, user.username, user.full_name, self.lang_of(user))
 
     async def receive(self, messages: list[Message]) -> None:
-        """收到用户内容（单条或整个相册），创建草稿并让用户选署名/匿名。"""
+        """收到用户内容（单条或整个相册），创建草稿并让用户选署名/匿名。
+        相册的每一项是分开到达的，晚于 ALBUM_DELAY 到的部分会单独交过来：并进同一个相册生成的投稿。"""
+        first = messages[0]
+        if not first.media_group_id:
+            await self._receive(messages)
+            return
+        # 同一个相册的几部分依次处理：前一部分的草稿和提示消息都建好了，后一部分才能并进去
+        key = (first.from_user.id, first.media_group_id)
+        lock, users = self._album_locks.get(key) or (asyncio.Lock(), 0)
+        self._album_locks[key] = (lock, users + 1)
+        try:
+            async with lock:
+                await self._receive(messages)
+        finally:
+            lock, users = self._album_locks[key]
+            if users == 1:
+                del self._album_locks[key]
+            else:
+                self._album_locks[key] = (lock, users - 1)
+
+    async def _receive(self, messages: list[Message]) -> None:
         first = messages[0]
         user = first.from_user
         lang = self.lang_of(user)
@@ -31,13 +60,20 @@ class SubmissionsMixin(CoreBase):
         if db_user and db_user.banned:
             await first.reply(t(lang, "banned") + _reason_line(lang, db_user.ban_reason))
             return
-        if await self.db.count_open_by_user(user.id) >= self.s.max_pending_per_user:
-            await first.reply(t(lang, "too_many"))
-            return
-
         items = [extract_item(m) for m in messages]
         if any(i is None for i in items):
             await first.reply(t(lang, "unsupported"))
+            return
+
+        late = None  # 相册后到的部分没能并进原来的投稿：原因，新草稿的提示里说明
+        if first.media_group_id:
+            target = await self.db.find_by_album(user.id, first.media_group_id, now_ts() - ALBUM_MERGE_WINDOW)
+            if target:
+                late = await self._join_album(target, first, items, lang)
+                if late is None:
+                    return
+        if await self.db.count_open_by_user(user.id) >= self.s.max_pending_per_user:
+            await first.reply(t(lang, "too_many"))
             return
 
         # 用户自己给媒体加了剧透时，默认保留剧透
@@ -45,12 +81,50 @@ class SubmissionsMixin(CoreBase):
         sid = await self.db.create_draft(user.id, items, silent=self.s.default_silent, spoiler=spoiler,
                                          media_group_id=first.media_group_id)
         merge_to = await self._merge_target(first, items)
-        text = t(lang, "choose_mode", desc=describe(items, lang))
         if merge_to:
             await self.db.update(sid, merge_to=merge_to)
-            text += t(lang, "choose_or_merge")
-        prompt = await first.reply(text, reply_markup=await self.user_keyboard(await self.db.get(sid), lang))
+        sub = await self.db.get(sid)
+        text = self._draft_prompt(sub, lang)
+        if late:
+            text = t(lang, "album_late_separate", reason=late.text(lang)) + "\n\n" + text
+        prompt = await first.reply(text, reply_markup=await self.user_keyboard(sub, lang))
         await self.db.update(sid, user_msg_id=prompt.message_id)
+
+    @staticmethod
+    def _draft_prompt(sub: Submission, lang: str) -> str:
+        """草稿的“请选择投稿方式”提示。"""
+        text = t(lang, "choose_mode", desc=describe(sub.items, lang))
+        return text + t(lang, "choose_or_merge") if sub.merge_to else text
+
+    async def _join_album(self, target: Submission, first: Message, items: list[dict], lang: str) -> Notice | None:
+        """把相册后到的部分并进同一个相册生成的投稿 target：
+        - 还是草稿：直接加进去，原来那条“请选择投稿方式”改成新的数量，不再发新的提示
+        - 已提交、待审核：加进去，审核群收到修改后的预览，并告诉投稿人
+        返回 None 表示已经并进去；否则返回原因（比如已经开始审核），调用方把这部分当成新投稿。"""
+        merged = [*target.items, *items]  # 后到的部分在相册里也排在后面
+        if len(merged) > media.MAX_MEDIA:
+            return notice("media_too_many", max=media.MAX_MEDIA)
+        spoiler = int(any(it.get("spoiler") for it in merged))
+        if target.status == "draft" and await self.db.update_if(target.id, ("draft",), items=merged, spoiler=spoiler):
+            sub = await self.db.get(target.id)
+            if sub.user_msg_id:
+                try:
+                    await self.bot.edit_message_text(
+                        chat_id=sub.user_id, message_id=sub.user_msg_id, text=self._draft_prompt(sub, lang),
+                        reply_markup=await self.user_keyboard(sub, lang))
+                except TelegramAPIError as e:
+                    log.info("更新草稿 #%s 的提示失败：%s", sub.id, e)
+            return None
+        target = await self.db.get(target.id)  # 可能刚好被投稿人提交了
+        err = self._check_editable(target, target.id, ("pending",))
+        if not err:
+            editor = t(self.lang, "submitter_label", name=first.from_user.full_name)
+            err = await self._save_edit(target, merged, editor, ("pending",))
+        if err:
+            return err
+        await self.refresh_user_kb(target.id)
+        await first.reply(t(lang, "album_late_merged", desc=describe(items, lang)))
+        return None
 
     async def _merge_target(self, first: Message, items: list[dict]) -> int | None:
         """回复自己的一条投稿（还能修改的）发来的图片视频：可以加到那条投稿里，返回它的编号。"""

@@ -190,6 +190,16 @@ T: dict[str, dict[str, str]] = {
         "en": "➕ Added to your earlier submission.",
     },
     "merged_toast": {"zh": "已添加", "en": "Added"},
+    "album_late_merged": {
+        "zh": "➕ 相册后到的 {desc}已加进刚才的投稿，审核时将使用合并后的内容。",
+        "en": "➕ The {desc} that arrived late from your album were added to your submission; "
+              "the review will use the combined version.",
+    },
+    "album_late_separate": {
+        "zh": "⚠️ 这是刚才那个相册后到的部分，没能加进原来的投稿：{reason}。下面单独作为一条新投稿。",
+        "en": "⚠️ This is the late part of your album; it couldn't be added to your earlier submission: {reason}. "
+              "It's treated as a new submission below.",
+    },
     "btn_user_media": {"zh": "🗑 删除图片 / 视频", "en": "🗑 Remove a photo / video"},
     "media_locked": {
         "zh": "审核已经开始或结束，不能再修改图片视频了。",

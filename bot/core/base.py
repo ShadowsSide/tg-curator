@@ -54,6 +54,7 @@ class CoreBase:
         self._stats_dirty = False
         self._stats_task: asyncio.Task | None = None
         self._tasks: list[asyncio.Task] = []
+        self._album_locks: dict[tuple[int, str], tuple[asyncio.Lock, int]] = {}  # (投稿人, 相册编号) → (锁, 使用中的数量)
 
     # ---------- lifecycle ----------
 

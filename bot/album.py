@@ -17,7 +17,8 @@ class AlbumCollector:
         self.on_album = on_album  # 默认的处理：投稿人发来的相册当作投稿
         self._buffers: dict[str, list[Message]] = {}
         self._handlers: dict[str, Callable[[list[Message]], Awaitable[None]]] = {}
-        self._timers: dict[str, asyncio.Task] = {}
+        self._timers: dict[str, asyncio.Task] = {}  # 还在等后面几项的相册
+        self._running: set[asyncio.Task] = set()  # 等待结束、正在处理的相册
 
     @staticmethod
     def _key(message: Message) -> str:
@@ -39,6 +40,14 @@ class AlbumCollector:
         self.add(message)
         return True
 
+    async def close(self) -> None:
+        """关闭前调用（这时已经不再收消息）：还在等后面几项的相册马上处理，正在处理的等它处理完。
+        重启后才到的几项会并进同一条投稿（见 core 的 receive）。"""
+        for timer in self._timers.values():
+            timer.cancel()
+        self._timers.clear()
+        await asyncio.gather(*self._running, *(self._flush(key) for key in list(self._buffers)))
+
     async def _flush_later(self, key: str) -> None:
         try:
             await asyncio.sleep(self.delay)
@@ -46,8 +55,18 @@ class AlbumCollector:
             return
         # 先摘掉 timer，之后 add() 不会再 cancel 这个正在处理的任务
         self._timers.pop(key, None)
+        task = asyncio.current_task()
+        self._running.add(task)
+        try:
+            await self._flush(key)
+        finally:
+            self._running.discard(task)
+
+    async def _flush(self, key: str) -> None:
         messages = sorted(self._buffers.pop(key, []), key=lambda m: m.message_id)
         handler = self._handlers.pop(key, self.on_album)
+        if not messages:
+            return
         try:
             await handler(messages)
         except Exception:

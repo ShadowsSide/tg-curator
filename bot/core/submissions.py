@@ -101,6 +101,10 @@ class SubmissionsMixin(CoreBase):
         - 还是草稿：直接加进去，原来那条“请选择投稿方式”改成新的数量，不再发新的提示
         - 已提交、待审核：加进去，审核群收到修改后的预览，并告诉投稿人
         返回 None 表示已经并进去；否则返回原因（比如已经开始审核），调用方把这部分当成新投稿。"""
+        known = {it.get("msg_id") for it in target.items}
+        items = [it for it in items if it.get("msg_id") not in known]  # 重启前后同一项收到两次：只算一次
+        if not items:
+            return None
         merged = [*target.items, *items]  # 后到的部分在相册里也排在后面
         if len(merged) > media.MAX_MEDIA:
             return notice("media_too_many", max=media.MAX_MEDIA)

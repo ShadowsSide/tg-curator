@@ -78,6 +78,8 @@ async def run() -> None:
             # my_chat_member：机器人被拉进其他群时收到通知，才能自动退出
             allowed = sorted(set(dp.resolve_used_update_types()) | {"my_chat_member"})
             await dp.start_polling(bot, allowed_updates=allowed)
+            # 停止（docker stop 发 SIGTERM）后，内存里还没收齐的相册先处理掉，免得丢失
+            await core.albums.close()
         finally:
             await core.stop_background()
     finally:

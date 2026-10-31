@@ -525,6 +525,18 @@ T: dict[str, dict[str, str]] = {
         "en": "↑ This is the current content. Copy and change it, then reply to the submission with "
               "<code>/edit new content</code>.",
     },
+    "media_late_added": {
+        "zh": "✏️ 相册后到的 {n} 个也已加进去，新的预览已发出。",
+        "en": "✏️ The {n} late item(s) of the album were added too. A new preview has been posted.",
+    },
+    "media_late_failed": {
+        "zh": "相册后到的 {n} 个没有加进去：{reason}",
+        "en": "The {n} late item(s) of the album weren't added: {reason}",
+    },
+    "media_late_unused": {
+        "zh": "相册后到的 {n} 个没有使用：替换时一次只能用一个图片或视频。",
+        "en": "The {n} late item(s) of the album weren't used: replacing takes exactly one photo or video.",
+    },
     "admin_edited": {
         "zh": '✏️ 已修改，新的预览已发出，发布时将使用修改后的内容。',
         "en": '✏️ Edited. A new preview has been posted, and the new version will be published.',

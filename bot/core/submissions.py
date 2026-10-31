@@ -8,6 +8,7 @@ from aiogram.exceptions import TelegramAPIError
 from aiogram.types import Message, User as TgUser
 
 from .. import media, spam
+from ..album import ALBUM_MERGE_WINDOW
 from ..errors import Notice, notice
 from ..i18n import t
 from ..db import SUBMITTER_EDITABLE, Submission
@@ -18,9 +19,6 @@ from ..timeutil import now_ts
 from .base import CoreBase, NO_PREVIEW, _reply_to, _reason_line, explicit_reply
 
 log = logging.getLogger(__name__)
-
-# 相册后到的部分：这么久之内由同一个相册生成的投稿，会把它并进去（超过就当成新投稿）
-ALBUM_MERGE_WINDOW = 10 * 60
 
 
 class SubmissionsMixin(CoreBase):

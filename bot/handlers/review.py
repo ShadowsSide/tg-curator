@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import html
+import time
 
 from aiogram import F, Router
 from aiogram.dispatcher.event.bases import SkipHandler
@@ -9,6 +10,7 @@ from aiogram.filters import Command, CommandObject
 from aiogram.types import CallbackQuery, Message
 
 from .. import entities as ent
+from ..album import ALBUM_MERGE_WINDOW
 from ..config import Settings
 from ..core import NO_PREVIEW, Core, explicit_reply
 from ..db import Prompt
@@ -211,17 +213,26 @@ def build_router(settings: Settings) -> Router:
             raise SkipHandler
         if prompt.kind in ("madd", "mrep"):
             if m.media_group_id:  # 回复的是相册：收齐所有项再一起处理
-                core.albums.add(m, lambda messages: _answer_media(prompt, messages, core))
+                core.albums.add(m, lambda messages: _answer_media(prompt, messages, core, album=m.media_group_id))
             else:
                 await _answer_media(prompt, [m], core)
             return
         await _finish(prompt, m, core, *await _answer_prompt(prompt, m, core))
 
+    # 已经处理过的“添加 / 替换”相册：相册编号 → (回复的提示, 到期时间)。后到的部分（晚于 ALBUM_DELAY）靠它接着处理。
+    # 只记在内存里：重启后才到的部分不认
+    answered: dict[str, tuple[Prompt, float]] = {}
+
     @router.message(F.media_group_id)
     async def album_rest(m: Message, core: Core) -> None:
-        """相册里没带回复的其余项（如果有）：并进正在收集的那个相册。"""
-        if not core.albums.join(m):
+        """相册里没带回复的其余项（如果有）：并进正在收集的那个相册；
+        相册前面的部分已经处理过（这几项晚到了）：同一个人发的就接着处理。"""
+        if core.albums.join(m):
+            return
+        prompt, until = answered.get(m.media_group_id, (None, 0))
+        if not prompt or until < time.monotonic() or not _is_owner(m, prompt):
             raise SkipHandler
+        core.albums.add(m, lambda messages: _answer_late_media(prompt, messages, core))
 
     async def _finish(prompt: Prompt, m: Message, core: Core, err: Notice | None, done: str) -> None:
         """回复提示的结果：成功就删掉提示；出错时能改了再试的保留提示，其他的作废。"""
@@ -233,17 +244,33 @@ def build_router(settings: Settings) -> Router:
         await core.finish_prompt(prompt)
         await m.reply(done)
 
-    async def _answer_media(prompt: Prompt, messages: list[Message], core: Core) -> None:
+    async def _answer_media(prompt: Prompt, messages: list[Message], core: Core, album: str | None = None) -> None:
         """回复了“添加 / 替换”的提示：发来的图片视频（可以是相册）加进投稿或换掉第 arg 个。"""
         first = messages[0]
+        err = await _apply_media(prompt, messages, "add" if prompt.kind == "madd" else "replace", core)
+        if album:
+            now = time.monotonic()
+            for key in [k for k, (_, until) in answered.items() if until < now]:
+                del answered[key]
+            answered[album] = (prompt, now + ALBUM_MERGE_WINDOW)
+        await _finish(prompt, first, core, err, t(core.lang, "admin_edited"))
+
+    async def _answer_late_media(prompt: Prompt, messages: list[Message], core: Core) -> None:
+        """“添加 / 替换”相册后到的部分：添加就接着加进去；替换只能用一张，告诉审核员这几张没用上。"""
+        first, n = messages[0], len(messages)
+        if prompt.kind == "mrep":
+            await first.reply(t(core.lang, "media_late_unused", n=n))
+            return
+        err = await _apply_media(prompt, messages, "add", core)
+        await first.reply(t(core.lang, "media_late_failed", n=n, reason=err.text(core.lang)) if err
+                          else t(core.lang, "media_late_added", n=n))
+
+    async def _apply_media(prompt: Prompt, messages: list[Message], op: str, core: Core) -> Notice | None:
         items = [extract_item(x) for x in messages]
         if any(it is None or it["type"] == "text" for it in items):
-            err = notice("media_only_photo_video")
-        else:
-            op = "add" if prompt.kind == "madd" else "replace"
-            err = await core.change_media(prompt.sid, op, prompt.arg, items, first.from_user.full_name,
-                                          REVIEWER_MEDIA, by_submitter=False)
-        await _finish(prompt, first, core, err, t(core.lang, "admin_edited"))
+            return notice("media_only_photo_video")
+        return await core.change_media(prompt.sid, op, prompt.arg, items, messages[0].from_user.full_name,
+                                       REVIEWER_MEDIA, by_submitter=False)
 
     async def _answer_prompt(prompt: Prompt, m: Message, core: Core) -> tuple[Notice | None, str]:
         """按提示的种类执行，返回 (错误, 成功时的回复)。"""

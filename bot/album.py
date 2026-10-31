@@ -8,6 +8,9 @@ from aiogram.types import Message
 
 log = logging.getLogger(__name__)
 
+# 相册后到的部分（晚于 delay 才到，已经单独处理过前面的部分）：这么久之内还会接着并进去，超过就不认了
+ALBUM_MERGE_WINDOW = 10 * 60
+
 
 class AlbumCollector:
     """相册（media group）的每一项是单独的 update，这里等最后一项到达后 delay 秒再一起处理。"""

@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from dataclasses import replace
 
 from aiogram.exceptions import TelegramAPIError
 from aiogram.types import Message, User as TgUser
@@ -171,6 +172,9 @@ class SubmissionsMixin(CoreBase):
         if hits and self.s.spam_action == "block":
             # 不告诉投稿人命中了哪个关键词，免得照着绕过；草稿保留，改了内容可以重新提交
             return notice("spam_blocked_" + hits[0]["k"], **({"max": hits[0]["max"]} if "max" in hits[0] else {}))
+        err = await self._length_error(replace(sub, anonymous=anonymous), sub.items)  # 草稿保留，改短了可以重新提交
+        if err:
+            return err
         if not await self.db.transition(sid, ("draft",), "pending", anonymous=int(anonymous), submitted_at=now_ts(),
                                         spam_flags=hits or None):
             return notice("already_handled")

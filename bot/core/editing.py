@@ -8,7 +8,6 @@ from aiogram.types import Message
 
 from .. import media, spam
 from ..db import OPEN_STATES, Submission
-from ..entities import u16len
 from ..errors import Notice, notice
 from ..render import caption_index, send_items
 from ..timeutil import now_ts
@@ -89,10 +88,9 @@ class EditingMixin(CoreBase):
 
     async def _save_edit(self, sub: Submission, items: list[dict], editor: str,
                          allowed: tuple[str, ...]) -> Notice | None:
-        for it in items:
-            limit = 4096 if it["type"] == "text" else 1024
-            if u16len(it.get("text", "")) > limit:
-                return notice("too_long", n=u16len(it["text"]), limit=limit)
+        err = await self._length_error(sub, items, signed=sub.status != "draft")
+        if err:
+            return err
         # 媒体自带的剧透有变化（Telegram 编辑里开关了剧透，或加 / 换 / 删了带剧透的图）时，剧透设置跟着变；
         # 没变化就保留当前设置，不覆盖审核员手动切换的结果
         has_spoiler = any(it.get("spoiler") for it in items)

@@ -14,13 +14,14 @@ from aiogram.exceptions import (TelegramAPIError, TelegramBadRequest, TelegramFo
                                 TelegramUnauthorizedError)
 from aiogram.types import ChatFullInfo, InlineKeyboardMarkup, LinkPreviewOptions, Message, ReplyParameters, User as TgUser
 
+from .. import entities as ent
 from ..album import AlbumCollector
 from ..config import Settings
 from ..db import DB, Submission, User
 from ..errors import ConfigError, Notice, notice
 from ..i18n import normalize, t
 from ..keyboards import confirm_kb, control_kb, media_count, media_kb, reasons_kb, schedule_kb, user_kb
-from ..render import control_text, signature
+from ..render import caption_index, control_text, signature
 from ..timeutil import fmt_ts
 
 log = logging.getLogger(__name__)
@@ -162,6 +163,19 @@ class CoreBase:
         """link：审核群预览里名字带投稿人链接；发到频道的不带。"""
         user = await self.db.get_user(sub.user_id)
         return signature(sub, user, self.lang, link=link)
+
+    async def _length_error(self, sub: Submission, items: list[dict], *, signed: bool = True) -> Notice | None:
+        """每一项是否超过 Telegram 的长度限制。signed：把落款算进承载说明文字的那一项（发送时会加上它）；
+        草稿还没选署名 / 匿名，不算落款，提交时再检查。"""
+        tail = (await self._signature(sub, link=False))[0] if signed else ""
+        carrier = caption_index(items)
+        for i, it in enumerate(items):
+            limit = 4096 if it["type"] == "text" else 1024
+            text = it.get("text", "")
+            n = ent.u16len(ent.join(text, [], tail, [])[0] if i == carrier else text)
+            if n > limit:
+                return notice("too_long", n=n, limit=limit)
+        return None
 
     async def notify(self, sub: Submission, key: str, **kw) -> None:
         """用投稿人自己的语言通知他，回复在他的投稿提示消息下面。"""

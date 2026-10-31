@@ -201,7 +201,7 @@ class CoreBase:
                 reply_markup=control_kb(sub, self.lang, banned=bool(user and user.banned)),
                 link_preview_options=NO_PREVIEW,
             )
-        except TelegramBadRequest as e:
+        except TelegramAPIError as e:  # 只是显示没更新，不能打断调用方（比如发布）接下来的状态变化
             if "not modified" not in str(e):
                 log.warning("更新控制消息 #%s 失败：%s", sid, e)
 

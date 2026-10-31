@@ -91,6 +91,18 @@ class EditingMixin(CoreBase):
         err = await self._length_error(sub, items, signed=sub.status != "draft")
         if err:
             return err
+        # 先发预览再保存：预览发不出去就不改稿件，否则审核员可能发布没看过的内容
+        preview = None
+        if sub.status != "draft":  # 草稿还没进审核群，不用发预览
+            try:
+                preview = await send_items(
+                    self.bot, self.s.review_chat_id, items, sig=await self._signature(sub, link=True),
+                    spoiler=False, reply_to=sub.review_msg_id,
+                )
+            except TelegramAPIError:
+                log.exception("投稿 #%s 的修改预览发送失败，修改未保存", sub.id)
+                return notice("edit_preview_failed")
+        ids = [m.message_id for m in preview or []]
         # 媒体自带的剧透有变化（Telegram 编辑里开关了剧透，或加 / 换 / 删了带剧透的图）时，剧透设置跟着变；
         # 没变化就保留当前设置，不覆盖审核员手动切换的结果
         has_spoiler = any(it.get("spoiler") for it in items)
@@ -103,14 +115,10 @@ class EditingMixin(CoreBase):
             **follow,
         )
         if not ok:
+            await self._delete_old_preview(ids)  # 这份预览的内容没有保存，不能留在审核群里
             return notice("edit_race")
         sub = await self.db.get(sub.id)
-        if sub.status != "draft":  # 草稿还没进审核群，不用发预览
-            preview = await send_items(
-                self.bot, self.s.review_chat_id, sub.items, sig=await self._signature(sub, link=True),
-                spoiler=False, reply_to=sub.review_msg_id,
-            )
-            ids = [m.message_id for m in preview]
+        if ids:
             await self.db.link_review_messages(sub.id, ids)
             await self.db.update(sub.id, edit_preview=ids)
             await self._delete_old_preview(sub.edit_preview)

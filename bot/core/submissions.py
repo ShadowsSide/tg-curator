@@ -178,7 +178,12 @@ class SubmissionsMixin(CoreBase):
         if not await self.db.transition(sid, ("draft",), "pending", anonymous=int(anonymous), submitted_at=now_ts(),
                                         spam_flags=hits or None):
             return notice("already_handled")
-        await self._send_to_review(sid)
+        try:
+            await self._send_to_review(sid)
+        except Exception:  # 审核群看不到的待审核稿没人能处理：退回草稿，投稿人可以再点一次
+            log.exception("投稿 #%s 发到审核群失败，退回草稿", sid)
+            await self.db.transition(sid, ("pending",), "draft", submitted_at=None, spam_flags=None)
+            return notice("submit_failed")
         await self.refresh_stats()
         return None
 
@@ -208,12 +213,16 @@ class SubmissionsMixin(CoreBase):
         preview = await send_items(
             self.bot, self.s.review_chat_id, sub.items, sig=await self._signature(sub, link=True), spoiler=False,
         )
-        ctrl = await self.bot.send_message(
-            self.s.review_chat_id,
-            control_text(sub, user, self.s.tz, None, self.lang),
-            reply_markup=control_kb(sub, self.lang),
-            reply_parameters=_reply_to(preview[0].message_id),
-            link_preview_options=NO_PREVIEW,
-        )
+        try:
+            ctrl = await self.bot.send_message(
+                self.s.review_chat_id,
+                control_text(sub, user, self.s.tz, None, self.lang),
+                reply_markup=control_kb(sub, self.lang),
+                reply_parameters=_reply_to(preview[0].message_id),
+                link_preview_options=NO_PREVIEW,
+            )
+        except Exception:  # 没有控制消息的预览没法操作，重新提交时还会再发一份
+            await self._delete_old_preview([m.message_id for m in preview])
+            raise
         await self.db.update(sid, review_msg_id=ctrl.message_id)
         await self.db.link_review_messages(sid, [m.message_id for m in preview] + [ctrl.message_id])

@@ -69,7 +69,7 @@ class ReviewMixin(CoreBase):
             await self.refresh_control(sid)
             await self.refresh_stats()
             return notice("publish_postponed", when=self.fmt(ts))
-        except TelegramAPIError as e:
+        except Exception as e:  # 无论什么错误都不能停在 publishing：那个状态下审核员什么也做不了
             log.exception("发布 #%s 失败", sid)
             await self.db.update(sid, status="failed", error=str(e)[:300])
             await self.refresh_control(sid)

@@ -42,7 +42,8 @@ class SubmissionsMixin(CoreBase):
 
         # 用户自己给媒体加了剧透时，默认保留剧透
         spoiler = any(i.get("spoiler") for i in items)
-        sid = await self.db.create_draft(user.id, items, silent=self.s.default_silent, spoiler=spoiler)
+        sid = await self.db.create_draft(user.id, items, silent=self.s.default_silent, spoiler=spoiler,
+                                         media_group_id=first.media_group_id)
         merge_to = await self._merge_target(first, items)
         text = t(lang, "choose_mode", desc=describe(items, lang))
         if merge_to:

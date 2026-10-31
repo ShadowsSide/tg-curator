@@ -59,7 +59,8 @@ CREATE TABLE IF NOT EXISTS submissions (
     msg_count      INTEGER NOT NULL DEFAULT 0,
     error          TEXT,
     edit_preview   TEXT,
-    merge_to       INTEGER
+    merge_to       INTEGER,
+    media_group_id TEXT
 );
 
 CREATE INDEX IF NOT EXISTS idx_sub_status ON submissions(status, scheduled_at);
@@ -121,6 +122,7 @@ MIGRATIONS = [
     ("submissions", "spam_flags", "ALTER TABLE submissions ADD COLUMN spam_flags TEXT"),
     ("submissions", "edit_preview", "ALTER TABLE submissions ADD COLUMN edit_preview TEXT"),
     ("submissions", "merge_to", "ALTER TABLE submissions ADD COLUMN merge_to INTEGER"),
+    ("submissions", "media_group_id", "ALTER TABLE submissions ADD COLUMN media_group_id TEXT"),
     ("prompts", "arg", "ALTER TABLE prompts ADD COLUMN arg INTEGER NOT NULL DEFAULT 0"),
 ]
 
@@ -182,6 +184,7 @@ class Submission:
     spam_flags: list[dict[str, Any]] | None = None  # 防垃圾检查的命中项，见 spam.py；没命中为 None
     edit_preview: list[int] | None = None  # 审核群里最新一份修改后预览的消息（改稿时删掉上一份）
     merge_to: int | None = None  # 草稿：投稿人回复旧投稿发的图片，可以“加到”这条投稿里
+    media_group_id: str | None = None  # 由相册生成的投稿：Telegram 的相册编号，相册后到的部分靠它找回这条投稿
 
     @property
     def spoilerable(self) -> bool:
@@ -300,10 +303,11 @@ class DB:
     # ---------- submissions ----------
 
     async def create_draft(self, user_id: int, items: list[dict[str, Any]], silent: bool = False,
-                           spoiler: bool = False) -> int:
+                           spoiler: bool = False, media_group_id: str | None = None) -> int:
         cur = await self.conn.execute(
-            "INSERT INTO submissions(user_id, items, silent, spoiler, status, created_at) VALUES(?, ?, ?, ?, 'draft', ?)",
-            (user_id, json.dumps(items, ensure_ascii=False), int(silent), int(spoiler), now_ts()),
+            "INSERT INTO submissions(user_id, items, silent, spoiler, status, created_at, media_group_id)"
+            " VALUES(?, ?, ?, ?, 'draft', ?, ?)",
+            (user_id, json.dumps(items, ensure_ascii=False), int(silent), int(spoiler), now_ts(), media_group_id),
         )
         await self.conn.commit()
         return cur.lastrowid
@@ -326,6 +330,15 @@ class DB:
         return await self._exec(
             f"UPDATE submissions SET {cols} WHERE id=? AND status IN ({marks})", (*fields.values(), sid, *states)
         ) == 1
+
+    async def find_by_album(self, user_id: int, media_group_id: str, since: int) -> Submission | None:
+        """这个投稿人 since 之后由这个相册生成的最新一条投稿（相册后到的部分要并进去）。
+        按 user_id 走 idx_sub_user，一个人的投稿不多，不单独给相册编号建索引。"""
+        row = await self._one(
+            "SELECT * FROM submissions WHERE user_id=? AND media_group_id=? AND created_at>=? ORDER BY id DESC LIMIT 1",
+            (user_id, media_group_id, since),
+        )
+        return Submission.from_row(row) if row else None
 
     async def find_by_user_message(self, user_id: int, message_id: int) -> tuple[int, int | None] | None:
         """用户私聊里的某条消息属于哪条投稿：

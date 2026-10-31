@@ -201,7 +201,7 @@ Buttons on the control message: **✅ Publish now**, **⏰ Schedule**, **❌ Rej
 
 #### Changing photos and videos
 
-**🖼 Media** (only while pending) opens the media panel: **➕ Add photo / video** (an album reply works too), **🔁 Replace N** and **🗑 Remove N** (asks to confirm; the last one can't be removed). Photos and videos only, at most 10 per submission; submissions with a file, GIF or audio can't use it. A text submission can get photos too: its text becomes their caption (see “Known limitations and risks” below).
+**🖼 Media** (only while pending) opens the media panel: **➕ Add photo / video** (an album reply works too; if the last items of the album arrive late, they're added as well with a separate reply), **🔁 Replace N** and **🗑 Remove N** (asks to confirm; the last one can't be removed). Photos and videos only, at most 10 per submission; submissions with a file, GIF or audio can't use it. A text submission can get photos too: its text becomes their caption (see “Known limitations and risks” below).
 
 Every edit posts a new preview. The review group keeps only the original preview and the latest edited one; older edited previews are deleted (Telegram doesn't let bots delete messages older than 48 hours, so those stay).
 
@@ -257,7 +257,7 @@ The commands below do the same as the buttons, for those who prefer commands. Us
 
 **Other**
 - **An album being collected during a crash is lost**: the items of an album arrive separately, and the bot waits `ALBUM_DELAY` seconds in memory to collect them. On a normal stop (`docker stop`, updates) it handles the items that already arrived first, and the ones arriving after the restart join the same submission; but if it crashes, loses power or is killed within those seconds, the items that already arrived are lost and the submitter needs to send them again
-- **The late part of an album isn't always merged**: items arriving later than `ALBUM_DELAY` join the submission made from the same album for up to 10 minutes. If that submission is already being reviewed, was cancelled, or would go over 10 items, the late part becomes a separate submission and the prompt says why. When it joins a pending submission, the review group gets an updated preview and the control message shows “edited (submitter)”
+- **The late part of an album isn't always merged**: items arriving later than `ALBUM_DELAY` join the submission made from the same album for up to 10 minutes. If that submission is already being reviewed, was cancelled, or would go over 10 items, the late part becomes a separate submission and the prompt says why. When it joins a pending submission, the review group gets an updated preview and the control message shows “edited (submitter)”. When a reviewer replies to “Add” with an album, its late part is added too (within 10 minutes, same reviewer only); a reply to “Replace” uses only the first item that arrived, and the bot says the late ones weren't used. On the reviewer side this is kept in memory only, so items arriving after a restart are lost
 
 ## FAQ
 

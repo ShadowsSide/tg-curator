@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import asyncio
 import html
 import time
+from dataclasses import dataclass, field
 
 from aiogram import F, Router
 from aiogram.dispatcher.event.bases import SkipHandler
@@ -31,6 +33,15 @@ REVIEWER_MEDIA = ("pending",)  # 审核员只能在待审核时改媒体
 # 按钮 → 提示的种类；FOLD 里的按钮来自面板（理由面板、媒体面板），发提示时把控制消息恢复原样
 PROMPT_KIND = {"custom": "time", "edit": "edit", "creason": "reason", "madd": "madd", "mrep": "mrep"}
 FOLD = ("creason", "madd", "mrep")
+
+
+@dataclass
+class _AlbumAnswer:
+    """回复“添加 / 替换”提示的一个相册的处理情况。"""
+    prompt: Prompt
+    until: float  # 到期（monotonic 时间），之后到的部分不认
+    lock: asyncio.Lock = field(default_factory=asyncio.Lock)  # 同一个相册的几批依次处理
+    error: Notice | None = None  # 第一批失败的原因
 
 
 def _is_owner(m: Message, prompt: Prompt) -> bool:
@@ -212,16 +223,22 @@ def build_router(settings: Settings) -> Router:
         if not prompt or not _is_owner(m, prompt) or (m.text or "").startswith("/"):
             raise SkipHandler
         if prompt.kind in ("madd", "mrep"):
-            if m.media_group_id:  # 回复的是相册：收齐所有项再一起处理
-                core.albums.add(m, lambda messages: _answer_media(prompt, messages, core, album=m.media_group_id))
+            if m.media_group_id:  # 回复的是相册：收齐所有项再一起处理；前面的部分已经开始处理，这几项就算后到的
+                ans = _answered(m.media_group_id)
+                core.albums.add(m, (lambda messages: _answer_late_media(ans, messages, core)) if ans else
+                                (lambda messages: _answer_album(prompt, m.media_group_id, messages, core)))
             else:
                 await _answer_media(prompt, [m], core)
             return
         await _finish(prompt, m, core, *await _answer_prompt(prompt, m, core))
 
-    # 已经处理过的“添加 / 替换”相册：相册编号 → (回复的提示, 到期时间)。后到的部分（晚于 ALBUM_DELAY）靠它接着处理。
+    # 已经开始处理的“添加 / 替换”相册：相册编号 → 处理情况。后到的部分（晚于 ALBUM_DELAY）靠它接着处理。
     # 只记在内存里：重启后才到的部分不认
-    answered: dict[str, tuple[Prompt, float]] = {}
+    answered: dict[str, _AlbumAnswer] = {}
+
+    def _answered(album: str) -> _AlbumAnswer | None:
+        ans = answered.get(album)
+        return ans if ans and ans.until >= time.monotonic() else None
 
     @router.message(F.media_group_id)
     async def album_rest(m: Message, core: Core) -> None:
@@ -229,10 +246,10 @@ def build_router(settings: Settings) -> Router:
         相册前面的部分已经处理过（这几项晚到了）：同一个人发的就接着处理。"""
         if core.albums.join(m):
             return
-        prompt, until = answered.get(m.media_group_id, (None, 0))
-        if not prompt or until < time.monotonic() or not _is_owner(m, prompt):
+        ans = _answered(m.media_group_id)
+        if not ans or not _is_owner(m, ans.prompt):
             raise SkipHandler
-        core.albums.add(m, lambda messages: _answer_late_media(prompt, messages, core))
+        core.albums.add(m, lambda messages: _answer_late_media(ans, messages, core))
 
     async def _finish(prompt: Prompt, m: Message, core: Core, err: Notice | None, done: str) -> None:
         """回复提示的结果：成功就删掉提示；出错时能改了再试的保留提示，其他的作废。"""
@@ -244,26 +261,33 @@ def build_router(settings: Settings) -> Router:
         await core.finish_prompt(prompt)
         await m.reply(done)
 
-    async def _answer_media(prompt: Prompt, messages: list[Message], core: Core, album: str | None = None) -> None:
+    async def _answer_media(prompt: Prompt, messages: list[Message], core: Core) -> Notice | None:
         """回复了“添加 / 替换”的提示：发来的图片视频（可以是相册）加进投稿或换掉第 arg 个。"""
-        first = messages[0]
         err = await _apply_media(prompt, messages, "add" if prompt.kind == "madd" else "replace", core)
-        if album:
-            now = time.monotonic()
-            for key in [k for k, (_, until) in answered.items() if until < now]:
-                del answered[key]
-            answered[album] = (prompt, now + ALBUM_MERGE_WINDOW)
-        await _finish(prompt, first, core, err, t(core.lang, "admin_edited"))
+        await _finish(prompt, messages[0], core, err, t(core.lang, "admin_edited"))
+        return err
 
-    async def _answer_late_media(prompt: Prompt, messages: list[Message], core: Core) -> None:
-        """“添加 / 替换”相册后到的部分：添加就接着加进去；替换只能用一张，告诉审核员这几张没用上。"""
-        first, n = messages[0], len(messages)
-        if prompt.kind == "mrep":
-            await first.reply(t(core.lang, "media_late_unused", n=n))
-            return
-        err = await _apply_media(prompt, messages, "add", core)
-        await first.reply(t(core.lang, "media_late_failed", n=n, reason=err.text(core.lang)) if err
-                          else t(core.lang, "media_late_added", n=n))
+    async def _answer_album(prompt: Prompt, album: str, messages: list[Message], core: Core) -> None:
+        """相册的第一批。开始处理前就记下来（中间没有 await）：处理期间到的部分也要认出是后到的。"""
+        now = time.monotonic()
+        for key in [k for k, ans in answered.items() if ans.until < now]:
+            del answered[key]
+        ans = answered[album] = _AlbumAnswer(prompt, now + ALBUM_MERGE_WINDOW)
+        async with ans.lock:
+            ans.error = await _answer_media(prompt, messages, core)
+
+    async def _answer_late_media(ans: _AlbumAnswer, messages: list[Message], core: Core) -> None:
+        """“添加 / 替换”相册后到的部分：添加就接着加进去；替换只能用一张，告诉审核员这几张没用上；
+        前面的部分没成功，后到的也不加，免得审核员以为都没加进去、重发时多出几张。
+        用锁排在前面的部分之后：同时改稿件时，后保存的会盖掉先保存的。"""
+        prompt, first, n = ans.prompt, messages[0], len(messages)
+        async with ans.lock:
+            if prompt.kind == "mrep":
+                await first.reply(t(core.lang, "media_late_unused", n=n))
+                return
+            err = ans.error or await _apply_media(prompt, messages, "add", core)
+            await first.reply(t(core.lang, "media_late_failed", n=n, reason=err.text(core.lang)) if err
+                              else t(core.lang, "media_late_added", n=n))
 
     async def _apply_media(prompt: Prompt, messages: list[Message], op: str, core: Core) -> Notice | None:
         items = [extract_item(x) for x in messages]

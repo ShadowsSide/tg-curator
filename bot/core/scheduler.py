@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import logging
 from datetime import datetime
 
@@ -19,9 +20,11 @@ class SchedulerMixin(CoreBase):
     # ---------- 后台任务 ----------
 
     async def _scheduler_loop(self) -> None:
-        while True:
+        while not self._stopping.is_set():  # 停止时不取消：正在发布的这条发完，剩下的留给下次启动
             try:
                 for sub in await self.db.due_scheduled(now_ts()):
+                    if self._stopping.is_set():
+                        return
                     err = await self.publish(sub.id, from_states=("scheduled",))
                     if err:
                         log.warning("定时发布 #%s：%s", sub.id, err.key)
@@ -37,7 +40,8 @@ class SchedulerMixin(CoreBase):
                 await self.expire_prompts()
             except Exception:
                 log.exception("调度循环出错")
-            await asyncio.sleep(SCHEDULER_TICK)
+            with contextlib.suppress(TimeoutError):
+                await asyncio.wait_for(self._stopping.wait(), SCHEDULER_TICK)
 
     async def _reminder_loop(self) -> None:
         interval = self.s.reminder_interval_min * 60

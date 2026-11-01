@@ -106,6 +106,16 @@ async def handle(request: web.Request):
         return web.json_response({"ok": False, "error_code": 400,
                                   "description": "Bad Request: custom emoji can't be used in this chat"}, status=400)
 
+    # 和 Telegram 一样限制长度（按 UTF-16 计），否则超长的内容在测试里发得出去，到了线上才失败
+    if m.startswith("send") or m == "editmessagetext":
+        captions = [x.get("caption") for x in params.get("media") or [] if isinstance(x, dict)]
+        for piece, limit, what in ((params.get("text"), 4096, "message"),
+                                   *((c, 1024, "message caption") for c in [params.get("caption"), *captions])):
+            if isinstance(piece, str) and len(piece.encode("utf-16-le")) // 2 > limit:
+                log.append({"method": method, "params": params, "result": None, "error": True, "t": time.time()})
+                return web.json_response({"ok": False, "error_code": 400,
+                                          "description": f"Bad Request: {what} is too long"}, status=400)
+
     if m in ("editmessagereplymarkup", "editmessagetext"):
         key = (str(params.get("chat_id")), str(params.get("message_id")))
         if m == "editmessagereplymarkup" and markups.get(key) == params.get("reply_markup"):

@@ -77,11 +77,11 @@ async def run() -> None:
         try:
             # my_chat_member：机器人被拉进其他群时收到通知，才能自动退出
             allowed = sorted(set(dp.resolve_used_update_types()) | {"my_chat_member"})
-            await dp.start_polling(bot, allowed_updates=allowed)
-            # 停止（docker stop 发 SIGTERM）后，内存里还没收齐的相册先处理掉，免得丢失
-            await core.albums.close()
+            # close_bot_session=False：这时还有处理函数在发请求，连接等下面的 finally 再关
+            await dp.start_polling(bot, allowed_updates=allowed, close_bot_session=False)
         finally:
-            await core.stop_background()
+            # aiogram 只停止轮询，不等已经开始的处理函数，也没有公开的接口拿到它们（升级时 test_shutdown 会检查这个属性）
+            await core.shutdown(dp._handle_update_tasks)
     finally:
         await db.close()
         await bot.session.close()

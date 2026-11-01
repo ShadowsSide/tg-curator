@@ -303,6 +303,14 @@ T: dict[str, dict[str, str]] = {
         "zh": "内容太长：{n} 字，上限 {limit}（还需留出落款的长度）",
         "en": "Too long: {n} characters, the limit is {limit} (leave room for the signature too)",
     },
+    "submit_failed": {
+        "zh": "暂时没能送到审核群，投稿还在草稿里，请稍后再点一次",
+        "en": "Couldn't reach the review group just now. Your submission is still a draft; please try again shortly",
+    },
+    "edit_preview_failed": {
+        "zh": "审核群的预览没有发出去，这次修改没有保存，请稍后再试",
+        "en": "The preview couldn't be sent to the review group, so this edit was not saved. Please try again shortly",
+    },
     "edit_race": {
         "zh": "投稿状态刚刚发生了变化，修改未生效",
         "en": "The submission's status just changed, so the edit was not applied",

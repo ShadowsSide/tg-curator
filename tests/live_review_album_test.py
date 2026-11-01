@@ -3,6 +3,8 @@
 - 加进去会超过 10 个：回复原因，不加
 - 替换：只能用一个，后到的部分不用，回复说明
 - 别的审核员发的同号相册不算
+- 第一批还在处理时后到的部分：认得出是后到的；添加不互相覆盖，替换不会换两次
+- 第一批失败：后到的部分也不加，回复原因
 
 用法（项目根目录下）：python tests/live_review_album_test.py
 复用 live_test.py 的模拟 Bot API 服务器。约 30 秒。
@@ -70,7 +72,7 @@ async def scenario():
               files(sid) == ["A", "B", "C"] and got[-1].startswith("✏️ 相册后到的 1 个也已加进去"), (files(sid), got))
 
     # 加进去会超过 10 个：不加，回复原因
-    ctrl = (await submit("相册 3", 3))["result"]["message_id"]
+    ctrl = ctrl3 = (await submit("相册 3", 3))["result"]["message_id"]
     p = await ask("madd", 3, ctrl, "要添加的图片")
     got = await split_album(p["result"]["message_id"], "g3", list("ABCDEFGH"), list("XYZ"), late_reply=False)
     check("add, late part would exceed 10 → not added, reviewer told why",
@@ -87,6 +89,31 @@ async def scenario():
     p = await ask("madd", 4, ctrl, "要添加的图片")
     got = await split_album(p["result"]["message_id"], "g5", ["A"], ["B"], late_reply=False, late_from=OTHER)
     check("late part from another reviewer → ignored", files(4) == ["A"] and len(got) == 1, (files(4), got))
+
+    # 第一批还在处理（预览被限流）时后到的部分：认得出，排在后面，两批都保留
+    ctrl = (await submit("相册 5", 5))["result"]["message_id"]
+    p = await ask("madd", 5, ctrl, "要添加的图片")
+    lt.MOCK["flood"][f"sendPhoto:{REVIEW}"] = [3]
+    n = len(log)
+    got = await split_album(p["result"]["message_id"], "g6", ["A"], ["B"], late_reply=False)
+    told = await wait_for(lambda e: is_send(e, "sendMessage", REVIEW, "后到的 1 个也已加进去"), timeout=8, since=n)
+    check("late part while the first is still being handled → both kept",
+          files(5) == ["A", "B"] and told, (files(5), got))
+
+    # 替换，第一批还在处理时后到的部分带着回复（提示还没删）：不能再替换一次
+    p = await ask("mrep:3:2", 3, ctrl3, "换掉第 2 个")
+    lt.MOCK["flood"][f"sendMediaGroup:{REVIEW}"] = [3]
+    n = len(log)
+    got = await split_album(p["result"]["message_id"], "g7", ["T"], ["U"])
+    told = await wait_for(lambda e: is_send(e, "sendMessage", REVIEW, "后到的 1 个没有使用"), timeout=8, since=n)
+    check("replace, late part with a reply while the prompt is alive → replaced only once",
+          files(3)[1] == "T" and "U" not in files(3) and told, (files(3), got))
+
+    # 第一批失败（超过 10 个，提示保留）：后到的部分单独放得下也不加
+    p = await ask("madd", 3, ctrl3, "要添加的图片")
+    got = await split_album(p["result"]["message_id"], "g8", list("XYZ"), ["W"], late_reply=False)
+    check("first part failed → late part not added, reviewer told why",
+          len(files(3)) == 8 and "W" not in files(3) and got[-1].startswith("相册后到的 1 个没有加进去"), (files(3), got))
 
 
 if __name__ == "__main__":

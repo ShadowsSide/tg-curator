@@ -14,13 +14,14 @@ from aiogram.exceptions import (TelegramAPIError, TelegramBadRequest, TelegramFo
                                 TelegramUnauthorizedError)
 from aiogram.types import ChatFullInfo, InlineKeyboardMarkup, LinkPreviewOptions, Message, ReplyParameters, User as TgUser
 
+from .. import entities as ent
 from ..album import AlbumCollector
 from ..config import Settings
 from ..db import DB, Submission, User
 from ..errors import ConfigError, Notice, notice
 from ..i18n import normalize, t
 from ..keyboards import confirm_kb, control_kb, media_count, media_kb, reasons_kb, schedule_kb, user_kb
-from ..render import control_text, signature
+from ..render import caption_index, control_text, signature
 from ..timeutil import fmt_ts
 
 log = logging.getLogger(__name__)
@@ -31,6 +32,7 @@ PROMPT_TTL = 24 * 3600  # 等待回复的提示超过这么久就删掉
 STATS_MSG_KEY = "stats_msg_id"
 STATS_DEBOUNCE = 3  # 秒：统计消息在这段时间内的多次更新合并成一次编辑（减少审核群里的请求，避免限流）
 POSTPONE_MARGIN = 5  # 秒：发布被限流时，在 Telegram 要求的等待时间之后再多留一点余量
+SHUTDOWN_WAIT = 45  # 秒：停止时最多等进行中的处理这么久；docker-compose.yml 的 stop_grace_period 要比它长
 NO_PREVIEW = LinkPreviewOptions(is_disabled=True)
 
 
@@ -54,6 +56,8 @@ class CoreBase:
         self._stats_dirty = False
         self._stats_task: asyncio.Task | None = None
         self._tasks: list[asyncio.Task] = []
+        self._scheduler_task: asyncio.Task | None = None
+        self._stopping = asyncio.Event()
         self._album_locks: dict[tuple[int, str], tuple[asyncio.Lock, int]] = {}  # (投稿人, 相册编号) → (锁, 使用中的数量)
 
     # ---------- lifecycle ----------
@@ -92,10 +96,29 @@ class CoreBase:
             raise ConfigError(missing, value=chat_id) from None
 
     def start_background(self) -> None:
-        self._tasks = [
-            asyncio.create_task(self._scheduler_loop(), name="scheduler"),
-            asyncio.create_task(self._reminder_loop(), name="reminder"),
-        ]
+        self._scheduler_task = asyncio.create_task(self._scheduler_loop(), name="scheduler")
+        self._tasks = [self._scheduler_task, asyncio.create_task(self._reminder_loop(), name="reminder")]
+
+    async def shutdown(self, handlers: set[asyncio.Task]) -> None:
+        """停止（docker stop 发 SIGTERM）：已经开始的处理做完再退出，否则发到频道的稿件可能没记下状态，审核员会重复发布。
+        等太久就取消，发布到一半的稿件下次启动时标成失败，由审核员确认后决定是否重试。"""
+        self._stopping.set()
+        finishing = asyncio.create_task(self._finish_work(handlers))
+        _, pending = await asyncio.wait({finishing}, timeout=SHUTDOWN_WAIT)
+        if pending:
+            log.warning("等待进行中的处理超过 %s 秒，强制退出", SHUTDOWN_WAIT)
+            left = [finishing, *handlers]
+            for task in left:
+                task.cancel()
+            await asyncio.gather(*left, return_exceptions=True)
+        await self.stop_background()
+
+    async def _finish_work(self, handlers: set[asyncio.Task]) -> None:
+        if handlers:
+            await asyncio.wait(set(handlers))
+        await self.albums.close()  # 处理函数可能刚把一项放进相册，所以排在它们之后；还没收齐的也处理掉，免得丢失
+        if self._scheduler_task:
+            await asyncio.wait({self._scheduler_task})
 
     async def stop_background(self) -> None:
         if self._stats_task:
@@ -163,6 +186,19 @@ class CoreBase:
         user = await self.db.get_user(sub.user_id)
         return signature(sub, user, self.lang, link=link)
 
+    async def _length_error(self, sub: Submission, items: list[dict], *, signed: bool = True) -> Notice | None:
+        """每一项是否超过 Telegram 的长度限制。signed：把落款算进承载说明文字的那一项（发送时会加上它）；
+        草稿还没选署名 / 匿名，不算落款，提交时再检查。"""
+        tail = (await self._signature(sub, link=False))[0] if signed else ""
+        carrier = caption_index(items)
+        for i, it in enumerate(items):
+            limit = 4096 if it["type"] == "text" else 1024
+            text = it.get("text", "")
+            n = ent.u16len(ent.join(text, [], tail, [])[0] if i == carrier else text)
+            if n > limit:
+                return notice("too_long", n=n, limit=limit)
+        return None
+
     async def notify(self, sub: Submission, key: str, **kw) -> None:
         """用投稿人自己的语言通知他，回复在他的投稿提示消息下面。"""
         lang = await self.user_lang(sub.user_id)
@@ -187,7 +223,7 @@ class CoreBase:
                 reply_markup=control_kb(sub, self.lang, banned=bool(user and user.banned)),
                 link_preview_options=NO_PREVIEW,
             )
-        except TelegramBadRequest as e:
+        except TelegramAPIError as e:  # 只是显示没更新，不能打断调用方（比如发布）接下来的状态变化
             if "not modified" not in str(e):
                 log.warning("更新控制消息 #%s 失败：%s", sid, e)
 

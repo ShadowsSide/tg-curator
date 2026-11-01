@@ -32,6 +32,7 @@ PROMPT_TTL = 24 * 3600  # 等待回复的提示超过这么久就删掉
 STATS_MSG_KEY = "stats_msg_id"
 STATS_DEBOUNCE = 3  # 秒：统计消息在这段时间内的多次更新合并成一次编辑（减少审核群里的请求，避免限流）
 POSTPONE_MARGIN = 5  # 秒：发布被限流时，在 Telegram 要求的等待时间之后再多留一点余量
+SHUTDOWN_WAIT = 45  # 秒：停止时最多等进行中的处理这么久；docker-compose.yml 的 stop_grace_period 要比它长
 NO_PREVIEW = LinkPreviewOptions(is_disabled=True)
 
 
@@ -55,6 +56,8 @@ class CoreBase:
         self._stats_dirty = False
         self._stats_task: asyncio.Task | None = None
         self._tasks: list[asyncio.Task] = []
+        self._scheduler_task: asyncio.Task | None = None
+        self._stopping = asyncio.Event()
         self._album_locks: dict[tuple[int, str], tuple[asyncio.Lock, int]] = {}  # (投稿人, 相册编号) → (锁, 使用中的数量)
 
     # ---------- lifecycle ----------
@@ -93,10 +96,29 @@ class CoreBase:
             raise ConfigError(missing, value=chat_id) from None
 
     def start_background(self) -> None:
-        self._tasks = [
-            asyncio.create_task(self._scheduler_loop(), name="scheduler"),
-            asyncio.create_task(self._reminder_loop(), name="reminder"),
-        ]
+        self._scheduler_task = asyncio.create_task(self._scheduler_loop(), name="scheduler")
+        self._tasks = [self._scheduler_task, asyncio.create_task(self._reminder_loop(), name="reminder")]
+
+    async def shutdown(self, handlers: set[asyncio.Task]) -> None:
+        """停止（docker stop 发 SIGTERM）：已经开始的处理做完再退出，否则发到频道的稿件可能没记下状态，审核员会重复发布。
+        等太久就取消，发布到一半的稿件下次启动时标成失败，由审核员确认后决定是否重试。"""
+        self._stopping.set()
+        finishing = asyncio.create_task(self._finish_work(handlers))
+        _, pending = await asyncio.wait({finishing}, timeout=SHUTDOWN_WAIT)
+        if pending:
+            log.warning("等待进行中的处理超过 %s 秒，强制退出", SHUTDOWN_WAIT)
+            left = [finishing, *handlers]
+            for task in left:
+                task.cancel()
+            await asyncio.gather(*left, return_exceptions=True)
+        await self.stop_background()
+
+    async def _finish_work(self, handlers: set[asyncio.Task]) -> None:
+        if handlers:
+            await asyncio.wait(set(handlers))
+        await self.albums.close()  # 处理函数可能刚把一项放进相册，所以排在它们之后；还没收齐的也处理掉，免得丢失
+        if self._scheduler_task:
+            await asyncio.wait({self._scheduler_task})
 
     async def stop_background(self) -> None:
         if self._stats_task:

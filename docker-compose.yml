@@ -4,6 +4,7 @@ services:
     # 换成 fork、Docker Hub 或固定版本：在 .env 里设置 IMAGE；自己构建：见 docker-compose.build.yml
     image: ${IMAGE:-ghcr.io/shadowsside/tg-curator:latest}
     restart: unless-stopped
+    stop_grace_period: 60s  # 停止时先做完进行中的发布（最多 45 秒，见 bot/core/base.py 的 SHUTDOWN_WAIT）
     env_file: .env
     volumes:
       - bot-data:/app/data

@@ -21,11 +21,11 @@ from ..permissions import ReviewerCheck, ReviewerOnly, ReviewerPolicy
 from ..i18n import t
 from ..keyboards import AdminUserCB, ReviewCB, route, user_confirm_kb
 from ..render import dump_link_preview, extract_item, message_item, user_link
-from ..timeutil import parse_time
+from ..timeutil import MAX_AHEAD, TimeTooFar, parse_time
 
 MAX_REASON = 500
 # 回复提示时这些错误可以改了再回复一次，提示保留；其他错误（比如投稿已被别人处理）提示作废
-RETRYABLE = ("prompt_text_needed", "custom_time_bad", "time_past", "too_long", "text_empty",
+RETRYABLE = ("prompt_text_needed", "custom_time_bad", "custom_time_far", "time_past", "too_long", "text_empty",
              "media_only_photo_video", "media_replace_one", "media_too_many")
 REVIEWER_MEDIA = ("pending",)  # 审核员只能在待审核时改媒体
 
@@ -42,6 +42,11 @@ class _AlbumAnswer:
     until: float  # 到期（monotonic 时间），之后到的部分不认
     lock: asyncio.Lock = field(default_factory=asyncio.Lock)  # 同一个相册的几批依次处理
     error: Notice | None = None  # 第一批失败的原因
+
+
+def _confirm_toast(action: str) -> str:
+    """出确认面板时的提示。删除稿件不可恢复，按钮上写不下（手机上显示不全），放在这里说。"""
+    return "toast_confirm_purge" if action == "purge" else "toast_confirm"
 
 
 def _is_owner(m: Message, prompt: Prompt) -> bool:
@@ -111,7 +116,7 @@ def build_router(settings: Settings) -> Router:
             return
         if step == "confirm":
             await core.show_confirm(sid, action, v)
-            await cq.answer(t(lang, "toast_confirm"))
+            await cq.answer(t(lang, _confirm_toast(action)))
             return
 
         if action == "spoiler":
@@ -194,7 +199,7 @@ def build_router(settings: Settings) -> Router:
             toast, alert = t(lang, "toast_not_banned"), True
         elif a in ("ban", "unban", "purge"):
             await cq.message.edit_reply_markup(reply_markup=user_confirm_kb(uid, a, lang))
-            await cq.answer(t(lang, "toast_confirm"))
+            await cq.answer(t(lang, _confirm_toast(a)))
             return
         elif a == "ban_ok":
             rejected = await core.ban_user(uid, cq.from_user)
@@ -307,7 +312,10 @@ def build_router(settings: Settings) -> Router:
         if not body.strip():
             return notice("prompt_text_needed"), ""
         if prompt.kind == "time":
-            ts = parse_time(body, settings.tz)
+            try:
+                ts = parse_time(body, settings.tz)
+            except TimeTooFar:
+                return notice("custom_time_far", years=MAX_AHEAD // (365 * 86400)), ""
             if ts is None:
                 return notice("custom_time_bad"), ""
             return await core.schedule(sid, ts, who), t(lang, "custom_time_done", when=core.fmt(ts))

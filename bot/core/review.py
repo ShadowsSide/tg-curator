@@ -4,7 +4,7 @@ from __future__ import annotations
 import html
 import logging
 
-from aiogram.exceptions import TelegramAPIError, TelegramRetryAfter
+from aiogram.exceptions import TelegramAPIError, TelegramBadRequest, TelegramRetryAfter
 from aiogram.types import User as TgUser
 
 from ..db import OPEN_STATES, Submission
@@ -172,7 +172,8 @@ class ReviewMixin(CoreBase):
 
     async def purge_review_messages(self, user_id: int) -> Notice:
         """删除被封禁用户的全部投稿在审核群里的消息（含已发布的）；数据库里的投稿记录保留，/user 统计不变。
-        按整条投稿分批，每次最多 100 条（deleteMessages 的上限）；删成功的投稿才清掉记录，失败的可以再点一次重试。"""
+        按整条投稿分批，每次最多 100 条（deleteMessages 的上限）；删成功的投稿才清掉记录，失败的可以再点一次重试。
+        一批里只要有一条删不掉，Telegram 就让整批失败：这时改为按投稿逐条删，一条坏消息不会连累其他稿件。"""
         user = await self.db.get_user(user_id)
         if not user or not user.banned:
             return notice("toast_not_banned")
@@ -181,18 +182,49 @@ class ReviewMixin(CoreBase):
             return notice("purge_nothing")
         done = failed = 0
         for sids, ids in _delete_batches(traces):
-            try:
-                for i in range(0, len(ids), DELETE_LIMIT):
-                    await self.bot.delete_messages(self.s.review_chat_id, ids[i:i + DELETE_LIMIT])
-            except TelegramAPIError as e:
-                log.warning("删除审核群消息失败（投稿 %s）：%s", sids, e)
-                failed += len(sids)
+            if await self._delete_review_messages(ids):
+                await self.db.forget_review_messages(self.s.review_chat_id, sids)
+                done += len(sids)
                 continue
-            await self.db.forget_review_messages(self.s.review_chat_id, sids)
-            done += len(sids)
+            for sid in sids:  # 整批失败：一条一条投稿地删；这条投稿还删不掉，再一条一条消息地删
+                # 只有一条投稿的批次刚刚已经整体试过了，直接逐条
+                whole = len(sids) > 1 and await self._delete_review_messages(traces[sid])
+                if whole or await self._delete_one_by_one(sid, traces[sid]):
+                    await self.db.forget_review_messages(self.s.review_chat_id, [sid])
+                    done += 1
+                else:
+                    failed += 1
         if failed:
             return notice("purge_partial", n=done, failed=failed)
         return notice("purge_done", n=done)
+
+    async def _delete_review_messages(self, ids: list[int]) -> bool:
+        """一次删一批（超过 100 条分几次）；有一条删不掉就整批失败，返回 False。"""
+        try:
+            for i in range(0, len(ids), DELETE_LIMIT):
+                await self.bot.delete_messages(self.s.review_chat_id, ids[i:i + DELETE_LIMIT])
+        except TelegramAPIError:
+            return False
+        return True
+
+    async def _delete_one_by_one(self, sid: int, ids: list[int]) -> bool:
+        """这条投稿的消息一条一条删：能删的删掉（之后不再算它），删不掉的记进日志，方便查原因。"""
+        gone, bad = [], {}
+        for mid in ids:
+            try:
+                await self.bot.delete_message(self.s.review_chat_id, mid)
+            except TelegramBadRequest as e:
+                if "not found" not in e.message:  # 已经不在了（手动删过、上次删掉了）就算删掉了
+                    bad[mid] = e.message
+                    continue
+            except TelegramAPIError as e:
+                bad[mid] = str(e)
+                continue
+            gone.append(mid)
+        if bad:
+            await self.db.unlink_review_messages(gone)
+            log.warning("删除审核群消息失败：投稿 #%s 的消息 %s 删不掉（%s）", sid, sorted(bad), "；".join(set(bad.values())))
+        return not bad
 
     async def unban_user(self, user_id: int) -> bool:
         if not await self.db.unban(user_id):

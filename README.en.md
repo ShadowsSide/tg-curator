@@ -180,7 +180,8 @@ Spam checks, messaging window, stats scope and so on; the defaults are usually f
 |---|---|
 | Send any content | Starts a submission, then choose signed or anonymous. Your previous choice is marked “(last time)” and shown first; you still tap it |
 | Edit the original message with Telegram's "Edit" | Changes the submission until the review starts (scheduled, published, rejected): text, formatting, or even the image |
-| Reply to your submission with a photo / video | The choice panel gets an extra **➕ Add to that submission** button that adds the new photos to it; or submit them as a new submission as usual. Only drafts and pending submissions can take more |
+| Reply to your submission with a photo / video | The choice panel gets an extra **➕ Add to that submission** button that adds the new photos to it; or submit them as a new submission as usual. Only drafts and pending submissions can take more. You can reply to the original message or to the bot's "Submitted" message |
+| Send several photos / videos at once (an album) | Becomes one submission. Telegram sometimes delivers an album in batches (say 1 photo, then 9 more a little later); parts arriving **within 10 minutes** join the same submission and the count in the prompt is updated. Parts that arrive after you submitted are added too, and reviewers get a new preview |
 | 🗑 Remove a photo / video | Shown on the bot's message while a draft or pending submission has 2 or more photos/videos; tap it and pick the one to remove. Nothing can be changed once the review has started (scheduled, published, rejected) |
 | `/edit new content` | Only works as a **reply** to your submission (or the bot's message about it); without a reply nothing is changed |
 | `/edit` (as a reply) | Shows the current content with formatting, so you can copy and change it |

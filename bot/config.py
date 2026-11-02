@@ -58,9 +58,12 @@ def _quiet_hours(value: str) -> tuple[int, int] | None:
         return None
     try:
         start, end = value.split("-", 1)
-        return int(start) % 24, int(end) % 24
+        start, end = int(start) % 24, int(end) % 24
     except ValueError:
         raise ConfigError("cfg_quiet_hours", value=value) from None
+    if start == end:  # 按“跨零点”的规则算会变成全天安静，提醒永远不发
+        raise ConfigError("cfg_quiet_hours_same", value=value)
+    return start, end
 
 
 @dataclass(frozen=True)

@@ -57,6 +57,15 @@ def test_malformed_values():
         assert name in zh and name in en, (zh, en)
 
 
+def test_quiet_hours():
+    """安静时段跨零点也能用；开始和结束是同一个小时（会变成全天安静）时报错。"""
+    for value, start_end in (("23-7", (23, 7)), ("0-8", (0, 8)), ("24-6", (0, 6))):
+        assert load(REMINDER_QUIET_HOURS=value).quiet_hours == start_end, value
+    for value in ("8-8", "0-24"):
+        got, zh, en = error(REMINDER_QUIET_HOURS=value)
+        assert got == "cfg_quiet_hours_same" and value in zh and value in en, (value, got)
+
+
 if __name__ == "__main__":
     tests = [v for k, v in dict(globals()).items() if k.startswith("test_")]
     for fn in tests:

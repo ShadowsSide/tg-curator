@@ -72,7 +72,7 @@ async def scenario():
           await wait_for(lambda e: is_send(e, "sendPhoto", REVIEW, "via Alice"), since=n))
 
     # 发布：刚好在上限内的稿件能发到频道
-    n = len(log); lt.cb("r:pub_ok:2:0", REVIEW, lt.ADMIN, ctrl_id)
+    n = len(log); lt.cb(lt.pub_ok(2), REVIEW, lt.ADMIN, ctrl_id)
     check("fits exactly → published", await wait_for(lambda e: is_send(e, "sendPhoto", lt.CHANNEL), since=n))
 
 

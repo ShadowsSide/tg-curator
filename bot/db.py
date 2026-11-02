@@ -60,7 +60,8 @@ CREATE TABLE IF NOT EXISTS submissions (
     error          TEXT,
     edit_preview   TEXT,
     merge_to       INTEGER,
-    media_group_id TEXT
+    media_group_id TEXT,
+    version        INTEGER NOT NULL DEFAULT 0
 );
 
 CREATE INDEX IF NOT EXISTS idx_sub_status ON submissions(status, scheduled_at);
@@ -123,6 +124,7 @@ MIGRATIONS = [
     ("submissions", "edit_preview", "ALTER TABLE submissions ADD COLUMN edit_preview TEXT"),
     ("submissions", "merge_to", "ALTER TABLE submissions ADD COLUMN merge_to INTEGER"),
     ("submissions", "media_group_id", "ALTER TABLE submissions ADD COLUMN media_group_id TEXT"),
+    ("submissions", "version", "ALTER TABLE submissions ADD COLUMN version INTEGER NOT NULL DEFAULT 0"),
     ("prompts", "arg", "ALTER TABLE prompts ADD COLUMN arg INTEGER NOT NULL DEFAULT 0"),
 ]
 
@@ -185,6 +187,7 @@ class Submission:
     edit_preview: list[int] | None = None  # 审核群里最新一份修改后预览的消息（改稿时删掉上一份）
     merge_to: int | None = None  # 草稿：投稿人回复旧投稿发的图片，可以“加到”这条投稿里
     media_group_id: str | None = None  # 由相册生成的投稿：Telegram 的相册编号，相册后到的部分靠它找回这条投稿
+    version: int = 0  # 内容每改一次加 1：发布按钮带着它，确认时内容变过就不发；改稿时防止互相覆盖
 
     @property
     def spoilerable(self) -> bool:
@@ -224,6 +227,10 @@ class Prompt:
 def _encode(fields: dict[str, Any]) -> dict[str, Any]:
     return {k: json.dumps(v, ensure_ascii=False) if k in JSON_COLUMNS and isinstance(v, list) else v
             for k, v in fields.items()}
+
+
+def _version_cond(version: int | None) -> tuple[str, tuple]:
+    return ("", ()) if version is None else (" AND version=?", (version,))
 
 
 class DB:
@@ -321,14 +328,19 @@ class DB:
         cols = ", ".join(f"{k}=?" for k in fields)
         await self._exec(f"UPDATE submissions SET {cols} WHERE id=?", (*fields.values(), sid))
 
-    async def update_if(self, sid: int, states: Iterable[str], **fields: Any) -> bool:
-        """只在状态仍属于 states 时更新（防止修改和发布/审核同时发生）。"""
+    async def update_if(self, sid: int, states: Iterable[str], *, version: int | None = None, **fields: Any) -> bool:
+        """只在状态仍属于 states 时更新（防止修改和发布/审核同时发生）。
+        version：内容版本也必须还是它，同时把版本加 1（防止两次修改互相覆盖）。"""
         states = tuple(states)
         fields = _encode(fields)
         cols = ", ".join(f"{k}=?" for k in fields)
         marks = ", ".join("?" * len(states))
+        where, args = _version_cond(version)
+        if version is not None:
+            cols += ", version=version+1"
         return await self._exec(
-            f"UPDATE submissions SET {cols} WHERE id=? AND status IN ({marks})", (*fields.values(), sid, *states)
+            f"UPDATE submissions SET {cols} WHERE id=? AND status IN ({marks}){where}",
+            (*fields.values(), sid, *states, *args),
         ) == 1
 
     async def find_by_album(self, user_id: int, media_group_id: str, since: int) -> Submission | None:
@@ -390,15 +402,18 @@ class DB:
         await self.conn.execute("UPDATE submissions SET msg_count = msg_count + 1 WHERE id=?", (sid,))
         await self.conn.commit()
 
-    async def transition(self, sid: int, from_states: Iterable[str], to_state: str, **fields: Any) -> bool:
-        """原子地把状态从 from_states 之一改成 to_state；状态不符时返回 False（防并发重复操作）。"""
+    async def transition(self, sid: int, from_states: Iterable[str], to_state: str, *, version: int | None = None,
+                         **fields: Any) -> bool:
+        """原子地把状态从 from_states 之一改成 to_state；状态不符时返回 False（防并发重复操作）。
+        version：内容版本也必须还是它（发布时确认的就是审核员看到的那一版）。"""
         from_states = tuple(from_states)
         fields = {**_encode(fields), "status": to_state}
         cols = ", ".join(f"{k}=?" for k in fields)
         marks = ", ".join("?" * len(from_states))
+        where, args = _version_cond(version)
         changed = await self._exec(
-            f"UPDATE submissions SET {cols} WHERE id=? AND status IN ({marks})",
-            (*fields.values(), sid, *from_states),
+            f"UPDATE submissions SET {cols} WHERE id=? AND status IN ({marks}){where}",
+            (*fields.values(), sid, *from_states, *args),
         )
         return changed == 1
 

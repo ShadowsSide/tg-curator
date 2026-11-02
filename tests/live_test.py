@@ -205,6 +205,16 @@ def cb(data, chat_id, from_id, message_id=999):
                          "message": {"message_id": message_id, "date": now(), "chat": chat(chat_id)}})
 
 
+def pub_ok(sid):
+    """“确认发布”的按钮数据。发布按钮带着内容版本（改一次稿加 1），这里取控制消息上最新的那个。"""
+    for e in reversed(log):
+        kb = (e["params"].get("reply_markup") or {}).get("inline_keyboard", []) if not e.get("error") else []
+        for b in (b for row in kb for b in row):
+            if b.get("callback_data", "").startswith(f"r:pub:{sid}:"):
+                return f"r:pub_ok:{sid}:{b['callback_data'].rsplit(':', 1)[1]}"
+    return f"r:pub_ok:{sid}:0"
+
+
 async def wait_for(pred, timeout=10.0, since=None):
     start = since if since is not None else len(log)
     deadline = time.time() + timeout
@@ -315,7 +325,7 @@ async def scenario():
     e = await wait_for(lambda e: e["method"] == "editMessageText" and "静音发送：🔕 开" in e["params"].get("text", "")
                        and "剧透遮罩：🙈 开" in e["params"].get("text", ""), since=n)
     check("spoiler + silent toggled", e)
-    n = len(log); cb("r:pub_ok:2:0", REVIEW, ADMIN)
+    n = len(log); cb(pub_ok(2), REVIEW, ADMIN)
     e = await wait_for(lambda e: is_send(e, "sendMediaGroup", CHANNEL), since=n)
     ok = e and all(m.get("has_spoiler") for m in e["params"]["media"]) and str(e["params"].get("disable_notification")).lower() == "true"
     check("published to channel with spoiler + silent (real HTTP payload)", ok,
@@ -389,7 +399,7 @@ async def scenario():
           pv and pv["params"]["text"].endswith("\n\nvia Alice")
           and set(norm(sig_ents)) <= set(norm(pv["params"].get("entities"))),
           pv and pv["params"].get("entities"))
-    n = len(log); cb("r:pub_ok:5:0", REVIEW, ADMIN)
+    n = len(log); cb(pub_ok(5), REVIEW, ADMIN)
     rejected = await wait_for(lambda e: e.get("error") and str(e["params"].get("chat_id")) == str(CHANNEL), since=n)
     pub = await wait_for(lambda e: is_send(e, "sendMessage", CHANNEL, "热门"), since=n)
     sig_text = "via Alice"  # 落款：斜体的 via + 不带链接的名字
@@ -438,7 +448,7 @@ async def scenario():
                        since=n)
     check("/edit without text echoes current caption with formatting", e and norm(e["params"].get("entities")) == norm(shifted))
 
-    n = len(log); cb("r:pub_ok:6:0", REVIEW, ADMIN)
+    n = len(log); cb(pub_ok(6), REVIEW, ADMIN)
     pub6 = await wait_for(lambda e: is_send(e, "sendPhoto", CHANNEL), since=n)
     p6 = pub6["params"] if pub6 else {}
     check("edited photo published: new caption, formatting, caption-above, spoiler",
@@ -509,7 +519,7 @@ async def scenario():
     check("replying with just /edit echoes current content", e)
 
     # 7f. 发布后再改 → 拒绝
-    n = len(log); cb("r:pub_ok:7:0", REVIEW, ADMIN)
+    n = len(log); cb(pub_ok(7), REVIEW, ADMIN)
     await wait_for(lambda e: is_send(e, "sendMessage", CHANNEL, "2024年总结"), since=n)
     n = len(log); pm_edit(src, "发布后偷偷改")
     e = await wait_for(lambda e: is_send(e, "sendMessage", USER, "已经发布，不能修改"), since=n)

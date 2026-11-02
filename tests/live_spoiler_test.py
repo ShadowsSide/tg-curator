@@ -93,7 +93,7 @@ async def scenario():
     check("add a spoilered photo to a submission → spoiler on", e and ON in e["params"]["text"], e and e["params"]["text"])
 
     # 6. 发布时按当前设置给媒体加剧透
-    n = len(log); lt.cb("r:pub_ok:2:0", REVIEW, ADMIN, message_id=cid2)
+    n = len(log); lt.cb(lt.pub_ok(2), REVIEW, ADMIN, message_id=cid2)
     pub = await wait_for(lambda e: is_send(e, "sendMediaGroup", lt.CHANNEL), since=n)
     media = pub and media_of(pub)
     check("published album has the spoiler on every item", media and all(m.get("has_spoiler") for m in media), media)

@@ -46,13 +46,19 @@ class ReviewMixin(CoreBase):
         return notice("toast_silent", state=notice("on" if not sub.silent else "off"))
 
     async def publish(self, sid: int, reviewer: TgUser | None = None,
-                      from_states: tuple[str, ...] = ("pending", "scheduled", "failed")) -> Notice | None:
-        """立即发布到频道。返回错误信息，成功返回 None。"""
+                      from_states: tuple[str, ...] = ("pending", "scheduled", "failed"),
+                      version: int | None = None) -> Notice | None:
+        """立即发布到频道。返回错误信息，成功返回 None。
+        version：审核员点按钮时看到的内容版本；之后内容又被改过就不发（定时发布不带，按到点时的内容发）。"""
         sub = await self.db.get(sid)
         if not sub:
             return notice("sub_not_found", sid=sid)
         fields = self._review_fields(sub, reviewer, "approved")
-        if not await self.db.transition(sid, from_states, "publishing", error=None, **fields):
+        if not await self.db.transition(sid, from_states, "publishing", version=version, error=None, **fields):
+            sub = await self.db.get(sid)
+            if version is not None and sub.status in from_states and sub.version != version:
+                await self.refresh_control(sid)  # 按钮换成新版本的，看过新预览后再点
+                return notice("publish_stale")
             return notice("status_changed")
         await self.refresh_control(sid)
 

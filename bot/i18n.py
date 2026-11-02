@@ -433,6 +433,7 @@ T: dict[str, dict[str, str]] = {
         "zh": "已封禁，并拒绝 {n} 条未处理来稿",
         "en": "Banned; {n} open submission(s) rejected",
     },
+    "sched_publish_failed": {"zh": "⏰ 定时发布没有成功：{reason}", "en": "⏰ The scheduled post didn't go out: {reason}"},
     "publish_failed": {"zh": "发布失败：{error}", "en": "Failed to publish: {error}"},
     "publish_postponed": {
         "zh": "⏳ Telegram 正在限流，已自动改为 <b>{when}</b> 发布",

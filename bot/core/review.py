@@ -1,6 +1,7 @@
 """审核动作：剧透 / 静音开关、发布、定时、拒绝、封禁。"""
 from __future__ import annotations
 
+import html
 import logging
 
 from aiogram.exceptions import TelegramAPIError, TelegramRetryAfter
@@ -74,7 +75,7 @@ class ReviewMixin(CoreBase):
             await self.db.update(sid, status="failed", error=str(e)[:300])
             await self.refresh_control(sid)
             await self.refresh_stats()
-            return notice("publish_failed", error=str(e))
+            return notice("publish_failed", error=html.escape(str(e)))  # 错误原文可能带 < >，消息按 HTML 解析
 
         await self.db.update(sid, status="published", published_at=now_ts(), channel_msg_id=sent[0].message_id)
         sub = await self.db.get(sid)

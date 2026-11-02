@@ -333,6 +333,7 @@ bot/
   handlers/
     user.py       private chat: submitting, editing, /me
     review.py     review group: buttons and commands
+    errors.py     unhandled errors: log and tell the person
 tests/            unit and end-to-end tests
 scripts/          multi-arch image build script
 ```

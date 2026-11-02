@@ -331,6 +331,7 @@ bot/
   handlers/
     user.py       私聊：投稿、修改、/me
     review.py     审核群：按钮与命令
+    errors.py     没被处理的异常：记日志并告诉对方
 tests/            单元测试与端到端测试
 scripts/          多架构镜像构建脚本
 ```

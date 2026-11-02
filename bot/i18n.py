@@ -433,6 +433,10 @@ T: dict[str, dict[str, str]] = {
         "zh": "已封禁，并拒绝 {n} 条未处理来稿",
         "en": "Banned; {n} open submission(s) rejected",
     },
+    "error_generic": {
+        "zh": "出错了，这次操作没有完成，请稍后再试",
+        "en": "Something went wrong and this action wasn't completed. Please try again shortly",
+    },
     "sched_publish_failed": {"zh": "⏰ 定时发布没有成功：{reason}", "en": "⏰ The scheduled post didn't go out: {reason}"},
     "publish_failed": {"zh": "发布失败：{error}", "en": "Failed to publish: {error}"},
     "publish_postponed": {

@@ -173,14 +173,15 @@ class ReviewMixin(CoreBase):
     async def purge_review_messages(self, user_id: int) -> Notice:
         """删除被封禁用户的全部投稿在审核群里的消息（含已发布的）；数据库里的投稿记录保留，/user 统计不变。
         按整条投稿分批，每次最多 100 条（deleteMessages 的上限）；删成功的投稿才清掉记录，失败的可以再点一次重试。
-        一批里只要有一条删不掉，Telegram 就让整批失败：这时改为按投稿逐条删，一条坏消息不会连累其他稿件。"""
+        一批里只要有一条删不掉，Telegram 就让整批失败：这时改为按投稿逐条删，一条坏消息不会连累其他稿件。
+        超过 48 小时的消息 Telegram 不允许机器人删除（有删除权限也不行）：不再记录、不再重试，提示里说明要手动删。"""
         user = await self.db.get_user(user_id)
         if not user or not user.banned:
             return notice("toast_not_banned")
         traces = await self.db.review_traces(self.s.review_chat_id, user_id)
         if not traces:
             return notice("purge_nothing")
-        done = failed = 0
+        done = failed = old = 0
         for sids, ids in _delete_batches(traces):
             if await self._delete_review_messages(ids):
                 await self.db.forget_review_messages(self.s.review_chat_id, sids)
@@ -189,14 +190,17 @@ class ReviewMixin(CoreBase):
             for sid in sids:  # 整批失败：一条一条投稿地删；这条投稿还删不掉，再一条一条消息地删
                 # 只有一条投稿的批次刚刚已经整体试过了，直接逐条
                 whole = len(sids) > 1 and await self._delete_review_messages(traces[sid])
-                if whole or await self._delete_one_by_one(sid, traces[sid]):
-                    await self.db.forget_review_messages(self.s.review_chat_id, [sid])
-                    done += 1
-                else:
+                too_old = 0 if whole else await self._delete_one_by_one(sid, traces[sid])
+                if too_old is None:
                     failed += 1
+                    continue
+                await self.db.forget_review_messages(self.s.review_chat_id, [sid])
+                done += 1
+                old += too_old
+        note = notice("purge_too_old", n=old) if old else ""
         if failed:
-            return notice("purge_partial", n=done, failed=failed)
-        return notice("purge_done", n=done)
+            return notice("purge_partial", n=done, failed=failed, note=note)
+        return notice("purge_done", n=done, note=note)
 
     async def _delete_review_messages(self, ids: list[int]) -> bool:
         """一次删一批（超过 100 条分几次）；有一条删不掉就整批失败，返回 False。"""
@@ -207,13 +211,17 @@ class ReviewMixin(CoreBase):
             return False
         return True
 
-    async def _delete_one_by_one(self, sid: int, ids: list[int]) -> bool:
-        """这条投稿的消息一条一条删：能删的删掉（之后不再算它），删不掉的记进日志，方便查原因。"""
-        gone, bad = [], {}
+    async def _delete_one_by_one(self, sid: int, ids: list[int]) -> int | None:
+        """这条投稿的消息一条一条删。返回其中有几条太旧、删不掉（Telegram 不允许，不用再试）；
+        有别的错误（网络、权限等，下次可能成功）返回 None，能删的已经删掉，删不掉的记进日志，下次再试。"""
+        gone, too_old, bad = [], [], {}
         for mid in ids:
             try:
                 await self.bot.delete_message(self.s.review_chat_id, mid)
             except TelegramBadRequest as e:
+                if "can't be deleted" in e.message:  # 机器人自己发的消息只有超过 48 小时才会这样
+                    too_old.append(mid)
+                    continue
                 if "not found" not in e.message:  # 已经不在了（手动删过、上次删掉了）就算删掉了
                     bad[mid] = e.message
                     continue
@@ -221,10 +229,13 @@ class ReviewMixin(CoreBase):
                 bad[mid] = str(e)
                 continue
             gone.append(mid)
+        if too_old:
+            log.info("投稿 #%s 的消息 %s 超过 48 小时，Telegram 不允许机器人删除，需要手动删除", sid, too_old)
         if bad:
-            await self.db.unlink_review_messages(gone)
+            await self.db.unlink_review_messages(gone + too_old)
             log.warning("删除审核群消息失败：投稿 #%s 的消息 %s 删不掉（%s）", sid, sorted(bad), "；".join(set(bad.values())))
-        return not bad
+            return None
+        return len(too_old)
 
     async def unban_user(self, user_id: int) -> bool:
         if not await self.db.unban(user_id):

@@ -85,7 +85,7 @@ Built with Python 3.12 + [aiogram 3](https://github.com/aiogram/aiogram) + SQLit
 
 1. Create a bot with [@BotFather](https://t.me/BotFather) and copy its token. Leave privacy mode on (the default)
 2. Make the bot an admin of your **channel** with permission to post messages
-3. Create a **review group** and add the bot as a regular member (to use 🗑 on a banned user's posts older than 48 hours, make it an admin with the “Delete messages” right). By default only the group's **admins and owner** can review (`REVIEWERS`); other members get a “no permission” notice
+3. Create a **review group** and add the bot as a regular member. By default only the group's **admins and owner** can review (`REVIEWERS`); other members get a “no permission” notice
 4. Find the channel ID and review group ID (both are numbers starting with `-100`). The review group must be a supergroup: if its ID doesn't start with `-100`, it's a basic group. Make chat history visible to new members in the group settings to upgrade it, then get the ID again. You can use a bot such as [@RawDataBot](https://t.me/RawDataBot), or send a message in the group and open `https://api.telegram.org/bot<token>/getUpdates`. For the channel you can also use its `@username`
 
 ### 2. Deploy
@@ -195,7 +195,7 @@ Spam checks, messaging window, stats scope and so on; the defaults are usually f
 
 ### Admins (review group)
 
-Buttons on the control message: **✅ Publish now**, **⏰ Schedule**, **❌ Reject**, **🚫 Ban submitter**, **✏️ Edit**, **🖼 Media**, plus the **🙈 Spoiler** and **🔕 Silent** toggles. Once a submitter is banned, their control messages show **🔓 Unban** and **🗑 Delete their posts**: after you confirm, it deletes the previews, control messages and relayed messages of all their submissions (published ones too) from the review group. The submissions and stats stay in the database.
+Buttons on the control message: **✅ Publish now**, **⏰ Schedule**, **❌ Reject**, **🚫 Ban submitter**, **✏️ Edit**, **🖼 Media**, plus the **🙈 Spoiler** and **🔕 Silent** toggles. Once a submitter is banned, their control messages show **🔓 Unban** and **🗑 Delete their posts**: after you confirm, it deletes the previews, control messages and relayed messages of all their submissions (published ones too) from the review group. The submissions and stats stay in the database. Telegram doesn't let bots delete messages older than 48 hours (not even as an admin); the reply says how many there are, and an admin has to delete them by hand.
 
 #### Reply prompts
 
@@ -281,7 +281,7 @@ Two processes are using the same token.
 The control message shows the reason and a 🔁 Retry button; a failed scheduled post also gets a reply under its control message. A common cause is that the bot lost the "Post messages" right in the channel. Length, including the signature, is already checked when submitting and editing (1024 characters for media captions, 4096 for text), so posts rarely fail for being too long.
 
 **"Delete their posts" says some couldn't be deleted?**
-Everything that could be deleted is gone; the rest is logged. Run `docker compose logs bot | grep 删除审核群消息失败` to see the submission, the message IDs and Telegram's reason. A common cause is that the bot doesn't have the "Delete messages" right.
+Telegram doesn't let bots delete messages older than 48 hours; the reply says how many there are, an admin has to delete them by hand, and pressing again won't retry them. Messages that couldn't be deleted for other reasons (a network error, say) are logged and retried when you press again. Run `docker compose logs bot | grep 删除审核群消息失败` to see the submission, the message IDs and Telegram's reason.
 
 **What happens when Telegram rate-limits the bot?**
 The bot waits as long as Telegram asks and retries automatically. If the wait would be too long (over 30 seconds), a post being published is automatically rescheduled for later instead of being marked failed. Several changes to the review summary within a few seconds are merged into one update.

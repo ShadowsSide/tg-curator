@@ -133,6 +133,29 @@ def test_version_guards_content_changes():
         asyncio.run(run(os.path.join(d, "v.db")))
 
 
+def test_failed_publish_not_counted_as_approved():
+    """发布失败的稿件 decision 仍是 approved：统计里不算通过，算待处理（等审核员重试）；重试成功后才算通过。"""
+    async def run(path):
+        db = DB(path)
+        await db.connect()
+        try:
+            item = [{"type": "text", "text": "a", "entities": []}]
+            ok, failed, pending = [await db.create_draft(42, item) for _ in range(3)]
+            await db.update(ok, status="published", decision="approved", reviewed_at=10, submitted_at=1)
+            await db.update(failed, status="failed", decision="approved", reviewed_at=10, submitted_at=1)
+            await db.update(pending, status="pending", submitted_at=1)
+            assert await db.review_counts(0) == (1, 0, 2)
+            assert (await db.activity(0, 0))[0]["approved"] == 1
+            await db.update(failed, status="published")  # 重试成功
+            assert await db.review_counts(0) == (2, 0, 1)
+            assert (await db.activity(0, 0))[0]["approved"] == 2
+        finally:
+            await db.close()
+
+    with tempfile.TemporaryDirectory() as d:
+        asyncio.run(run(os.path.join(d, "s.db")))
+
+
 if __name__ == "__main__":
     tests = [v for k, v in dict(globals()).items() if k.startswith("test_")]
     for fn in tests:

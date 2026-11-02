@@ -508,11 +508,12 @@ class DB:
     # ---------- stats ----------
 
     async def review_counts(self, since: int) -> tuple[int, int, int]:
+        """通过、拒绝、待处理。发布失败的稿件 decision 仍是 approved，但还没发出去、等审核员重试，算待处理。"""
         row = await self._one(
             """SELECT
-                 COALESCE(SUM(decision='approved' AND reviewed_at>=?), 0),
+                 COALESCE(SUM(decision='approved' AND status!='failed' AND reviewed_at>=?), 0),
                  COALESCE(SUM(decision='rejected' AND reviewed_at>=?), 0),
-                 COALESCE(SUM(status='pending'), 0)
+                 COALESCE(SUM(status IN ('pending', 'failed')), 0)
                FROM submissions""",
             (since, since),
         )
@@ -522,7 +523,7 @@ class DB:
         return await self._all(
             """SELECT s.user_id, u.username, u.full_name, u.banned,
                       COUNT(*)                                                     AS total,
-                      SUM(s.decision='approved')                                   AS approved,
+                      SUM(s.decision='approved' AND s.status!='failed')            AS approved,
                       SUM(s.decision='rejected')                                   AS rejected,
                       SUM(s.anonymous)                                             AS anonymous,
                       COUNT(DISTINCT date(s.submitted_at + ?, 'unixepoch'))        AS active_days,

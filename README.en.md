@@ -145,12 +145,12 @@ Options most deployments adjust as needed.
 |---|---|---|
 | `LANGUAGE` | `zh` | Language of the review group, channel signatures and review summary: `zh` / `en` |
 | `USER_LANGUAGE` | `auto` | Language submitters see: `auto` follows their Telegram app, or fix it to `zh` / `en` |
-| `REVIEWERS` | `admins` | Who can review: `admins` = review group admins and owner; `all` = every member; or user IDs, combinable, e.g. `admins,123456`. Bots never count as reviewers |
 | `TZ` | `Asia/Shanghai` | Time zone for scheduling and for what counts as "today" in stats |
+| `REVIEWERS` | `admins` | Who can review: `admins` = review group admins and owner; `all` = every member; or user IDs, combinable, e.g. `admins,123456`. Bots never count as reviewers |
 | `REJECT_TEMPLATES` | 4 default reasons, depends on `LANGUAGE` | Reasons offered after tapping Reject, separated by `\|`, e.g. `Duplicate\|Ads`; set it to empty to skip the reason panel |
-| `MAX_PENDING_PER_USER` | `5` | Maximum open submissions per user at a time |
 | `SCHEDULE_PRESETS` | `09:00,12:00,18:00,21:00` | Quick time buttons in the schedule panel |
 | `DEFAULT_SILENT` | `false` | Whether new submissions are published silently by default |
+| `MAX_PENDING_PER_USER` | `5` | Maximum open submissions per user at a time |
 | `REMINDER_INTERVAL_MINUTES` | `60` | Interval of the review summary, aligned to the clock; `0` turns it off |
 | `REMINDER_QUIET_HOURS` | — | Quiet hours with no summaries, e.g. `0-8` |
 | `PROXY` | — | Proxy, e.g. `socks5://host:port` |
@@ -166,15 +166,15 @@ Spam checks, messaging window, stats scope and so on; the defaults are usually f
 | Variable | Default | Description |
 |---|---|---|
 | `SPAM_KEYWORDS` | empty | Keyword blacklist, comma-separated, case-insensitive; checks both the text and link addresses |
+| `SPAM_ACTION` | `flag` | On a keyword or link-limit hit: `flag` = submit as usual and mark the control message; `block` = refuse it, the submitter can edit and resubmit |
 | `MAX_LINKS` | `0` | Maximum links per submission, `0` = no limit; domains in `LINK_WHITELIST` don't count |
 | `LINK_WHITELIST` | empty | Domains that don't count toward the link limit, comma-separated, subdomains included, e.g. `t.me,github.com` |
-| `SPAM_ACTION` | `flag` | On a keyword or link-limit hit: `flag` = submit as usual and mark the control message; `block` = refuse it, the submitter can edit and resubmit |
 | `NEW_USER_COOLDOWN_MINUTES` | `0` | Submitters with nothing published yet must wait this many minutes between submissions; `0` = no limit |
+| `REMINDER_ONLY_WHEN_PENDING` | `true` | Only post the summary when something is waiting for review |
+| `STATS_SCOPE` | `today` | `today`: accepted/rejected counts cover today only; `all`: all time |
 | `MSG_WINDOW_DAYS` | `3` | `/msg`: days after a submission is published or rejected during which messaging stays open; always open during review |
 | `LEAVE_UNKNOWN_CHATS` | `true` | Leave any other group or channel the bot is added to; `false` stays but never responds. The publishing channel and its linked discussion group (detected at startup) are always kept |
 | `ALBUM_DELAY` | `1.5` | Seconds to wait while collecting the parts of an album |
-| `REMINDER_ONLY_WHEN_PENDING` | `true` | Only post the summary when something is waiting for review |
-| `STATS_SCOPE` | `today` | `today`: accepted/rejected counts cover today only; `all`: all time |
 | `TELEGRAM_API_URL` | — | Self-hosted Bot API server, which lifts the official 20 MB / 50 MB file limits |
 
 ## Usage

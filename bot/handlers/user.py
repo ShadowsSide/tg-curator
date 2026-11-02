@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from aiogram import F, Router
-from aiogram.enums import ChatType
+from aiogram.enums import ChatType, ContentType
 from aiogram.exceptions import TelegramBadRequest
 from aiogram.filters import Command, CommandStart
 from aiogram.types import CallbackQuery, Message
@@ -12,6 +12,16 @@ from ..db import SUBMITTER_EDITABLE
 from ..i18n import t
 from ..keyboards import UserCB, UserMediaCB, user_media_kb
 from ..render import dump_link_preview, extract_item, message_item
+
+# 用户自己发的内容（能投稿的和不支持的都在内）。其余是置顶、自动删除计时等服务消息，种类多且还在增加，所以列这边。
+# UNKNOWN 是 aiogram 还不认识的新类型，当作内容，至少回一句“不支持”
+USER_CONTENT = frozenset({
+    ContentType.TEXT, ContentType.PHOTO, ContentType.VIDEO, ContentType.ANIMATION, ContentType.DOCUMENT,
+    ContentType.AUDIO, ContentType.VOICE, ContentType.VIDEO_NOTE, ContentType.STICKER, ContentType.LIVE_PHOTO,
+    ContentType.PAID_MEDIA, ContentType.STORY, ContentType.CHECKLIST, ContentType.CONTACT, ContentType.DICE,
+    ContentType.GAME, ContentType.POLL, ContentType.VENUE, ContentType.LOCATION, ContentType.UNKNOWN,
+})
+
 
 def build_router() -> Router:
     router = Router(name="user")
@@ -97,6 +107,8 @@ def build_router() -> Router:
 
     @router.message()
     async def single(m: Message, core: Core) -> None:
+        if m.content_type not in USER_CONTENT:
+            return  # 置顶、自动删除计时等服务消息不是用户发的内容，不回复“不支持”
         if m.text and m.text.startswith("/"):
             await m.answer(t(core.lang_of(m.from_user), "unknown_cmd"))
             return

@@ -35,11 +35,14 @@ def review_ids(marker):
 
 
 def deletes(since):
-    return [e for e in log[since:] if e["method"] == "deleteMessages" and str(e["params"].get("chat_id")) == str(REVIEW)]
+    """since 之后在审核群的删除请求：整批（deleteMessages）和逐条（deleteMessage）。"""
+    return [e for e in log[since:] if e["method"] in ("deleteMessages", "deleteMessage")
+            and str(e["params"].get("chat_id")) == str(REVIEW)]
 
 
 def deleted_ids(since):
-    return {int(m) for e in deletes(since) if not e.get("error") for m in e["params"]["message_ids"]}
+    return {int(m) for e in deletes(since) if not e.get("error")
+            for m in e["params"].get("message_ids") or [e["params"]["message_id"]]}
 
 
 async def card(uid):
@@ -106,25 +109,26 @@ async def scenario():
     check("/user of a banned user with posts → 🗑 with count", c and buttons(c).get(purge_n) == f"au:purge:{BOB}",
           c and buttons(c))
 
-    # 6. 卡片上删除：先确认；第一次删除失败 → 提示可重试，按钮还在
+    # 6. 卡片上删除：先确认；有一条消息删不掉（整批失败，逐条删时也失败）→ 提示可重试，按钮还在，能删的先删掉
     n = len(log); lt.cb(f"au:purge:{BOB}", REVIEW, ADMIN, message_id=cid)
     panel = await edited(cid, n)
     check("card 🗑 → confirm panel", panel and buttons(panel) == {CONFIRM: f"au:purge_ok:{BOB}", "« 返回": f"au:back:{BOB}"},
           panel and buttons(panel))
     lt.MOCK["fail"][f"deleteMessages:{REVIEW}"] = ["Bad Request: message can't be deleted"]
-    n = len(log); lt.cb(f"au:purge_ok:{BOB}", REVIEW, ADMIN, message_id=cid)
+    lt.MOCK["fail"][f"deleteMessage:{REVIEW}"] = ["Bad Request: message can't be deleted"]
+    n = n6 = len(log); lt.cb(f"au:purge_ok:{BOB}", REVIEW, ADMIN, message_id=cid)
     t = await toast(n, "删除失败")
     after = await edited(cid, n)
-    check("delete fails → alert says retry, card keeps 🗑",
-          t and t["params"].get("show_alert") and after and buttons(after).get(purge_n) == f"au:purge:{BOB}",
-          after and buttons(after))
+    check("delete fails → alert says retry, card keeps 🗑, the deletable messages are removed",
+          t and t["params"].get("show_alert") and after and buttons(after).get(purge_n) == f"au:purge:{BOB}"
+          and len(bob_ids - deleted_ids(n)) == 1, after and buttons(after))
 
     # 7. 重试成功：Bob 的消息删掉，卡片上 🗑 消失
     n = len(log); lt.cb(f"au:purge_ok:{BOB}", REVIEW, ADMIN, message_id=cid)
     t = await toast(n, "已删除 TA 在审核群的 1 条稿件")
     after = await edited(cid, n)
     check("retry → Bob's messages deleted, 🗑 gone from the card",
-          t and bob_ids <= deleted_ids(n) and after and buttons(after) == {"🔓 解除封禁": f"au:unban:{BOB}"},
+          t and bob_ids <= deleted_ids(n6) and after and buttons(after) == {"🔓 解除封禁": f"au:unban:{BOB}"},
           after and buttons(after))
 
     # 8. 卡片上的旧 🗑：解封后再点 → 提示没有被封禁，卡片刷新成 🚫 封禁，不删

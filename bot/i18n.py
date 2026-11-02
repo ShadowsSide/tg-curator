@@ -451,9 +451,10 @@ T: dict[str, dict[str, str]] = {
     "toast_not_banned": {"zh": "这个投稿人现在没有被封禁", "en": "This submitter isn't banned now"},
     "purge_done": {"zh": "已删除 TA 在审核群的 {n} 条稿件", "en": "Deleted their {n} submission(s) from the review group"},
     "purge_partial": {
-        "zh": "已删除 {n} 条稿件；{failed} 条删除失败（机器人可能没有删除消息的权限），可以再试一次",
-        "en": "Deleted {n} submission(s); {failed} couldn't be deleted (the bot may lack the delete-messages right). "
-              "You can try again",
+        "zh": "已删除 {n} 条稿件；{failed} 条删除失败（可能是机器人没有删除消息的权限，或者消息太旧、"
+              "不属于这个群），具体见日志。可以再试一次",
+        "en": "Deleted {n} submission(s); {failed} couldn't be deleted (the bot may lack the delete-messages right, "
+              "or the messages are too old or not in this group; see the log). You can try again",
     },
     "purge_nothing": {"zh": "TA 在审核群里没有可删除的稿件", "en": "They have nothing left to delete in the review group"},
     "toast_already_banned": {"zh": "这个投稿人已经被封禁了", "en": "This submitter is already banned"},

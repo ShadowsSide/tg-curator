@@ -15,15 +15,26 @@ TEXT = [{"type": "text", "text": "hi", "entities": []}]
 
 
 class FakeBot:
-    """只记录 delete_messages；fail 里的调用序号（从 0 开始）抛出“没有权限”。"""
-    def __init__(self, fail=()):
-        self.calls, self.fail = [], set(fail)
+    """记录删除请求，行为和 Telegram 一样：
+    - delete_messages：有一条删不掉（undeletable）整批失败；找不到的跳过
+    - delete_message：删不掉报 can't be deleted，已经不在了报 not found"""
+    def __init__(self, undeletable=()):
+        self.calls, self.undeletable, self.deleted = [], set(undeletable), set()
 
     async def delete_messages(self, chat_id, message_ids):
-        n = len(self.calls)
         self.calls.append((chat_id, list(message_ids)))
-        if n in self.fail:
+        if self.undeletable & set(message_ids):
             raise TelegramBadRequest(method=None, message="Bad Request: message can't be deleted")
+        self.deleted |= set(message_ids)
+        return True
+
+    async def delete_message(self, chat_id, message_id):
+        self.calls.append((chat_id, message_id))
+        if message_id in self.undeletable:
+            raise TelegramBadRequest(method=None, message="Bad Request: message can't be deleted")
+        if message_id in self.deleted:
+            raise TelegramBadRequest(method=None, message="Bad Request: message to delete not found")
+        self.deleted.add(message_id)
         return True
 
 
@@ -99,19 +110,35 @@ def test_batches_keep_each_submission_together_and_respect_the_100_limit():
 
 
 def test_failed_batch_is_kept_for_retry():
+    """一条投稿里有消息删不掉：这条投稿逐条删，能删的删掉，剩下的留着重试；别的投稿照常删。"""
     async def check(core, db):
         await db.ban(42, None, "Admin")
         s1 = await _sub(db, 42, "rejected", 100, linked=range(101, 160))
         s2 = await _sub(db, 42, "published", 200, linked=range(201, 260))
-        res = await core.purge_review_messages(42)  # 第一批（s1）失败，第二批（s2）成功
+        res = await core.purge_review_messages(42)
         assert (res.key, res.params) == ("purge_partial", {"n": 1, "failed": 1}), res
-        assert (await db.get(s1)).review_msg_id == 100 and (await db.get(s2)).review_msg_id is None
-        assert list(await db.review_traces(REVIEW, 42)) == [s1]
-        core.bot.fail = set()
-        res = await core.purge_review_messages(42)  # 重试：只删剩下的
+        assert (await db.get(s2)).review_msg_id is None
+        assert core.bot.deleted == set(range(100, 160)) - {130} | set(range(200, 260)), "能删的都删了"
+        assert await db.review_traces(REVIEW, 42) == {s1: [100, 130]}  # 控制消息编号还记着，重试时会找不到，算删掉
+        core.bot.undeletable = set()
+        res = await core.purge_review_messages(42)  # 重试：只剩删不掉的那条和控制消息
         assert (res.key, res.params) == ("purge_done", {"n": 1}), res
-        assert core.bot.calls[-1][1] == list(range(100, 160))
-    _with_core(check, FakeBot(fail={0}))
+        assert await db.review_traces(REVIEW, 42) == {}
+    _with_core(check, FakeBot(undeletable={130}))
+
+
+def test_one_bad_message_does_not_block_the_whole_batch():
+    """好几条投稿拼成一批：其中一条有删不掉的消息，其他投稿逐条投稿地删掉，不受连累。"""
+    async def check(core, db):
+        await db.ban(42, None, "Admin")
+        good = [await _sub(db, 42, "rejected", 100 * k, linked=(100 * k + 1,)) for k in range(1, 4)]
+        bad = await _sub(db, 42, "rejected", 900, linked=(901,))
+        res = await core.purge_review_messages(42)
+        assert (res.key, res.params) == ("purge_partial", {"n": 3, "failed": 1}), res
+        assert [(await db.get(s)).review_msg_id for s in good] == [None] * 3
+        assert list(await db.review_traces(REVIEW, 42)) == [bad]
+        assert 900 in core.bot.deleted and 901 not in core.bot.deleted
+    _with_core(check, FakeBot(undeletable={901}))
 
 
 def test_purge_texts_in_both_languages():

@@ -21,7 +21,7 @@ from ..permissions import ReviewerCheck, ReviewerOnly, ReviewerPolicy
 from ..i18n import t
 from ..keyboards import AdminUserCB, ReviewCB, route, user_confirm_kb
 from ..render import dump_link_preview, extract_item, message_item, user_link
-from ..timeutil import MAX_AHEAD, TimeTooFar, parse_time
+from ..timeutil import TimeTooFar, parse_time
 
 MAX_REASON = 500
 # 回复提示时这些错误可以改了再回复一次，提示保留；其他错误（比如投稿已被别人处理）提示作废
@@ -315,7 +315,7 @@ def build_router(settings: Settings) -> Router:
             try:
                 ts = parse_time(body, settings.tz)
             except TimeTooFar:
-                return notice("custom_time_far", years=MAX_AHEAD // (365 * 86400)), ""
+                return notice("custom_time_far"), ""
             if ts is None:
                 return notice("custom_time_bad"), ""
             return await core.schedule(sid, ts, who), t(lang, "custom_time_done", when=core.fmt(ts))

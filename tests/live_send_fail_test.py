@@ -55,7 +55,7 @@ async def scenario():
 
     # 3. 发布时控制消息更新失败：照常发到频道，不卡在“发布中”
     lt.MOCK["fail"][f"editMessageText:{REVIEW}"] = [KICKED]
-    n = len(log); lt.cb(lt.pub_ok(1), REVIEW, ADMIN)
+    n = len(log); lt.cb(await lt.pub_ok(1), REVIEW, ADMIN)
     check("control update fails during publish → still published",
           await wait_for(lambda e: is_send(e, "sendMessage", CHANNEL, "提交失败测试"), since=n))
 
@@ -65,7 +65,7 @@ async def scenario():
     n = len(log); lt.gm("/edit 没人看过的新内容", reply_to=c3["result"]["message_id"])
     check("edit preview fails → editor told it wasn't saved",
           await wait_for(lambda e: is_send(e, "sendMessage", REVIEW, "没有保存"), since=n))
-    n = len(log); lt.cb(lt.pub_ok(3), REVIEW, ADMIN)
+    n = len(log); lt.cb(await lt.pub_ok(3), REVIEW, ADMIN)
     post = await wait_for(lambda e: is_send(e, "sendMessage", CHANNEL), since=n)
     check("publish sends the reviewed text, not the unseen edit",
           post and "审核过的原文" in post["params"]["text"] and "没人看过" not in post["params"]["text"],
@@ -76,7 +76,7 @@ async def scenario():
     n = len(log); lt.gm("/edit 第四条新内容", reply_to=c4["result"]["message_id"])
     check("normal edit → new preview sent",
           await wait_for(lambda e: is_send(e, "sendMessage", REVIEW, "第四条新内容"), since=n))
-    n = len(log); lt.cb(lt.pub_ok(4), REVIEW, ADMIN)
+    n = len(log); lt.cb(await lt.pub_ok(4), REVIEW, ADMIN)
     check("normal edit → new text published",
           await wait_for(lambda e: is_send(e, "sendMessage", CHANNEL, "第四条新内容"), since=n))
 

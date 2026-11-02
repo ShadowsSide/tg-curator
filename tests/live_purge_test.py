@@ -109,13 +109,14 @@ async def scenario():
     check("/user of a banned user with posts → 🗑 with count", c and buttons(c).get(purge_n) == f"au:purge:{BOB}",
           c and buttons(c))
 
-    # 6. 卡片上删除：先确认；有一条消息删不掉（整批失败，逐条删时也失败）→ 提示可重试，按钮还在，能删的先删掉
+    # 6. 卡片上删除：先确认；有一条消息暂时删不掉（整批失败，逐条删时也失败）→ 提示可重试，按钮还在，能删的先删掉
+    #    （超过 48 小时、Telegram 不允许删的消息不重试，见 test_purge.py）
     n = len(log); lt.cb(f"au:purge:{BOB}", REVIEW, ADMIN, message_id=cid)
     panel = await edited(cid, n)
     check("card 🗑 → confirm panel", panel and buttons(panel) == {CONFIRM: f"au:purge_ok:{BOB}", "« 返回": f"au:back:{BOB}"},
           panel and buttons(panel))
     lt.MOCK["fail"][f"deleteMessages:{REVIEW}"] = ["Bad Request: message can't be deleted"]
-    lt.MOCK["fail"][f"deleteMessage:{REVIEW}"] = ["Bad Request: message can't be deleted"]
+    lt.MOCK["fail"][f"deleteMessage:{REVIEW}"] = ["Bad Request: not enough rights to delete a message"]
     n = n6 = len(log); lt.cb(f"au:purge_ok:{BOB}", REVIEW, ADMIN, message_id=cid)
     t = await toast(n, "删除失败")
     after = await edited(cid, n)

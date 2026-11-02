@@ -23,7 +23,7 @@ Built with Python 3.12 + [aiogram 3](https://github.com/aiogram/aiogram) + SQLit
 - Channel posts end with *via* the submitter's name or *via* Anonymous (“via” in italics; the name links to the submitter in the review-group preview, but not in the channel)
 - **Formatting is kept exactly as sent**: links, bold, quotes, spoiler text, code, date/time and emoji all come through to the channel unchanged
 - Submitters can **edit their post** until the review starts, either with Telegram's built-in "Edit" or by **replying** to it with `/edit`; they can also **add or remove photos** (reply to their submission with a photo to add it)
-- **Spam checks** (optional): keyword blacklist, a link limit (whitelisted domains don't count) and a cooldown for new submitters. By default a hit only puts a ⚠️ Possible spam note on the control message for reviewers to judge; it can also block the submission
+- **Spam checks** (optional): keyword blacklist, a link limit (whitelisted domains don't count) and a cooldown for new submitters. By default a hit only puts a ⚠️ Possible spam note on the control message for reviewers to judge; it can also block the submission (edits after submitting are checked too). Submitters can use `/msg` and edits at most 5 times a minute, so they can't flood the review group
 
 **Reviewer ↔ submitter messaging**
 - Both sides use `/msg message`: reviewers reply to the submission's preview or control message, submitters reply to the reviewer's message or their own submission, and the bot relays it. A plain reply without `/msg` only gets a hint and isn't relayed. Submitters always see the sender as “Reviewer”; neither side sees the other's account
@@ -41,10 +41,11 @@ Built with Python 3.12 + [aiogram 3](https://github.com/aiogram/aiogram) + SQLit
 - Safe against accidental taps: Publish now, Reject, Ban and Unban need a second tap to confirm
 - `/user` shows a contributor with a button to ban or unban them directly
 - Safe against double actions: if two admins press "Publish" at the same time, the post is still published only once
+- Publishes what the reviewer saw: if the post is edited after "Publish" is pressed, confirming doesn't publish it; the buttons refresh so you can check the new preview first. When two people edit at once, the edit based on old content is not saved
 - **Only answers in private chats and the review group**: it never replies in other groups, and leaves any other group or channel it's added to. The publishing channel and its linked discussion group are whitelisted and never left
 
 **Scheduling and stats**
-- Schedule with quick buttons or a custom time (`20:30`, `10-20 09:00`, `+2h`, …). Schedules are stored in the database and survive restarts
+- Schedule with quick buttons or a custom time (`20:30`, `10-20 09:00`, `+2h`, `+1d`, …). Schedules are stored in the database and survive restarts; if a scheduled post fails to go out, reviewers are told under its control message
 - A review summary is posted to the review group at a set interval and refreshed after each review action:
   ```
   Accepted 3 Rejected 1 Pending 4
@@ -84,7 +85,7 @@ Built with Python 3.12 + [aiogram 3](https://github.com/aiogram/aiogram) + SQLit
 
 1. Create a bot with [@BotFather](https://t.me/BotFather) and copy its token. Leave privacy mode on (the default)
 2. Make the bot an admin of your **channel** with permission to post messages
-3. Create a **review group** and add the bot as a regular member (to use 🗑 on a banned user's posts older than 48 hours, make it an admin with the “Delete messages” right). By default only the group's **admins and owner** can review (`REVIEWERS`); other members get a “no permission” notice
+3. Create a **review group** and add the bot as a regular member. By default only the group's **admins and owner** can review (`REVIEWERS`); other members get a “no permission” notice
 4. Find the channel ID and review group ID (both are numbers starting with `-100`). The review group must be a supergroup: if its ID doesn't start with `-100`, it's a basic group. Make chat history visible to new members in the group settings to upgrade it, then get the ID again. You can use a bot such as [@RawDataBot](https://t.me/RawDataBot), or send a message in the group and open `https://api.telegram.org/bot<token>/getUpdates`. For the channel you can also use its `@username`
 
 ### 2. Deploy
@@ -95,6 +96,7 @@ The prebuilt image (`ghcr.io/shadowsside/tg-curator`, amd64 / arm64) is used by 
 mkdir tg-curator && cd tg-curator
 curl -fsSLO https://raw.githubusercontent.com/ShadowsSide/tg-curator/main/docker-compose.yml
 curl -fsSL https://raw.githubusercontent.com/ShadowsSide/tg-curator/main/.env.en.example -o .env   # fill in BOT_TOKEN, CHANNEL_ID and REVIEW_CHAT_ID (LANGUAGE=en is already set)
+nano .env   # edit the configuration
 docker compose up -d
 docker compose logs -f
 ```
@@ -118,6 +120,9 @@ docker compose pull && docker compose up -d                      # 2. update to 
 
 The database lives in the `bot-data` Docker volume.
 
+> [!NOTE]
+> When stopped or updated, the bot finishes any publishing or handling in progress (up to 45 seconds) before exiting. That's what `stop_grace_period: 60s` in `docker-compose.yml` is for; don't remove it, or Docker kills the bot after its default 10 seconds. When a new version changes `docker-compose.yml`, download it again before updating.
+
 ## Configuration
 
 Everything is configured in `.env`. See [`.env.en.example`](.env.en.example) for a full example, grouped the same way as below ([`.env.example`](.env.example) is the Chinese version).
@@ -140,12 +145,12 @@ Options most deployments adjust as needed.
 |---|---|---|
 | `LANGUAGE` | `zh` | Language of the review group, channel signatures and review summary: `zh` / `en` |
 | `USER_LANGUAGE` | `auto` | Language submitters see: `auto` follows their Telegram app, or fix it to `zh` / `en` |
-| `REVIEWERS` | `admins` | Who can review: `admins` = review group admins and owner; `all` = every member; or user IDs, combinable, e.g. `admins,123456`. Bots never count as reviewers |
 | `TZ` | `Asia/Shanghai` | Time zone for scheduling and for what counts as "today" in stats |
+| `REVIEWERS` | `admins` | Who can review: `admins` = review group admins and owner; `all` = every member; or user IDs, combinable, e.g. `admins,123456`. Bots never count as reviewers |
 | `REJECT_TEMPLATES` | 4 default reasons, depends on `LANGUAGE` | Reasons offered after tapping Reject, separated by `\|`, e.g. `Duplicate\|Ads`; set it to empty to skip the reason panel |
-| `MAX_PENDING_PER_USER` | `5` | Maximum open submissions per user at a time |
 | `SCHEDULE_PRESETS` | `09:00,12:00,18:00,21:00` | Quick time buttons in the schedule panel |
 | `DEFAULT_SILENT` | `false` | Whether new submissions are published silently by default |
+| `MAX_PENDING_PER_USER` | `5` | Maximum open submissions per user at a time |
 | `REMINDER_INTERVAL_MINUTES` | `60` | Interval of the review summary, aligned to the clock; `0` turns it off |
 | `REMINDER_QUIET_HOURS` | — | Quiet hours with no summaries, e.g. `0-8` |
 | `PROXY` | — | Proxy, e.g. `socks5://host:port` |
@@ -161,15 +166,15 @@ Spam checks, messaging window, stats scope and so on; the defaults are usually f
 | Variable | Default | Description |
 |---|---|---|
 | `SPAM_KEYWORDS` | empty | Keyword blacklist, comma-separated, case-insensitive; checks both the text and link addresses |
+| `SPAM_ACTION` | `flag` | On a keyword or link-limit hit: `flag` = submit as usual and mark the control message; `block` = refuse it, the submitter can edit and resubmit |
 | `MAX_LINKS` | `0` | Maximum links per submission, `0` = no limit; domains in `LINK_WHITELIST` don't count |
 | `LINK_WHITELIST` | empty | Domains that don't count toward the link limit, comma-separated, subdomains included, e.g. `t.me,github.com` |
-| `SPAM_ACTION` | `flag` | On a keyword or link-limit hit: `flag` = submit as usual and mark the control message; `block` = refuse it, the submitter can edit and resubmit |
 | `NEW_USER_COOLDOWN_MINUTES` | `0` | Submitters with nothing published yet must wait this many minutes between submissions; `0` = no limit |
+| `REMINDER_ONLY_WHEN_PENDING` | `true` | Only post the summary when something is waiting for review |
+| `STATS_SCOPE` | `today` | `today`: accepted/rejected counts cover today only; `all`: all time |
 | `MSG_WINDOW_DAYS` | `3` | `/msg`: days after a submission is published or rejected during which messaging stays open; always open during review |
 | `LEAVE_UNKNOWN_CHATS` | `true` | Leave any other group or channel the bot is added to; `false` stays but never responds. The publishing channel and its linked discussion group (detected at startup) are always kept |
 | `ALBUM_DELAY` | `1.5` | Seconds to wait while collecting the parts of an album |
-| `REMINDER_ONLY_WHEN_PENDING` | `true` | Only post the summary when something is waiting for review |
-| `STATS_SCOPE` | `today` | `today`: accepted/rejected counts cover today only; `all`: all time |
 | `TELEGRAM_API_URL` | — | Self-hosted Bot API server, which lifts the official 20 MB / 50 MB file limits |
 
 ## Usage
@@ -190,7 +195,7 @@ Spam checks, messaging window, stats scope and so on; the defaults are usually f
 
 ### Admins (review group)
 
-Buttons on the control message: **✅ Publish now**, **⏰ Schedule**, **❌ Reject**, **🚫 Ban submitter**, **✏️ Edit**, **🖼 Media**, plus the **🙈 Spoiler** and **🔕 Silent** toggles. Once a submitter is banned, their control messages show **🔓 Unban** and **🗑 Delete their posts**: after you confirm, it deletes the previews, control messages and relayed messages of all their submissions (published ones too) from the review group. The submissions and stats stay in the database.
+Buttons on the control message: **✅ Publish now**, **⏰ Schedule**, **❌ Reject**, **🚫 Ban submitter**, **✏️ Edit**, **🖼 Media**, plus the **🙈 Spoiler** and **🔕 Silent** toggles. Once a submitter is banned, their control messages show **🔓 Unban** and **🗑 Delete their posts**: after you confirm, it deletes the previews, control messages and relayed messages of all their submissions (published ones too) from the review group. The submissions and stats stay in the database. Telegram doesn't let bots delete messages older than 48 hours (not even as an admin); the reply says how many there are, and an admin has to delete them by hand.
 
 #### Reply prompts
 
@@ -252,7 +257,8 @@ The commands below do the same as the buttons, for those who prefer commands. Us
 - **Chinese keywords can over-match**: Chinese has no word boundaries, so keywords match as substrings (e.g. “微信” also matches “微信公众号推荐”). That's why the default only flags (`SPAM_ACTION=flag`); watch the flags for a while before switching to `block`
 - **Blocking doesn't tell the submitter which word matched**: so it can't be dodged on purpose, but the submitter may not know what to change
 - **Only URLs and hyperlinks count as links**: `@usernames`, emails and phone numbers don't
-- **Edits only update the flags, never block**: even with `SPAM_ACTION=block`, adding a keyword by editing after submitting just shows a flag for reviewers
+- **Reviewer edits aren't blocked**: with `SPAM_ACTION=block`, a submitter adding a keyword by editing after submitting is blocked; edits by reviewers only update the flags
+- **The rate limit is fixed**: a submitter's `/msg` and edits after submitting are limited to 5 a minute in total, and this can't be configured. It's kept in memory and resets on restart. Edits to drafts and reviewer actions are not limited
 - **The cooldown only applies to submitters with nothing published yet**: one published post lifts it; it counts from the last submission, rejected ones included
 - **Bad values keep the bot from running**: with a non-number in `MAX_LINKS` or `NEW_USER_COOLDOWN_MINUTES`, or a `SPAM_ACTION` other than `flag` / `block`, the log shows one “Configuration error: …” line and the container is marked `unhealthy` until `.env` is fixed
 
@@ -272,7 +278,10 @@ Two processes are using the same token.
 > Run only one instance per token, and use a separate bot for testing.
 
 **A post failed to publish. What now?**
-The control message shows the reason and a 🔁 Retry button. A common cause is that the caption plus the signature exceeds Telegram's length limit (1024 characters for media captions, 4096 for text). Shorten it with `/edit`, then retry.
+The control message shows the reason and a 🔁 Retry button; a failed scheduled post also gets a reply under its control message. A common cause is that the bot lost the "Post messages" right in the channel. Length, including the signature, is already checked when submitting and editing (1024 characters for media captions, 4096 for text), so posts rarely fail for being too long.
+
+**"Delete their posts" says some couldn't be deleted?**
+Telegram doesn't let bots delete messages older than 48 hours; the reply says how many there are, an admin has to delete them by hand, and pressing again won't retry them. Messages that couldn't be deleted for other reasons (a network error, say) are logged and retried when you press again. Run `docker compose logs bot | grep 删除审核群消息失败` to see the submission, the message IDs and Telegram's reason.
 
 **What happens when Telegram rate-limits the bot?**
 The bot waits as long as Telegram asks and retries automatically. If the wait would be too long (over 30 seconds), a post being published is automatically rescheduled for later instead of being marked failed. Several changes to the review summary within a few seconds are merged into one update.
@@ -297,7 +306,7 @@ The tests need no token and no network access. `tests/test_*.py` are unit tests;
 for f in tests/test_*.py tests/live_*.py; do .venv/bin/python "$f" || echo "FAILED: $f"; done
 ```
 
-GitHub Actions (`.github/workflows/test.yml`) first checks the code with pyflakes (undefined names, unused imports and variables, …), then runs all the tests on every pull request and every push to `main`. To check locally:
+GitHub Actions (`.github/workflows/test.yml`) first checks the code with pyflakes (undefined names, unused imports and variables, …), then runs all the tests on every pull request, and on every push to `main` or tag (called from `docker.yml`, which only builds the image if they pass). To check locally:
 
 ```bash
 .venv/bin/python -m pyflakes bot tests

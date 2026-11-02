@@ -199,6 +199,13 @@ class CoreBase:
                 return notice("too_long", n=n, limit=limit)
         return None
 
+    def _spam_blocked(self, hits: list[dict]) -> Notice | None:
+        """SPAM_ACTION=block 时命中规则就拦下（提交、投稿人改稿）。
+        不告诉投稿人命中了哪个关键词，免得照着绕过。"""
+        if not hits or self.s.spam_action != "block":
+            return None
+        return notice("spam_blocked_" + hits[0]["k"], **({"max": hits[0]["max"]} if "max" in hits[0] else {}))
+
     async def notify(self, sub: Submission, key: str, **kw) -> None:
         """用投稿人自己的语言通知他，回复在他的投稿提示消息下面。"""
         lang = await self.user_lang(sub.user_id)

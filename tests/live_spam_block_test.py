@@ -9,7 +9,7 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import live_test as lt  # noqa: E402
-from live_test import USER, check, is_send, log, wait_for  # noqa: E402
+from live_test import REVIEW, USER, check, is_send, log, wait_for  # noqa: E402
 from live_spam_test import choose, draft  # noqa: E402
 
 
@@ -35,6 +35,27 @@ async def scenario():
         {"type": "url", "offset": 0, "length": 17}, {"type": "url", "offset": 18, "length": 17}])
     ctrl, _ = await choose(2)
     check("MAX_LINKS unset → links are not limited", ctrl)
+
+    # 4. 先提交干净的内容，再用 Telegram 的“编辑”改成命中关键词的：不保存，审核群看不到
+    mid = await draft("干净的投稿")
+    ctrl, _ = await choose(3)
+    n = len(log); lt.pm_edit(mid, "干净的投稿，加微信领取")
+    told = await wait_for(lambda e: is_send(e, "sendMessage", USER, "不允许的词语"), since=n)
+    await asyncio.sleep(0.5)
+    check("edit after submitting adds a keyword (block mode) → not saved, nothing new in review",
+          told and "加微信" not in told["params"]["text"]
+          and not [e for e in log[n:] if is_send(e, "sendMessage", REVIEW, "加微信")])
+
+    # 5. 投稿人用 /edit 回复自己的投稿改成命中的内容：同样拦下
+    n = len(log); lt.pm("/edit 改成加微信", reply_to_message={"message_id": mid, "date": lt.now(), "chat": lt.chat(USER)})
+    check("/edit by the submitter adding a keyword → refused",
+          await wait_for(lambda e: is_send(e, "sendMessage", USER, "不允许的词语"), since=n)
+          and not [e for e in log[n:] if is_send(e, "sendMessage", REVIEW, "加微信")])
+
+    # 6. 审核员自己改成带这个词的内容：不拦（审核员可信）
+    n = len(log); lt.gm("/edit 审核员写的：加微信", reply_to=ctrl["result"]["message_id"])
+    check("reviewer edit containing the keyword → allowed, preview sent",
+          await wait_for(lambda e: is_send(e, "sendMessage", REVIEW, "审核员写的"), since=n))
 
 
 if __name__ == "__main__":

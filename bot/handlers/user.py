@@ -56,7 +56,7 @@ def build_router() -> Router:
             return
 
         err = await core.edit(sid, _editor(core, m), body, entities, dump_link_preview(m.link_preview_options),
-                              allowed=SUBMITTER_EDITABLE)
+                              allowed=SUBMITTER_EDITABLE, by_submitter=True)
         await m.reply(err.text(lang) if err else _edited_text(lang, sid, sub.status))
 
     @router.message(Command("msg"))

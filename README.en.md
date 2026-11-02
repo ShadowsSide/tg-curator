@@ -23,7 +23,7 @@ Built with Python 3.12 + [aiogram 3](https://github.com/aiogram/aiogram) + SQLit
 - Channel posts end with *via* the submitter's name or *via* Anonymous (“via” in italics; the name links to the submitter in the review-group preview, but not in the channel)
 - **Formatting is kept exactly as sent**: links, bold, quotes, spoiler text, code, date/time and emoji all come through to the channel unchanged
 - Submitters can **edit their post** until the review starts, either with Telegram's built-in "Edit" or by **replying** to it with `/edit`; they can also **add or remove photos** (reply to their submission with a photo to add it)
-- **Spam checks** (optional): keyword blacklist, a link limit (whitelisted domains don't count) and a cooldown for new submitters. By default a hit only puts a ⚠️ Possible spam note on the control message for reviewers to judge; it can also block the submission
+- **Spam checks** (optional): keyword blacklist, a link limit (whitelisted domains don't count) and a cooldown for new submitters. By default a hit only puts a ⚠️ Possible spam note on the control message for reviewers to judge; it can also block the submission (edits after submitting are checked too). Submitters can use `/msg` and edits at most 5 times a minute, so they can't flood the review group
 
 **Reviewer ↔ submitter messaging**
 - Both sides use `/msg message`: reviewers reply to the submission's preview or control message, submitters reply to the reviewer's message or their own submission, and the bot relays it. A plain reply without `/msg` only gets a hint and isn't relayed. Submitters always see the sender as “Reviewer”; neither side sees the other's account
@@ -41,10 +41,11 @@ Built with Python 3.12 + [aiogram 3](https://github.com/aiogram/aiogram) + SQLit
 - Safe against accidental taps: Publish now, Reject, Ban and Unban need a second tap to confirm
 - `/user` shows a contributor with a button to ban or unban them directly
 - Safe against double actions: if two admins press "Publish" at the same time, the post is still published only once
+- Publishes what the reviewer saw: if the post is edited after "Publish" is pressed, confirming doesn't publish it; the buttons refresh so you can check the new preview first. When two people edit at once, the edit based on old content is not saved
 - **Only answers in private chats and the review group**: it never replies in other groups, and leaves any other group or channel it's added to. The publishing channel and its linked discussion group are whitelisted and never left
 
 **Scheduling and stats**
-- Schedule with quick buttons or a custom time (`20:30`, `10-20 09:00`, `+2h`, …). Schedules are stored in the database and survive restarts
+- Schedule with quick buttons or a custom time (`20:30`, `10-20 09:00`, `+2h`, `+1d`, …). Schedules are stored in the database and survive restarts; if a scheduled post fails to go out, reviewers are told under its control message
 - A review summary is posted to the review group at a set interval and refreshed after each review action:
   ```
   Accepted 3 Rejected 1 Pending 4
@@ -118,6 +119,9 @@ docker compose pull && docker compose up -d                      # 2. update to 
 ```
 
 The database lives in the `bot-data` Docker volume.
+
+> [!NOTE]
+> When stopped or updated, the bot finishes any publishing or handling in progress (up to 45 seconds) before exiting. That's what `stop_grace_period: 60s` in `docker-compose.yml` is for; don't remove it, or Docker kills the bot after its default 10 seconds. When a new version changes `docker-compose.yml`, download it again before updating.
 
 ## Configuration
 
@@ -253,7 +257,8 @@ The commands below do the same as the buttons, for those who prefer commands. Us
 - **Chinese keywords can over-match**: Chinese has no word boundaries, so keywords match as substrings (e.g. “微信” also matches “微信公众号推荐”). That's why the default only flags (`SPAM_ACTION=flag`); watch the flags for a while before switching to `block`
 - **Blocking doesn't tell the submitter which word matched**: so it can't be dodged on purpose, but the submitter may not know what to change
 - **Only URLs and hyperlinks count as links**: `@usernames`, emails and phone numbers don't
-- **Edits only update the flags, never block**: even with `SPAM_ACTION=block`, adding a keyword by editing after submitting just shows a flag for reviewers
+- **Reviewer edits aren't blocked**: with `SPAM_ACTION=block`, a submitter adding a keyword by editing after submitting is blocked; edits by reviewers only update the flags
+- **The rate limit is fixed**: a submitter's `/msg` and edits after submitting are limited to 5 a minute in total, and this can't be configured. It's kept in memory and resets on restart. Edits to drafts and reviewer actions are not limited
 - **The cooldown only applies to submitters with nothing published yet**: one published post lifts it; it counts from the last submission, rejected ones included
 - **Bad values keep the bot from running**: with a non-number in `MAX_LINKS` or `NEW_USER_COOLDOWN_MINUTES`, or a `SPAM_ACTION` other than `flag` / `block`, the log shows one “Configuration error: …” line and the container is marked `unhealthy` until `.env` is fixed
 
@@ -273,7 +278,10 @@ Two processes are using the same token.
 > Run only one instance per token, and use a separate bot for testing.
 
 **A post failed to publish. What now?**
-The control message shows the reason and a 🔁 Retry button. A common cause is that the caption plus the signature exceeds Telegram's length limit (1024 characters for media captions, 4096 for text). Shorten it with `/edit`, then retry.
+The control message shows the reason and a 🔁 Retry button; a failed scheduled post also gets a reply under its control message. A common cause is that the bot lost the "Post messages" right in the channel. Length, including the signature, is already checked when submitting and editing (1024 characters for media captions, 4096 for text), so posts rarely fail for being too long.
+
+**"Delete their posts" says some couldn't be deleted?**
+Everything that could be deleted is gone; the rest is logged. Run `docker compose logs bot | grep 删除审核群消息失败` to see the submission, the message IDs and Telegram's reason. A common cause is that the bot doesn't have the "Delete messages" right.
 
 **What happens when Telegram rate-limits the bot?**
 The bot waits as long as Telegram asks and retries automatically. If the wait would be too long (over 30 seconds), a post being published is automatically rescheduled for later instead of being marked failed. Several changes to the review summary within a few seconds are merged into one update.
@@ -298,7 +306,7 @@ The tests need no token and no network access. `tests/test_*.py` are unit tests;
 for f in tests/test_*.py tests/live_*.py; do .venv/bin/python "$f" || echo "FAILED: $f"; done
 ```
 
-GitHub Actions (`.github/workflows/test.yml`) first checks the code with pyflakes (undefined names, unused imports and variables, …), then runs all the tests on every pull request and every push to `main`. To check locally:
+GitHub Actions (`.github/workflows/test.yml`) first checks the code with pyflakes (undefined names, unused imports and variables, …), then runs all the tests on every pull request, and on every push to `main` or tag (called from `docker.yml`, which only builds the image if they pass). To check locally:
 
 ```bash
 .venv/bin/python -m pyflakes bot tests

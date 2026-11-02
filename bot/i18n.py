@@ -524,8 +524,8 @@ T: dict[str, dict[str, str]] = {
         "en": "I can't read that time 🤔 Try <code>20:30</code>, <code>10-20 09:00</code>, <code>+2h</code> or <code>+1d</code>",
     },
     "custom_time_far": {
-        "zh": "时间太远了：最多可以定到 {years} 年以后",
-        "en": "That's too far ahead: you can schedule at most {years} years from now",
+        "zh": "时间太远了",
+        "en": "That's too far ahead",
     },
     "custom_time_done": {
         "zh": '⏰ 将于 <b>{when}</b> 发布。',

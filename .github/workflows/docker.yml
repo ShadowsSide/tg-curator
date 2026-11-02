@@ -1,4 +1,4 @@
-# 推送到 main 或打 v* 标签时，构建 amd64 + arm64 镜像并发布：
+# 推送到 main 或打 v* 标签时，先跑完整测试（test.yml），通过后构建 amd64 + arm64 镜像并发布：
 #   - GHCR（始终）：ghcr.io/<owner>/tg-curator
 #   - Docker Hub（可选）：在仓库 Settings → Secrets and variables → Actions 中
 #       Variables 添加 DOCKERHUB_USERNAME，Secrets 添加 DOCKERHUB_TOKEN 后自动启用
@@ -18,7 +18,14 @@ env:
   DOCKERHUB_USERNAME: ${{ vars.DOCKERHUB_USERNAME }}
 
 jobs:
+  # 测试没通过就不发布：部署默认拉取 latest，有问题的版本会直接到用户的服务器上
+  test:
+    uses: ./.github/workflows/test.yml
+    permissions:
+      contents: read
+
   build:
+    needs: test
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7

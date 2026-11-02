@@ -48,7 +48,7 @@ def test_old_database_drops_topic_columns_and_keeps_data():
         assert sub.user_id == 42 and sub.status == "pending" and sub.items[0]["text"] == "hi", sub
         cols = columns(path)
         assert not {c for _, c in DROPPED_COLUMNS} & cols, cols
-        assert {"msg_count", "spam_flags", "edit_preview", "media_group_id"} <= cols, cols  # 其他升级照常进行
+        assert {"msg_count", "spam_flags", "edit_preview", "media_group_id", "version"} <= cols, cols  # 其他升级照常进行
         assert sub.media_group_id is None, sub
         asyncio.run(upgrade(path))  # 再启动一次：列已经没了，不报错
 
@@ -106,6 +106,31 @@ def test_find_by_album():
 
     with tempfile.TemporaryDirectory() as d:
         asyncio.run(run(os.path.join(d, "a.db")))
+
+
+def test_version_guards_content_changes():
+    """内容版本：带 version 的更新只在版本没变时生效，并把版本加 1；发布时版本不符就不改状态。"""
+    async def run(path):
+        db = DB(path)
+        await db.connect()
+        try:
+            sid = await db.create_draft(42, [{"type": "text", "text": "a", "entities": []}])
+            await db.update(sid, status="pending")
+            assert (await db.get(sid)).version == 0
+            assert await db.update_if(sid, ("pending",), version=0, edited_by="x")
+            assert (await db.get(sid)).version == 1
+            assert not await db.update_if(sid, ("pending",), version=0, edited_by="y")  # 基于旧版本：不覆盖
+            assert (await db.get(sid)).edited_by == "x"
+            assert await db.update_if(sid, ("pending",), spoiler=1)  # 不带 version：照旧，不加版本
+            assert (await db.get(sid)).version == 1
+            assert not await db.transition(sid, ("pending",), "publishing", version=0)
+            assert (await db.get(sid)).status == "pending"
+            assert await db.transition(sid, ("pending",), "publishing", version=1)
+        finally:
+            await db.close()
+
+    with tempfile.TemporaryDirectory() as d:
+        asyncio.run(run(os.path.join(d, "v.db")))
 
 
 if __name__ == "__main__":

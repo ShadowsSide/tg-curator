@@ -109,14 +109,17 @@ class EditingMixin(CoreBase):
         follow = {"spoiler": int(has_spoiler)} if has_spoiler != any(it.get("spoiler") for it in sub.items) else {}
         # 第一次修改前的原稿单独保存；状态变了（比如刚好被发布）就不改
         ok = await self.db.update_if(
-            sub.id, allowed, items=items, original_items=sub.original_items or sub.items,
+            sub.id, allowed, version=sub.version, items=items, original_items=sub.original_items or sub.items,
             edited_by=editor, edited_at=now_ts(),
             spam_flags=spam.check(items, self.s.spam_rules) or None,  # 改稿后可能加了广告链接，重新检查
             **follow,
         )
         if not ok:
             await self._delete_old_preview(ids)  # 这份预览的内容没有保存，不能留在审核群里
-            return notice("edit_race")
+            fresh = await self.db.get(sub.id)
+            # 状态没变、内容版本变了：别人刚改过，这次是基于旧内容改的，保存会把那次修改盖掉
+            changed = fresh and fresh.status == sub.status and fresh.version != sub.version
+            return notice("edit_conflict" if changed else "edit_race")
         sub = await self.db.get(sub.id)
         if ids:
             await self.db.link_review_messages(sub.id, ids)

@@ -19,7 +19,7 @@ from .core import Core
 from .db import DB
 from .errors import ConfigError
 from .guard import ChatGuard
-from .handlers import review, user
+from .handlers import errors, review, user
 from .i18n import LANGS, PRIVATE_COMMANDS, REVIEW_COMMANDS, t
 from .ratelimit import RetryAfterMiddleware
 
@@ -71,7 +71,7 @@ async def run() -> None:
         # 只处理私聊和审核群；必须在所有处理函数之前，放在 update 外层中间件
         keep = {c for c in (core.channel_chat_id, core.channel_linked_chat_id) if c}  # 发布频道 + 关联群组
         dp.update.outer_middleware(ChatGuard(settings.review_chat_id, keep, settings.leave_unknown_chats))
-        dp.include_routers(review.build_router(settings), user.build_router())
+        dp.include_routers(review.build_router(settings), user.build_router(), errors.build_router())
 
         core.start_background()
         try:

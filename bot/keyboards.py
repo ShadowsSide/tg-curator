@@ -60,7 +60,7 @@ class ReviewCB(CallbackData, prefix="r"):
     #         media：媒体面板；madd / mrep：发提示，回复图片视频来添加 / 替换第 v 个；mrm / mrm_ok：删除第 v 个
     #         pub_ok / reject_ok / ban_ok / unban_ok / purge_ok：确认面板上的“确认”，见 CONFIRMABLE
     #         reason：拒绝理由面板上选了一项
-    # v：preset = 定时的时间戳；reason / reject / reject_ok = 第几个拒绝理由（从 1 开始，0 = 不附理由）
+    # v：pub / pub_ok / retry = 审核员看到的内容版本；preset = 定时的时间戳；reason / reject / reject_ok = 第几个拒绝理由（从 1 开始，0 = 不附理由）
     sid: int
     v: int = 0
 
@@ -163,15 +163,16 @@ def control_kb(sub: Submission, lang: str, banned: bool = False) -> InlineKeyboa
         rows.append(options)
     reject = _rb(t(lang, "btn_reject"), "reject", sid, style=RED)
     if sub.status == "pending":
-        rows.append([_rb(t(lang, "btn_publish"), "pub", sid, style=GREEN),
+        # 发布 / 重试带着内容版本：确认时内容又被改过就不发，让审核员先看新的预览（见 core.publish）
+        rows.append([_rb(t(lang, "btn_publish"), "pub", sid, sub.version, style=GREEN),
                      _rb(t(lang, "btn_schedule"), "sched", sid, style=BLUE)])
         rows.append([reject, _rb(t(lang, "btn_ban"), "ban", sid, style=RED)])
     elif sub.status == "scheduled":
-        rows.append([_rb(t(lang, "btn_publish_now"), "pub", sid, style=GREEN),
+        rows.append([_rb(t(lang, "btn_publish_now"), "pub", sid, sub.version, style=GREEN),
                      _rb(t(lang, "btn_reschedule"), "sched", sid, style=BLUE)])
         rows.append([_rb(t(lang, "btn_unschedule"), "unsched", sid), reject])
     elif sub.status == "failed":
-        rows.append([_rb(t(lang, "btn_retry"), "retry", sid, style=GREEN), reject])
+        rows.append([_rb(t(lang, "btn_retry"), "retry", sid, sub.version, style=GREEN), reject])
     if sub.status in ("pending", "scheduled", "failed"):
         tools = [_rb(t(lang, "btn_edit"), "edit", sid)]  # 联系投稿人只用 /msg，不做按钮
         if sub.status == "pending":  # 审核员只能在待审核时改媒体

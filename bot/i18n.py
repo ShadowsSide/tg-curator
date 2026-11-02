@@ -311,6 +311,15 @@ T: dict[str, dict[str, str]] = {
         "zh": "审核群的预览没有发出去，这次修改没有保存，请稍后再试",
         "en": "The preview couldn't be sent to the review group, so this edit was not saved. Please try again shortly",
     },
+    "edit_conflict": {
+        "zh": "稿件刚刚被别人修改过，这次修改没有保存。请看最新的预览后再改",
+        "en": "Someone else just edited this submission, so your edit was not saved. Check the latest preview and try again",
+    },
+    "publish_stale": {
+        "zh": "稿件在你点按钮之后又被修改过，没有发布。请先看最新的预览，再点一次发布",
+        "en": "The submission was edited after you pressed the button, so it was not published. "
+              "Check the latest preview, then publish again",
+    },
     "edit_race": {
         "zh": "投稿状态刚刚发生了变化，修改未生效",
         "en": "The submission's status just changed, so the edit was not applied",
@@ -433,6 +442,11 @@ T: dict[str, dict[str, str]] = {
         "zh": "已封禁，并拒绝 {n} 条未处理来稿",
         "en": "Banned; {n} open submission(s) rejected",
     },
+    "error_generic": {
+        "zh": "出错了，这次操作没有完成，请稍后再试",
+        "en": "Something went wrong and this action wasn't completed. Please try again shortly",
+    },
+    "sched_publish_failed": {"zh": "⏰ 定时发布没有成功：{reason}", "en": "⏰ The scheduled post didn't go out: {reason}"},
     "publish_failed": {"zh": "发布失败：{error}", "en": "Failed to publish: {error}"},
     "publish_postponed": {
         "zh": "⏳ Telegram 正在限流，已自动改为 <b>{when}</b> 发布",

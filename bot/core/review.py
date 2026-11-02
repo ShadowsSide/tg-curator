@@ -1,6 +1,7 @@
 """审核动作：剧透 / 静音开关、发布、定时、拒绝、封禁。"""
 from __future__ import annotations
 
+import html
 import logging
 
 from aiogram.exceptions import TelegramAPIError, TelegramRetryAfter
@@ -45,13 +46,19 @@ class ReviewMixin(CoreBase):
         return notice("toast_silent", state=notice("on" if not sub.silent else "off"))
 
     async def publish(self, sid: int, reviewer: TgUser | None = None,
-                      from_states: tuple[str, ...] = ("pending", "scheduled", "failed")) -> Notice | None:
-        """立即发布到频道。返回错误信息，成功返回 None。"""
+                      from_states: tuple[str, ...] = ("pending", "scheduled", "failed"),
+                      version: int | None = None) -> Notice | None:
+        """立即发布到频道。返回错误信息，成功返回 None。
+        version：审核员点按钮时看到的内容版本；之后内容又被改过就不发（定时发布不带，按到点时的内容发）。"""
         sub = await self.db.get(sid)
         if not sub:
             return notice("sub_not_found", sid=sid)
         fields = self._review_fields(sub, reviewer, "approved")
-        if not await self.db.transition(sid, from_states, "publishing", error=None, **fields):
+        if not await self.db.transition(sid, from_states, "publishing", version=version, error=None, **fields):
+            sub = await self.db.get(sid)
+            if version is not None and sub.status in from_states and sub.version != version:
+                await self.refresh_control(sid)  # 按钮换成新版本的，看过新预览后再点
+                return notice("publish_stale")
             return notice("status_changed")
         await self.refresh_control(sid)
 
@@ -74,7 +81,7 @@ class ReviewMixin(CoreBase):
             await self.db.update(sid, status="failed", error=str(e)[:300])
             await self.refresh_control(sid)
             await self.refresh_stats()
-            return notice("publish_failed", error=str(e))
+            return notice("publish_failed", error=html.escape(str(e)))  # 错误原文可能带 < >，消息按 HTML 解析
 
         await self.db.update(sid, status="published", published_at=now_ts(), channel_msg_id=sent[0].message_id)
         sub = await self.db.get(sid)

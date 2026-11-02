@@ -333,13 +333,14 @@ bot/
   handlers/
     user.py       private chat: submitting, editing, /me
     review.py     review group: buttons and commands
+    errors.py     unhandled errors: log and tell the person
 tests/            unit and end-to-end tests
 scripts/          multi-arch image build script
 ```
 
 ### Publishing images (for your own fork)
 
-On every push to `main` or `v*` tag, GitHub Actions builds amd64 + arm64 images and publishes them to `ghcr.io/<owner>/tg-curator`. To run your own image, set `IMAGE=ghcr.io/<owner>/tg-curator:latest` in `.env`; otherwise this repository's image is pulled.
+On every push to `main` or `v*` tag, GitHub Actions runs all the tests first and, if they pass, builds amd64 + arm64 images and publishes them to `ghcr.io/<owner>/tg-curator`. To run your own image, set `IMAGE=ghcr.io/<owner>/tg-curator:latest` in `.env`; otherwise this repository's image is pulled.
 
 To publish to Docker Hub as well, add the variable `DOCKERHUB_USERNAME` and the secret `DOCKERHUB_TOKEN` (a Docker Hub access token with Read & Write permission) under **Settings → Secrets and variables → Actions** in your repository.
 

@@ -120,12 +120,12 @@ def build_router(settings: Settings) -> Router:
             await cq.answer((await core.toggle_silent(sid)).text(lang))
         elif action == "pub":
             await cq.answer(t(lang, "toast_publishing"))
-            err = await core.publish(sid, reviewer=who)
+            err = await core.publish(sid, reviewer=who, version=v)
             if err:
                 await cq.message.reply(err.text(lang))  # 回复在这条投稿的控制消息下面
         elif action == "retry":
             await cq.answer(t(lang, "toast_retrying"))
-            err = await core.publish(sid, reviewer=who, from_states=("failed",))
+            err = await core.publish(sid, reviewer=who, from_states=("failed",), version=v)
             if err:
                 await cq.message.reply(err.text(lang))
         elif action == "sched":

@@ -95,6 +95,7 @@ The prebuilt image (`ghcr.io/shadowsside/tg-curator`, amd64 / arm64) is used by 
 mkdir tg-curator && cd tg-curator
 curl -fsSLO https://raw.githubusercontent.com/ShadowsSide/tg-curator/main/docker-compose.yml
 curl -fsSL https://raw.githubusercontent.com/ShadowsSide/tg-curator/main/.env.en.example -o .env   # fill in BOT_TOKEN, CHANNEL_ID and REVIEW_CHAT_ID (LANGUAGE=en is already set)
+nano .env   # edit the configuration
 docker compose up -d
 docker compose logs -f
 ```

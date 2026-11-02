@@ -11,6 +11,8 @@
 
 **Curator** 是一个 Telegram 频道投稿机器人：用户私聊投稿，管理员在审核群里审核，通过后发布到频道。
 
+在媒体或互联网语境中，curator 可译为“内容策展人”，指筛选、整理并推荐有价值信息的人。
+
 基于 Python 3.12 + [aiogram 3](https://github.com/aiogram/aiogram) + SQLite，使用 Docker Compose 一键部署。采用长轮询方式运行，**不需要公网 IP，也不需要 HTTPS**。
 
 ## 功能
@@ -93,6 +95,7 @@
 mkdir tg-curator && cd tg-curator
 curl -fsSLO https://raw.githubusercontent.com/ShadowsSide/tg-curator/main/docker-compose.yml
 curl -fsSL https://raw.githubusercontent.com/ShadowsSide/tg-curator/main/.env.example -o .env   # 填写 BOT_TOKEN、CHANNEL_ID、REVIEW_CHAT_ID
+nano .env   # 修改配置
 docker compose up -d
 docker compose logs -f
 ```

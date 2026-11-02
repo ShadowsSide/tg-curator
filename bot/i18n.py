@@ -303,6 +303,10 @@ T: dict[str, dict[str, str]] = {
         "zh": "内容太长：{n} 字，上限 {limit}（还需留出落款的长度）",
         "en": "Too long: {n} characters, the limit is {limit} (leave room for the signature too)",
     },
+    "too_often": {
+        "zh": "操作太频繁了，请 {s} 秒后再试",
+        "en": "You're doing this too often. Please try again in {s} seconds",
+    },
     "submit_failed": {
         "zh": "暂时没能送到审核群，投稿还在草稿里，请稍后再点一次",
         "en": "Couldn't reach the review group just now. Your submission is still a draft; please try again shortly",

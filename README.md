@@ -325,6 +325,7 @@ bot/
   spam.py         投稿防垃圾：关键词、链接上限
   media.py        修改图片视频的规则：添加、替换、删除
   ratelimit.py    被限流时自动等待重试
+  throttle.py     投稿人 /msg 和改稿的频率限制
   keyboards.py    彩色内联按钮
   album.py        相册收集
   timeutil.py     时间解析

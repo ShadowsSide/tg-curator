@@ -20,6 +20,7 @@ from ..config import Settings
 from ..db import DB, Submission, User
 from ..errors import ConfigError, Notice, notice
 from ..i18n import normalize, t
+from ..throttle import Throttle
 from ..keyboards import confirm_kb, control_kb, media_count, media_kb, reasons_kb, schedule_kb, user_kb
 from ..render import caption_index, control_text, signature
 from ..timeutil import fmt_ts
@@ -58,6 +59,7 @@ class CoreBase:
         self._tasks: list[asyncio.Task] = []
         self._scheduler_task: asyncio.Task | None = None
         self._stopping = asyncio.Event()
+        self.throttle = Throttle()  # 投稿人的 /msg 和改稿：都会在审核群发消息，限制频率
         self._album_locks: dict[tuple[int, str], tuple[asyncio.Lock, int]] = {}  # (投稿人, 相册编号) → (锁, 使用中的数量)
 
     # ---------- lifecycle ----------
@@ -198,6 +200,11 @@ class CoreBase:
             if n > limit:
                 return notice("too_long", n=n, limit=limit)
         return None
+
+    def _too_often(self, user_id: int) -> Notice | None:
+        """投稿人这次操作会在审核群发一条消息：太频繁就拦下，告诉他还要等几秒。"""
+        wait = self.throttle.hit(user_id)
+        return notice("too_often", s=wait) if wait else None
 
     def _spam_blocked(self, hits: list[dict]) -> Notice | None:
         """SPAM_ACTION=block 时命中规则就拦下（提交、投稿人改稿）。

@@ -327,6 +327,7 @@ bot/
   spam.py         spam checks: keywords, link limit
   media.py        rules for changing photos and videos: add, replace, remove
   ratelimit.py    automatic waiting and retrying when rate-limited
+  throttle.py     rate limit for submitters' /msg and edits
   keyboards.py    colored inline buttons
   album.py        album collection
   timeutil.py     time parsing

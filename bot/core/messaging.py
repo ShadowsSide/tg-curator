@@ -63,7 +63,7 @@ class MessagingMixin(CoreBase):
         db_user = await self.db.get_user(user.id)
         if db_user and db_user.banned:
             return notice("banned")
-        err = self.msg_blocked(sub)
+        err = self.msg_blocked(sub) or self._too_often(user.id)
         if err:
             return err
         try:

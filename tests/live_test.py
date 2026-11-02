@@ -19,6 +19,7 @@ from aiohttp import web
 PROJECT = sys.argv[1] if len(sys.argv) > 1 else os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 USER, REVIEW, CHANNEL, ADMIN = 42, -1001, -1002, 7
 LINKED = -8000  # 发布频道的关联群组（评论区）
+BASIC_GROUP = -4001234  # 普通群（不是超级群），getChat 返回 type=group
 CTRL = "新投稿"  # 控制消息标题（不再显示投稿编号；测试按顺序取紧接着的那一条）
 T0 = time.time()
 
@@ -134,6 +135,8 @@ async def handle(request: web.Request):
                                                            "premium_subscription", "gifts_from_channels")}}
         if str(params.get("chat_id")) == str(REVIEW):
             result = {**chat(REVIEW), "title": "Review", **info}
+        elif str(params.get("chat_id")) == str(BASIC_GROUP):
+            result = {"id": BASIC_GROUP, "type": "group", "title": "Old basic group", **info}
         else:
             result = {**chat(CHANNEL), "title": "Test Channel", "username": "testchan", "linked_chat_id": LINKED, **info}
     elif m == "getchatmember":

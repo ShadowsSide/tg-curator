@@ -42,6 +42,7 @@ class SchedulerMixin(CoreBase):
                         except TelegramAPIError:
                             pass
                 await self.expire_prompts()
+                self.throttle.prune()
             except Exception:
                 log.exception("调度循环出错")
             with contextlib.suppress(TimeoutError):

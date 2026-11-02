@@ -122,7 +122,7 @@ class SubmissionsMixin(CoreBase):
         err = self._check_editable(target, target.id, ("pending",))
         if not err:
             editor = t(self.lang, "submitter_label", name=first.from_user.full_name)
-            err = await self._save_edit(target, merged, editor, ("pending",))
+            err = await self._save_edit(target, merged, editor, ("pending",), by_submitter=True)
         if err:
             return err
         await self.refresh_user_kb(target.id)
@@ -145,14 +145,14 @@ class SubmissionsMixin(CoreBase):
         draft = await self.db.get(sid)
         if not draft or draft.user_id != user_id or not draft.merge_to:
             return notice("invalid_sub")
-        if draft.status != "draft":
+        # 先把草稿作废再加图：连点两下时只有抢到的那一次能加，不会加两遍；加不进去就恢复成草稿
+        if not await self.db.transition(sid, ("draft",), "cancelled"):
             return notice("already_handled")
         err = await self.change_media(draft.merge_to, "add", 0, draft.items, editor, SUBMITTER_EDITABLE,
                                       by_submitter=True)
         if err:
-            return err
-        await self.db.transition(sid, ("draft",), "cancelled")
-        return None
+            await self.db.transition(sid, ("cancelled",), "draft")
+        return err
 
     async def remove_own_media(self, sid: int, user_id: int, index: int, editor: str) -> Notice | None:
         """投稿人删掉自己投稿里的第 index 个图片视频（草稿、待审核时）。"""
@@ -169,9 +169,9 @@ class SubmissionsMixin(CoreBase):
         if err:
             return err
         hits = spam.check(sub.items, self.s.spam_rules)
-        if hits and self.s.spam_action == "block":
-            # 不告诉投稿人命中了哪个关键词，免得照着绕过；草稿保留，改了内容可以重新提交
-            return notice("spam_blocked_" + hits[0]["k"], **({"max": hits[0]["max"]} if "max" in hits[0] else {}))
+        err = self._spam_blocked(hits)  # 草稿保留，改了内容可以重新提交
+        if err:
+            return err
         err = await self._length_error(replace(sub, anonymous=anonymous), sub.items)  # 草稿保留，改短了可以重新提交
         if err:
             return err

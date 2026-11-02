@@ -20,6 +20,7 @@ from ..config import Settings
 from ..db import DB, Submission, User
 from ..errors import ConfigError, Notice, notice
 from ..i18n import normalize, t
+from ..throttle import Throttle
 from ..keyboards import confirm_kb, control_kb, media_count, media_kb, reasons_kb, schedule_kb, user_kb
 from ..render import caption_index, control_text, signature
 from ..timeutil import fmt_ts
@@ -58,6 +59,7 @@ class CoreBase:
         self._tasks: list[asyncio.Task] = []
         self._scheduler_task: asyncio.Task | None = None
         self._stopping = asyncio.Event()
+        self.throttle = Throttle()  # 投稿人的 /msg 和改稿：都会在审核群发消息，限制频率
         self._album_locks: dict[tuple[int, str], tuple[asyncio.Lock, int]] = {}  # (投稿人, 相册编号) → (锁, 使用中的数量)
 
     # ---------- lifecycle ----------
@@ -78,7 +80,10 @@ class CoreBase:
         if not (member and member.status == ChatMemberStatus.ADMINISTRATOR and member.can_post_messages):
             raise ConfigError("cfg_channel_admin", value=self.s.channel_id)
         review = await self._config_chat(self.s.review_chat_id, "cfg_review_not_found")
-        if review.type not in (ChatType.GROUP, ChatType.SUPERGROUP):
+        if review.type == ChatType.GROUP:
+            # 普通群升级成超级群后 ID 会变（之后所有发送都失败），控制消息的 t.me/c 链接也只对超级群有效
+            raise ConfigError("cfg_review_basic_group", value=self.s.review_chat_id)
+        if review.type != ChatType.SUPERGROUP:
             raise ConfigError("cfg_review_type", value=self.s.review_chat_id)
 
         self.channel_chat_id = chat.id
@@ -198,6 +203,18 @@ class CoreBase:
             if n > limit:
                 return notice("too_long", n=n, limit=limit)
         return None
+
+    def _too_often(self, user_id: int) -> Notice | None:
+        """投稿人这次操作会在审核群发一条消息：太频繁就拦下，告诉他还要等几秒。"""
+        wait = self.throttle.hit(user_id)
+        return notice("too_often", s=wait) if wait else None
+
+    def _spam_blocked(self, hits: list[dict]) -> Notice | None:
+        """SPAM_ACTION=block 时命中规则就拦下（提交、投稿人改稿）。
+        不告诉投稿人命中了哪个关键词，免得照着绕过。"""
+        if not hits or self.s.spam_action != "block":
+            return None
+        return notice("spam_blocked_" + hits[0]["k"], **({"max": hits[0]["max"]} if "max" in hits[0] else {}))
 
     async def notify(self, sub: Submission, key: str, **kw) -> None:
         """用投稿人自己的语言通知他，回复在他的投稿提示消息下面。"""

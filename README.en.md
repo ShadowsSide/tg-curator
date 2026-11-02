@@ -85,7 +85,7 @@ Built with Python 3.12 + [aiogram 3](https://github.com/aiogram/aiogram) + SQLit
 1. Create a bot with [@BotFather](https://t.me/BotFather) and copy its token. Leave privacy mode on (the default)
 2. Make the bot an admin of your **channel** with permission to post messages
 3. Create a **review group** and add the bot as a regular member (to use 🗑 on a banned user's posts older than 48 hours, make it an admin with the “Delete messages” right). By default only the group's **admins and owner** can review (`REVIEWERS`); other members get a “no permission” notice
-4. Find the channel ID and review group ID (both are numbers starting with `-100`). You can use a bot such as [@RawDataBot](https://t.me/RawDataBot), or send a message in the group and open `https://api.telegram.org/bot<token>/getUpdates`. For the channel you can also use its `@username`
+4. Find the channel ID and review group ID (both are numbers starting with `-100`). The review group must be a supergroup: if its ID doesn't start with `-100`, it's a basic group. Make chat history visible to new members in the group settings to upgrade it, then get the ID again. You can use a bot such as [@RawDataBot](https://t.me/RawDataBot), or send a message in the group and open `https://api.telegram.org/bot<token>/getUpdates`. For the channel you can also use its `@username`
 
 ### 2. Deploy
 
@@ -130,7 +130,7 @@ The bot won't start without these.
 |---|---|---|
 | `BOT_TOKEN` | — | The bot token |
 | `CHANNEL_ID` | — | Channel to publish to: `@username` or `-100…` |
-| `REVIEW_CHAT_ID` | — | Review group ID |
+| `REVIEW_CHAT_ID` | — | Review group ID (must be a supergroup, starts with `-100`) |
 
 ### Common
 
@@ -327,6 +327,7 @@ bot/
   spam.py         spam checks: keywords, link limit
   media.py        rules for changing photos and videos: add, replace, remove
   ratelimit.py    automatic waiting and retrying when rate-limited
+  throttle.py     rate limit for submitters' /msg and edits
   keyboards.py    colored inline buttons
   album.py        album collection
   timeutil.py     time parsing

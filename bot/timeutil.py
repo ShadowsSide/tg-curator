@@ -40,6 +40,7 @@ def next_occurrence(hhmm: str, tz: ZoneInfo, now: datetime | None = None) -> dat
 
 _RELATIVE = re.compile(r"\+\s*(\d+)\s*(m|min|分钟?|h|小时|d|天)?", re.IGNORECASE)
 _UNITS = {"m": 60, "min": 60, "分": 60, "分钟": 60, "h": 3600, "小时": 3600, "d": 86400, "天": 86400}
+MAX_AHEAD = 3650 * 86400  # 相对时间最多 10 年：再大就超出日期范围，显示时间时会出错
 
 
 def parse_time(text: str, tz: ZoneInfo, now: datetime | None = None) -> int | None:
@@ -51,7 +52,8 @@ def parse_time(text: str, tz: ZoneInfo, now: datetime | None = None) -> int | No
     m = _RELATIVE.fullmatch(text)
     if m:
         unit = (m.group(2) or "m").lower()
-        return int(now.timestamp()) + int(m.group(1)) * _UNITS[unit]
+        ahead = int(m.group(1)) * _UNITS[unit]
+        return int(now.timestamp()) + ahead if ahead <= MAX_AHEAD else None
 
     try:
         t = datetime.strptime(text, "%H:%M")
@@ -70,5 +72,8 @@ def parse_time(text: str, tz: ZoneInfo, now: datetime | None = None) -> int | No
     except ValueError:
         return None
     if dt <= now:
-        dt = dt.replace(year=now.year + 1)
+        try:
+            dt = dt.replace(year=now.year + 1)
+        except ValueError:  # 闰年的 02-29 已经过了：明年没有这一天
+            return None
     return int(dt.timestamp())

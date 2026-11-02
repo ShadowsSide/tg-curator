@@ -173,13 +173,18 @@ async def scenario():
     check("reply to own submission with a photo → “Add to that submission” offered",
           b.get("➕ 加到这条投稿") == "um:merge:4:3" and "u:sign:4" in b.values()
           and "加到你回复的那条投稿" in ask_merge["params"]["text"], b)
-    n = len(log); lt.cb("um:merge:4:3", USER, USER, message_id=ask_merge["result"]["message_id"])
+    n = len(log)
+    for _ in range(2):  # 连点两下：只能加一次
+        lt.cb("um:merge:4:3", USER, USER, message_id=ask_merge["result"]["message_id"])
     merged = await wait_for(lambda e: e["method"] == "editMessageText" and "已加到" in e["params"].get("text", ""),
                             since=n)
     await wait_for(lambda e: e["method"] == "sendMediaGroup", since=n)
+    await asyncio.sleep(0.5)
     pv = previews(n, 3)
     check("merge → the earlier submission gets the photo, reviewers see a new preview",
           merged and pv and group_ids(pv[0]) == ["U1", "U2", "U3"], pv and group_ids(pv[0]))
+    check("merge pressed twice → the photo is added only once",
+          len(pv) == 1 and not previews(n, 4), [group_ids(p) for p in pv])
 
     # 9. 投稿人删掉第 1 张（不需要确认）
     n = len(log); lt.cb("um:mdel:3:0", USER, USER, message_id=user_prompt)

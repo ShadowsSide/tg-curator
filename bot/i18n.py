@@ -62,6 +62,11 @@ T: dict[str, dict[str, str]] = {
                "en": "TZ is not a valid time zone: {value!r} (e.g. Asia/Shanghai, UTC)"},
     "cfg_quiet_hours": {"zh": "REMINDER_QUIET_HOURS 格式不对：{value!r}（例如 0-8）",
                         "en": "REMINDER_QUIET_HOURS is malformed: {value!r} (e.g. 0-8)"},
+    "cfg_quiet_hours_same": {
+        "zh": "REMINDER_QUIET_HOURS={value} 的开始和结束是同一个小时，会变成全天都不提醒。不需要安静时段就留空",
+        "en": "REMINDER_QUIET_HOURS={value} starts and ends at the same hour, which would silence reminders all day. "
+              "Leave it empty if you don't want quiet hours",
+    },
     "cfg_reviewers": {"zh": "REVIEWERS 里有无法识别的值 {value!r}（可用：admins、all、用户 ID）",
                       "en": "REVIEWERS has an unknown value {value!r} (use admins, all or user IDs)"},
     "cfg_token_format": {
@@ -87,6 +92,13 @@ T: dict[str, dict[str, str]] = {
     "cfg_review_not_found": {
         "zh": "找不到 REVIEW_CHAT_ID 对应的群 {value}：ID 写错了，或者机器人还没加进这个群",
         "en": "Can't find the group REVIEW_CHAT_ID={value}: the ID is wrong, or the bot hasn't been added to it",
+    },
+    "cfg_review_basic_group": {
+        "zh": "REVIEW_CHAT_ID={value} 是普通群，审核群需要是超级群。在群设置里把“对新成员显示聊天记录”改为可见，"
+              "群就会升级为超级群，ID 变成 -100 开头，把新 ID 填进 REVIEW_CHAT_ID",
+        "en": "REVIEW_CHAT_ID={value} is a basic group; the review group must be a supergroup. In the group settings, "
+              "make chat history visible to new members to upgrade it; its ID then starts with -100. "
+              "Put the new ID in REVIEW_CHAT_ID",
     },
     "cfg_review_type": {
         "zh": "REVIEW_CHAT_ID={value} 不是群组，是不是和 CHANNEL_ID 填反了？",
@@ -302,6 +314,10 @@ T: dict[str, dict[str, str]] = {
     "too_long": {
         "zh": "内容太长：{n} 字，上限 {limit}（还需留出落款的长度）",
         "en": "Too long: {n} characters, the limit is {limit} (leave room for the signature too)",
+    },
+    "too_often": {
+        "zh": "操作太频繁了，请 {s} 秒后再试",
+        "en": "You're doing this too often. Please try again in {s} seconds",
     },
     "submit_failed": {
         "zh": "暂时没能送到审核群，投稿还在草稿里，请稍后再点一次",

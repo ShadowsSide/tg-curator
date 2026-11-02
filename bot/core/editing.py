@@ -20,8 +20,9 @@ class EditingMixin(CoreBase):
     # ---------- 修改稿件（管理员 / 投稿人共用；lang 是调用方的语言） ----------
 
     async def edit(self, sid: int, editor: str, text: str, entities: list, link_preview: dict | None = None,
-                   allowed: tuple[str, ...] = OPEN_STATES) -> Notice | None:
-        """修改稿件的文字（文字投稿改正文，媒体投稿改说明文字），格式由 entities 原样保留。"""
+                   allowed: tuple[str, ...] = OPEN_STATES, by_submitter: bool = False) -> Notice | None:
+        """修改稿件的文字（文字投稿改正文，媒体投稿改说明文字），格式由 entities 原样保留。
+        by_submitter：投稿人自己改的，要过垃圾拦截（审核员改的不拦）。"""
         sub = await self.db.get(sid)
         err = self._check_editable(sub, sid, allowed)
         if err:
@@ -34,7 +35,7 @@ class EditingMixin(CoreBase):
         target["text"], target["entities"] = text, entities
         if is_text:
             target["link_preview"] = link_preview
-        return await self._save_edit(sub, items, editor, allowed)
+        return await self._save_edit(sub, items, editor, allowed, by_submitter=by_submitter)
 
     async def replace_item(self, sid: int, index: int, new_item: dict, editor: str,
                            allowed: tuple[str, ...]) -> Notice | None:
@@ -52,7 +53,7 @@ class EditingMixin(CoreBase):
             return notice("type_change")
         else:
             items[index] = new_item
-        return await self._save_edit(sub, items, editor, allowed)
+        return await self._save_edit(sub, items, editor, allowed, by_submitter=True)
 
     async def change_media(self, sid: int, op: str, index: int, new_items: list[dict], editor: str,
                            allowed: tuple[str, ...], by_submitter: bool) -> Notice | None:
@@ -72,7 +73,7 @@ class EditingMixin(CoreBase):
             items, err = media.remove(sub.items, index)
         if err:
             return err
-        err = await self._save_edit(sub, items, editor, allowed)
+        err = await self._save_edit(sub, items, editor, allowed, by_submitter=by_submitter)
         if not err:
             await self.refresh_user_kb(sid)
         return err
@@ -87,8 +88,15 @@ class EditingMixin(CoreBase):
         return notice(f"not_editable_{sub.status if sub.status in known else 'other'}", sid=sid)
 
     async def _save_edit(self, sub: Submission, items: list[dict], editor: str,
-                         allowed: tuple[str, ...]) -> Notice | None:
+                         allowed: tuple[str, ...], *, by_submitter: bool) -> Notice | None:
         err = await self._length_error(sub, items, signed=sub.status != "draft")
+        if err:
+            return err
+        # 改稿后可能加了广告链接，重新检查；SPAM_ACTION=block 时投稿人不能靠“先提交、后改稿”绕过拦截
+        hits = spam.check(items, self.s.spam_rules)
+        err = self._spam_blocked(hits) if by_submitter else None
+        if not err and by_submitter and sub.status != "draft":  # 草稿还没进审核群，改多少次都不发消息
+            err = self._too_often(sub.user_id)
         if err:
             return err
         # 先发预览再保存：预览发不出去就不改稿件，否则审核员可能发布没看过的内容
@@ -111,7 +119,7 @@ class EditingMixin(CoreBase):
         ok = await self.db.update_if(
             sub.id, allowed, version=sub.version, items=items, original_items=sub.original_items or sub.items,
             edited_by=editor, edited_at=now_ts(),
-            spam_flags=spam.check(items, self.s.spam_rules) or None,  # 改稿后可能加了广告链接，重新检查
+            spam_flags=hits or None,
             **follow,
         )
         if not ok:

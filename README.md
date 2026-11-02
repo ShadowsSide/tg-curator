@@ -338,7 +338,7 @@ scripts/          多架构镜像构建脚本
 
 ### 发布镜像（Fork 后自用）
 
-推送到 `main` 或打 `v*` 标签时，GitHub Actions 会构建 amd64 + arm64 镜像，并发布到 `ghcr.io/<owner>/tg-curator`。部署时在 `.env` 里设置 `IMAGE=ghcr.io/<owner>/tg-curator:latest` 才会用上自己的镜像，否则默认拉取本仓库的镜像。
+推送到 `main` 或打 `v*` 标签时，GitHub Actions 会先运行全部测试，通过后再构建 amd64 + arm64 镜像，并发布到 `ghcr.io/<owner>/tg-curator`。部署时在 `.env` 里设置 `IMAGE=ghcr.io/<owner>/tg-curator:latest` 才会用上自己的镜像，否则默认拉取本仓库的镜像。
 
 如果还想同时发布到 Docker Hub，在仓库的 **Settings → Secrets and variables → Actions** 里添加变量 `DOCKERHUB_USERNAME` 和密钥 `DOCKERHUB_TOKEN`（Docker Hub 访问令牌，需要 Read & Write 权限）。
 

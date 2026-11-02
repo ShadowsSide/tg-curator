@@ -15,7 +15,7 @@ import live_test as lt  # noqa: E402
 from live_test import ADMIN, BOB, REVIEW, USER, buttons, check, gm, is_send, log, submit, wait_for  # noqa: E402
 
 PURGE_BTN = "🗑 删除 TA 的稿件"
-CONFIRM = "🗑 确认删除（审核群里 TA 的全部稿件，不可恢复）"
+CONFIRM = "🗑 确认删除 TA 的全部稿件"
 
 
 def edited(message_id, since):

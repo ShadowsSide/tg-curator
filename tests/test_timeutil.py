@@ -6,7 +6,7 @@ from zoneinfo import ZoneInfo
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from bot.timeutil import MAX_AHEAD, parse_time  # noqa: E402
+from bot.timeutil import MAX_AHEAD, TimeTooFar, parse_time  # noqa: E402
 
 TZ = ZoneInfo("Asia/Shanghai")
 
@@ -36,7 +36,11 @@ def test_leap_day_already_passed():
 
 def test_huge_relative_time():
     now = at(2026, 10, 20, 12, 0)
-    assert parse_time("+999999999d", TZ, now) is None
+    try:  # 格式是对的，只是太远：和“看不懂”分开，提示里说清楚
+        parse_time("+999999999d", TZ, now)
+        raise AssertionError("expected TimeTooFar")
+    except TimeTooFar:
+        pass
     assert parse_time(f"+{MAX_AHEAD // 86400}d", TZ, now) == int(now.timestamp()) + MAX_AHEAD
 
 

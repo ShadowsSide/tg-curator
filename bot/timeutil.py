@@ -43,8 +43,13 @@ _UNITS = {"m": 60, "min": 60, "分": 60, "分钟": 60, "h": 3600, "小时": 3600
 MAX_AHEAD = 3650 * 86400  # 相对时间最多 10 年：再大就超出日期范围，显示时间时会出错
 
 
+class TimeTooFar(ValueError):
+    """相对时间超过 MAX_AHEAD：格式是对的，只是太远，提示要和“看不懂”分开，免得以为不支持 +Nd。"""
+
+
 def parse_time(text: str, tz: ZoneInfo, now: datetime | None = None) -> int | None:
-    """支持：20:30 / 10-20 09:00 / 2026-10-20 09:00 / +90m / +2h / +1d。返回 unix 时间戳。"""
+    """支持：20:30 / 10-20 09:00 / 2026-10-20 09:00 / +90m / +2h / +1d。返回 unix 时间戳；看不懂返回 None。
+    相对时间超过 MAX_AHEAD 时抛出 TimeTooFar。"""
     now = now or datetime.now(tz)
     text = text.strip().replace("：", ":").replace("/", "-")
     text = re.sub(r"\s+", " ", text)
@@ -53,7 +58,9 @@ def parse_time(text: str, tz: ZoneInfo, now: datetime | None = None) -> int | No
     if m:
         unit = (m.group(2) or "m").lower()
         ahead = int(m.group(1)) * _UNITS[unit]
-        return int(now.timestamp()) + ahead if ahead <= MAX_AHEAD else None
+        if ahead > MAX_AHEAD:
+            raise TimeTooFar(text)
+        return int(now.timestamp()) + ahead
 
     try:
         t = datetime.strptime(text, "%H:%M")

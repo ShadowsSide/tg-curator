@@ -340,7 +340,11 @@ async def scenario():
     # 3. 自定义定时 +1m → 后台调度器真实发布
     n = len(log); cb("r:custom:1:0", REVIEW, ADMIN)
     prompt = await wait_for(lambda e: is_send(e, "sendMessage", REVIEW, "发布时间"), since=n)
-    check("custom time prompt (ForceReply)", prompt and "force_reply" in json.dumps(prompt["params"]))
+    check("custom time prompt (ForceReply) shows +1d",
+          prompt and "force_reply" in json.dumps(prompt["params"]) and "+1d" in prompt["params"]["text"])
+    n = len(log); gm("+999999999d", reply_to=prompt["result"]["message_id"])
+    e = await wait_for(lambda e: is_send(e, "sendMessage", REVIEW, "时间太远了"), since=n)
+    check("huge relative time → told it's too far (not 'can't read'), prompt kept", e)
     n = len(log); gm("+1m", reply_to=prompt["result"]["message_id"])
     e = await wait_for(lambda e: is_send(e, "sendMessage", REVIEW, "将于"), since=n)
     check("schedule +1m accepted", e)

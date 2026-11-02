@@ -188,8 +188,9 @@ T: dict[str, dict[str, str]] = {
     "mode_anon": {"zh": "匿名", "en": "anonymously"},
     "mode_signed": {"zh": "署名", "en": "with your name"},
     "submitted": {
-        "zh": '✅ 已{mode}提交。\n审核结果会通知你，请耐心等待。',
-        "en": "✅ Submitted {mode}.\nWe'll let you know the review result.",
+        "zh": '✅ 已{mode}提交。\n审核结果会通知你，请耐心等待。\n\n想补充图片或视频：<b>回复这条消息</b>发送，再点“➕ 加到这条投稿”。',
+        "en": "✅ Submitted {mode}.\nWe'll let you know the review result.\n\n"
+              "To add photos or videos: <b>reply to this message</b> with them, then tap “➕ Add to that submission”.",
     },
     "submitted_toast": {"zh": "已提交", "en": "Submitted"},
     "choose_or_merge": {
@@ -425,8 +426,7 @@ T: dict[str, dict[str, str]] = {
     "btn_ban_user": {"zh": "🚫 封禁", "en": "🚫 Ban"},
     "btn_purge": {"zh": "🗑 删除 TA 的稿件", "en": "🗑 Delete their posts"},
     "btn_purge_n": {"zh": "🗑 删除 TA 在审核群的稿件（{n} 条）", "en": "🗑 Delete their posts in this group ({n})"},
-    "btn_confirm_purge": {"zh": "🗑 确认删除（审核群里 TA 的全部稿件，不可恢复）",
-                          "en": "🗑 Confirm delete (all their posts in this group; can't be undone)"},
+    "btn_confirm_purge": {"zh": "🗑 确认删除 TA 的全部稿件", "en": "🗑 Delete all their posts"},
     "btn_confirm_unban": {"zh": "🔓 确认解封（会通知投稿人）", "en": "🔓 Confirm unban (the submitter is notified)"},
 
     # ---------- 审核：按钮反馈 ----------
@@ -439,6 +439,9 @@ T: dict[str, dict[str, str]] = {
     },
     "toast_rejected_with": {"zh": "已拒绝：{reason}", "en": "Rejected: {reason}"},
     "toast_confirm": {"zh": "请再点一次确认，或返回", "en": "Tap again to confirm, or go back"},
+    "toast_confirm_purge": {"zh": "删除审核群里 TA 的全部稿件，不可恢复。请再点一次确认，或返回",
+                            "en": "This deletes all their posts in this group and can't be undone. "
+                                  "Tap again to confirm, or go back"},
     "toast_publishing": {"zh": "发布中…", "en": "Publishing…"},
     "toast_retrying": {"zh": "重试中…", "en": "Retrying…"},
     "toast_scheduled": {"zh": "已定时：{when}", "en": "Scheduled: {when}"},
@@ -489,8 +492,8 @@ T: dict[str, dict[str, str]] = {
 
     # ---------- 审核：等待回复的提示（点按钮后“请回复本消息……”） ----------
     "prompt_time": {
-        "zh": '{who} 请<b>回复本消息</b>输入发布时间：\n<code>20:30</code> · <code>10-20 09:00</code> · <code>2026-10-20 09:00</code> · <code>+90m</code> · <code>+2h</code>\n发送 /cancel 放弃。',
-        "en": '{who} please <b>reply to this message</b> with a publish time:\n<code>20:30</code> · <code>10-20 09:00</code> · <code>2026-10-20 09:00</code> · <code>+90m</code> · <code>+2h</code>\nSend /cancel to give up.',
+        "zh": '{who} 请<b>回复本消息</b>输入发布时间：\n<code>20:30</code> · <code>10-20 09:00</code> · <code>2026-10-20 09:00</code> · <code>+90m</code> · <code>+2h</code> · <code>+1d</code>\n发送 /cancel 放弃。',
+        "en": '{who} please <b>reply to this message</b> with a publish time:\n<code>20:30</code> · <code>10-20 09:00</code> · <code>2026-10-20 09:00</code> · <code>+90m</code> · <code>+2h</code> · <code>+1d</code>\nSend /cancel to give up.',
     },
     "prompt_edit": {
         "zh": '{who} 请<b>回复本消息</b>发送修改后的正文或说明文字，格式原样保留。上面是当前内容，可以复制后修改。\n发送 /cancel 放弃。',
@@ -516,8 +519,12 @@ T: dict[str, dict[str, str]] = {
     "prompt_none": {"zh": "没有等你回复的操作。", "en": "Nothing is waiting for your reply."},
     "prompt_text_needed": {"zh": "请发送文字。", "en": "Please send text."},
     "custom_time_bad": {
-        "zh": "看不懂这个时间 🤔 例如 <code>20:30</code>、<code>10-20 09:00</code>、<code>+2h</code>",
-        "en": "I can't read that time 🤔 Try <code>20:30</code>, <code>10-20 09:00</code> or <code>+2h</code>",
+        "zh": "看不懂这个时间 🤔 例如 <code>20:30</code>、<code>10-20 09:00</code>、<code>+2h</code>、<code>+1d</code>",
+        "en": "I can't read that time 🤔 Try <code>20:30</code>, <code>10-20 09:00</code>, <code>+2h</code> or <code>+1d</code>",
+    },
+    "custom_time_far": {
+        "zh": "时间太远了：最多可以定到 {years} 年以后",
+        "en": "That's too far ahead: you can schedule at most {years} years from now",
     },
     "custom_time_done": {
         "zh": '⏰ 将于 <b>{when}</b> 发布。',

@@ -147,7 +147,7 @@ async def scenario():
 
     # 6. 审核开始后（已发布）不能改：旧按钮提示原因
     c2 = await submit("媒体测试 二", 2)
-    n = len(log); lt.cb(lt.pub_ok(2), REVIEW, ADMIN, message_id=c2["result"]["message_id"])
+    n = len(log); lt.cb(await lt.pub_ok(2), REVIEW, ADMIN, message_id=c2["result"]["message_id"])
     await wait_for(lambda e: is_send(e, "sendMessage", lt.CHANNEL, "媒体测试 二"), since=n)
     n = len(log); lt.cb("r:media:2:0", REVIEW, ADMIN, message_id=c2["result"]["message_id"])
     t = await toast(n, "只有待审核")
@@ -202,7 +202,7 @@ async def scenario():
           and buttons(restored) == {"🗑 删除图片 / 视频": "um:mdel:3:0"}, restored and buttons(restored))
 
     # 10. 审核员发布后，投稿人点旧按钮：说明原因并收起按钮
-    n = len(log); lt.cb(lt.pub_ok(3), REVIEW, ADMIN)
+    n = len(log); lt.cb(await lt.pub_ok(3), REVIEW, ADMIN)
     await wait_for(lambda e: is_send(e, "sendMessage", USER, "已发布"), since=n)
     n = len(log); lt.cb("um:mdel:3:0", USER, USER, message_id=user_prompt)
     t = await toast(n, "审核已经开始或结束")

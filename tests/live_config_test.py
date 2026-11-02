@@ -43,6 +43,8 @@ CASES = [
     ("review group not found", {}, {f"getChat:{REVIEW}": [(403, "Forbidden: bot is not a member of the group chat")]},
      None, f"找不到 REVIEW_CHAT_ID 对应的群 {REVIEW}"),
     ("review chat is a channel", {"REVIEW_CHAT_ID": "-1009999"}, {}, None, "REVIEW_CHAT_ID=-1009999 不是群组"),
+    ("review chat is a basic group", {"REVIEW_CHAT_ID": str(lt.BASIC_GROUP)}, {}, None,
+     f"REVIEW_CHAT_ID={lt.BASIC_GROUP} 是普通群，审核群需要是超级群"),
 ]
 
 

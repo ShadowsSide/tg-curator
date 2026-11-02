@@ -83,7 +83,7 @@
 1. 在 [@BotFather](https://t.me/BotFather) 创建机器人，拿到 token。隐私模式保持默认开启即可
 2. 把机器人设为**频道**管理员，并给它“发布消息”权限
 3. 建一个**审核群**，把机器人拉进去，普通成员即可（想用 🗑 删除封禁用户超过 48 小时的旧稿件时，需要设为管理员并给“删除消息”权限）。默认只有审核群的**管理员和群主**能审核（`REVIEWERS`），其他成员点按钮或发命令会提示没有权限
-4. 获取频道 ID 和审核群 ID（都是 `-100` 开头的数字）。可以借助 [@RawDataBot](https://t.me/RawDataBot) 这类机器人，或者在群里发一条消息后访问 `https://api.telegram.org/bot<token>/getUpdates` 查看。频道也可以直接填 `@用户名`
+4. 获取频道 ID 和审核群 ID（都是 `-100` 开头的数字）。审核群必须是超级群：如果 ID 不是 `-100` 开头，说明是普通群，在群设置里把“对新成员显示聊天记录”改为可见，群就会升级为超级群，再重新获取 ID。可以借助 [@RawDataBot](https://t.me/RawDataBot) 这类机器人，或者在群里发一条消息后访问 `https://api.telegram.org/bot<token>/getUpdates` 查看。频道也可以直接填 `@用户名`
 
 ### 2. 部署
 
@@ -128,7 +128,7 @@ docker compose pull && docker compose up -d                      # 2. 更新到�
 |---|---|---|
 | `BOT_TOKEN` | — | 机器人 token |
 | `CHANNEL_ID` | — | 发布频道，填 `@username` 或 `-100…` |
-| `REVIEW_CHAT_ID` | — | 审核群 ID |
+| `REVIEW_CHAT_ID` | — | 审核群 ID（必须是超级群，`-100` 开头） |
 
 ### 常用
 

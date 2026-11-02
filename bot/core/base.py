@@ -80,7 +80,10 @@ class CoreBase:
         if not (member and member.status == ChatMemberStatus.ADMINISTRATOR and member.can_post_messages):
             raise ConfigError("cfg_channel_admin", value=self.s.channel_id)
         review = await self._config_chat(self.s.review_chat_id, "cfg_review_not_found")
-        if review.type not in (ChatType.GROUP, ChatType.SUPERGROUP):
+        if review.type == ChatType.GROUP:
+            # 普通群升级成超级群后 ID 会变（之后所有发送都失败），控制消息的 t.me/c 链接也只对超级群有效
+            raise ConfigError("cfg_review_basic_group", value=self.s.review_chat_id)
+        if review.type != ChatType.SUPERGROUP:
             raise ConfigError("cfg_review_type", value=self.s.review_chat_id)
 
         self.channel_chat_id = chat.id

@@ -88,6 +88,13 @@ T: dict[str, dict[str, str]] = {
         "zh": "找不到 REVIEW_CHAT_ID 对应的群 {value}：ID 写错了，或者机器人还没加进这个群",
         "en": "Can't find the group REVIEW_CHAT_ID={value}: the ID is wrong, or the bot hasn't been added to it",
     },
+    "cfg_review_basic_group": {
+        "zh": "REVIEW_CHAT_ID={value} 是普通群，审核群需要是超级群。在群设置里把“对新成员显示聊天记录”改为可见，"
+              "群就会升级为超级群，ID 变成 -100 开头，把新 ID 填进 REVIEW_CHAT_ID",
+        "en": "REVIEW_CHAT_ID={value} is a basic group; the review group must be a supergroup. In the group settings, "
+              "make chat history visible to new members to upgrade it; its ID then starts with -100. "
+              "Put the new ID in REVIEW_CHAT_ID",
+    },
     "cfg_review_type": {
         "zh": "REVIEW_CHAT_ID={value} 不是群组，是不是和 CHANNEL_ID 填反了？",
         "en": "REVIEW_CHAT_ID={value} is not a group. Did you swap it with CHANNEL_ID?",

@@ -9,7 +9,7 @@ from ..db import Submission
 from ..entities import u16len
 from ..errors import Notice, notice
 from ..i18n import t
-from ..render import send_items
+from ..render import caption_index, send_items
 from ..timeutil import now_ts
 from .base import CoreBase
 
@@ -50,13 +50,13 @@ class MessagingMixin(CoreBase):
             )
         except TelegramAPIError as e:
             return notice("msg_undelivered", error=str(e))
-        await self.db.log_message(sid, "to_user", reviewer.id, reviewer.full_name, item,
-                                  user_msg_id=sent[0].message_id, review_msg_id=None)
+        await self.db.log_message(sid, "to_user", reviewer.id, reviewer.full_name,
+                                  [(item, sent[0].message_id, None)])
         await self.refresh_control(sid)
         return None
 
-    async def relay_to_review(self, sid: int, user: TgUser, item: dict, user_msg_id: int) -> Notice | None:
-        """投稿人 → 审核员：发到审核群，回复在这条投稿的控制消息下面。"""
+    async def relay_to_review(self, sid: int, user: TgUser, items: list[dict], user_msg_ids: list[int]) -> Notice | None:
+        """投稿人 → 审核员：发到审核群，回复在这条投稿的控制消息下面。items：一条，或相册的每一项。"""
         sub = await self.db.get(sid)
         if not sub or sub.user_id != user.id:
             return notice("u_edit_not_found")
@@ -66,16 +66,19 @@ class MessagingMixin(CoreBase):
         err = self.msg_blocked(sub) or self._too_often(user.id)
         if err:
             return err
+        labeled = list(items)
+        i = caption_index(items)  # 标签加在说明文字那一项前面，和发送时承载说明的是同一项
+        labeled[i] = self._labeled(items[i], t(self.lang, "msg_from_submitter"))
         try:
             sent = await send_items(
-                self.bot, self.s.review_chat_id, [self._labeled(item, t(self.lang, "msg_from_submitter"))],
-                sig=("", []), spoiler=bool(item.get("spoiler")), reply_to=sub.review_msg_id,
+                self.bot, self.s.review_chat_id, labeled,
+                sig=("", []), spoiler=any(it.get("spoiler") for it in items), reply_to=sub.review_msg_id,
             )
         except TelegramAPIError as e:
             return notice("msg_failed", error=str(e))
         # 审核员回复这条转来的消息发 /msg，就能定位到这条投稿
         await self.db.link_review_messages(sid, [m.message_id for m in sent])
-        await self.db.log_message(sid, "to_review", user.id, user.full_name, item,
-                                  user_msg_id=user_msg_id, review_msg_id=sent[0].message_id)
+        await self.db.log_message(sid, "to_review", user.id, user.full_name,
+                                  [(it, u, r.message_id) for it, u, r in zip(items, user_msg_ids, sent)])
         await self.refresh_control(sid)
         return None

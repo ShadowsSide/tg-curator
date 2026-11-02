@@ -72,19 +72,27 @@ def build_router() -> Router:
     @router.message(Command("msg"))
     async def msg_cmd(m: Message, core: Core) -> None:
         """投稿人给审核员发消息：必须回复审核员的消息或自己的投稿。"""
-        lang = core.lang_of(m.from_user)
-        body, entities = ent.strip_command(m.text or m.caption or "", ent.dump(m.entities or m.caption_entities))
-        reply = explicit_reply(m)
-        found = await core.find_user_message(m.from_user.id, reply.message_id) if reply else None
+        if m.media_group_id:  # 说明里写 /msg 的相册：收齐后整组转达，其余几项不能当成新投稿
+            core.albums.add(m, lambda messages: _relay_to_review(m, messages, core))
+            return
+        await _relay_to_review(m, [m], core)
+
+    async def _relay_to_review(cmd: Message, messages: list[Message], core: Core) -> None:
+        """cmd：带 /msg 的那条；messages：要转达的全部（单条就是它自己，相册是所有项）。"""
+        lang = core.lang_of(cmd.from_user)
+        body, entities = ent.strip_command(cmd.text or cmd.caption or "", ent.dump(cmd.entities or cmd.caption_entities))
+        reply = explicit_reply(cmd)
+        found = await core.find_user_message(cmd.from_user.id, reply.message_id) if reply else None
         if not found:
-            await m.reply(t(lang, "msg_usage_user"))
+            await cmd.reply(t(lang, "msg_usage_user"))
             return
-        item = message_item(m, body, entities)
-        if item is None:
-            await m.reply(t(lang, "msg_empty"))
+        items = [message_item(x, body, entities) if x.message_id == cmd.message_id
+                 else message_item(x, x.caption or "", ent.dump(x.caption_entities)) for x in messages]
+        if any(it is None for it in items):
+            await cmd.reply(t(lang, "msg_empty"))
             return
-        err = await core.relay_to_review(found[0], m.from_user, item, m.message_id)
-        await m.reply(err.text(lang) if err else t(lang, "msg_sent_to_review"))
+        err = await core.relay_to_review(found[0], cmd.from_user, items, [x.message_id for x in messages])
+        await cmd.reply(err.text(lang) if err else t(lang, "msg_sent_to_review"))
 
     @router.edited_message()
     async def native_edit(m: Message, core: Core) -> None:

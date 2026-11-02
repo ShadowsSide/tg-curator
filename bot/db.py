@@ -391,13 +391,16 @@ class DB:
             "SELECT 1 FROM conversations WHERE direction='to_review' AND review_msg_id=?", (message_id,)
         ) is not None
 
-    async def log_message(self, sid: int, direction: str, sender_id: int, sender_name: str, item: dict,
-                          user_msg_id: int | None, review_msg_id: int | None) -> None:
-        await self.conn.execute(
+    async def log_message(self, sid: int, direction: str, sender_id: int, sender_name: str,
+                          parts: list[tuple[dict, int | None, int | None]]) -> None:
+        """记下一次 /msg 转达（msg_count 加 1）。parts：(内容, 投稿人私聊里的消息, 审核群里的消息)，
+        相册每一项各一行，回复其中任何一张都能找到这条投稿。"""
+        ts = now_ts()
+        await self.conn.executemany(
             """INSERT INTO conversations(sid, direction, sender_id, sender_name, item, created_at,
                                          user_msg_id, review_msg_id) VALUES(?, ?, ?, ?, ?, ?, ?, ?)""",
-            (sid, direction, sender_id, sender_name, json.dumps(item, ensure_ascii=False), now_ts(),
-             user_msg_id, review_msg_id),
+            [(sid, direction, sender_id, sender_name, json.dumps(item, ensure_ascii=False), ts, user_msg_id,
+              review_msg_id) for item, user_msg_id, review_msg_id in parts],
         )
         await self.conn.execute("UPDATE submissions SET msg_count = msg_count + 1 WHERE id=?", (sid,))
         await self.conn.commit()

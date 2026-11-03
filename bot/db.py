@@ -512,9 +512,10 @@ class DB:
         )
         return row[0] if row else None
 
-    async def count_open_by_user(self, user_id: int) -> int:
+    async def count_open_by_user(self, user_id: int, statuses: tuple[str, ...] = ("draft", "pending")) -> int:
         row = await self._one(
-            "SELECT COUNT(*) FROM submissions WHERE user_id=? AND status IN ('draft', 'pending')", (user_id,)
+            f"SELECT COUNT(*) FROM submissions WHERE user_id=? AND status IN ({','.join('?' * len(statuses))})",
+            (user_id, *statuses),
         )
         return row[0]
 

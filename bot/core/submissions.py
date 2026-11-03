@@ -154,12 +154,13 @@ class SubmissionsMixin(CoreBase):
             await self.db.transition(sid, ("cancelled",), "draft")
         return err
 
-    async def remove_own_media(self, sid: int, user_id: int, index: int, editor: str) -> Notice | None:
-        """投稿人删掉自己投稿里的第 index 个图片视频（草稿、待审核时）。"""
+    async def remove_own_media(self, sid: int, user_id: int, index: int, editor: str, version: int) -> Notice | None:
+        """投稿人删掉自己投稿里的第 index 个图片视频（草稿、待审核时）。version：删除面板是按哪个内容版本显示的。"""
         sub = await self.db.get(sid)
         if not sub or sub.user_id != user_id:
             return notice("invalid_sub")
-        return await self.change_media(sid, "remove", index, [], editor, SUBMITTER_EDITABLE, by_submitter=True)
+        return await self.change_media(sid, "remove", index, [], editor, SUBMITTER_EDITABLE, by_submitter=True,
+                                       version=version)
 
     async def submit(self, sid: int, user_id: int, anonymous: bool) -> Notice | None:
         sub = await self.db.get(sid)

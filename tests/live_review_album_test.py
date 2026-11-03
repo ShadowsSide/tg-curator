@@ -18,7 +18,7 @@ import tempfile
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import live_test as lt  # noqa: E402
-from live_media_test import ask, bot_msg, photo  # noqa: E402
+from live_media_test import ask, bot_msg, panel_button, photo  # noqa: E402
 from live_test import ADMIN, REVIEW, check, is_send, log, submit, wait_for  # noqa: E402
 
 DELAY = 1.0  # ALBUM_DELAY
@@ -79,7 +79,7 @@ async def scenario():
           files(3) == list("ABCDEFGH") and got[-1].startswith("相册后到的 3 个没有加进去") and "最多 10 个" in got[-1], (files(3), got))
 
     # 替换：后到的部分不用
-    p = await ask("mrep:3:1", 3, ctrl, "换掉第 1 个")
+    p = await ask(await panel_button(3, ctrl, "🔁 换第 1 个"), 3, ctrl, "换掉第 1 个")
     got = await split_album(p["result"]["message_id"], "g4", ["R"], ["S"], late_reply=False)
     check("replace, late part → only the first one used, reviewer told the rest wasn't",
           files(3)[0] == "R" and "S" not in files(3) and "后到的 1 个没有使用" in got[-1], (files(3), got))
@@ -101,7 +101,7 @@ async def scenario():
           files(5) == ["A", "B"] and told, (files(5), got))
 
     # 替换，第一批还在处理时后到的部分带着回复（提示还没删）：不能再替换一次
-    p = await ask("mrep:3:2", 3, ctrl3, "换掉第 2 个")
+    p = await ask(await panel_button(3, ctrl3, "🔁 换第 2 个"), 3, ctrl3, "换掉第 2 个")
     lt.MOCK["flood"][f"sendMediaGroup:{REVIEW}"] = [3]
     n = len(log)
     got = await split_album(p["result"]["message_id"], "g7", ["T"], ["U"])

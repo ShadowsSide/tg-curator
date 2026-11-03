@@ -56,13 +56,16 @@ class EditingMixin(CoreBase):
         return await self._save_edit(sub, items, editor, allowed, by_submitter=True)
 
     async def change_media(self, sid: int, op: str, index: int, new_items: list[dict], editor: str,
-                           allowed: tuple[str, ...], by_submitter: bool) -> Notice | None:
+                           allowed: tuple[str, ...], by_submitter: bool, version: int | None = None) -> Notice | None:
         """新增 / 替换 / 删除图片和视频（op = add / replace / remove），规则见 media.py。
-        审核员发的媒体不记 msg_id：那是审核群里的消息编号，会和投稿人私聊里的编号混淆（投稿人“编辑”时按它找稿件）。"""
+        审核员发的媒体不记 msg_id：那是审核群里的消息编号，会和投稿人私聊里的编号混淆（投稿人“编辑”时按它找稿件）。
+        version：按钮 / 提示上的序号是按这个内容版本排的；之后内容又被改过，序号可能指向另一张，就不改。"""
         sub = await self.db.get(sid)
         err = self._check_editable(sub, sid, allowed)
         if err:
             return err
+        if version is not None and sub.version != version:
+            return notice("media_stale")
         if not by_submitter:
             new_items = [{k: v for k, v in it.items() if k != "msg_id"} for it in new_items]
         if op == "add":

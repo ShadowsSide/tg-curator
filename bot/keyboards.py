@@ -8,7 +8,7 @@ from aiogram.filters.callback_data import CallbackData
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
 from .db import OPEN_STATES, Submission
-from .media import MAX_MEDIA, MEDIA_TYPES
+from .media import MAX_MEDIA, MEDIA_TYPES, media_ref
 from .i18n import on_off, t
 from .timeutil import next_occurrence
 
@@ -48,7 +48,7 @@ class UserCB(CallbackData, prefix="u"):
 
 class UserMediaCB(CallbackData, prefix="um"):
     """投稿人改图片的按钮。单独一类：给 UserCB 加字段会让旧消息上的按钮（u:sign:5）解析失败。"""
-    a: str  # merge：把这份草稿的图片加到投稿 v 里；mdel：打开删除面板；mrm：删掉第 v 个；mback：收起删除面板
+    a: str  # merge：把这份草稿的图片加到投稿 v 里；mdel：打开删除面板；mrm：删掉第几个（v 见 media.media_ref）；mback：收起删除面板
     sid: int
     v: int = 0
 
@@ -57,7 +57,8 @@ class ReviewCB(CallbackData, prefix="r"):
     a: str  # spoiler / silent / pub / sched / preset / custom / back / unsched / reject / ban / unban / retry
     #         purge：删除被封禁投稿人在审核群的全部稿件消息
     #         edit / creason：发一条提示，回复它来修改稿件 / 写拒绝理由
-    #         media：媒体面板；madd / mrep：发提示，回复图片视频来添加 / 替换第 v 个；mrm / mrm_ok：删除第 v 个
+    #         media：媒体面板；madd / mrep：发提示，回复图片视频来添加 / 替换第几个；mrm / mrm_ok：删除第几个
+    #         （mrep / mrm 的 v 是序号加内容版本，见 media.media_ref）
     #         pub_ok / reject_ok / ban_ok / unban_ok / purge_ok：确认面板上的“确认”，见 CONFIRMABLE
     #         reason：拒绝理由面板上选了一项
     # v：pub / pub_ok / retry = 审核员看到的内容版本；preset = 定时的时间戳；reason / reject / reject_ok = 第几个拒绝理由（从 1 开始，0 = 不附理由）
@@ -144,7 +145,8 @@ def user_kb(sub: Submission, lang: str, last_anon: bool | None = None) -> Inline
 
 def user_media_kb(sub: Submission, lang: str) -> InlineKeyboardMarkup:
     """投稿人的删除面板：“🗑 1”“🗑 2”……（按投稿里的顺序），再加“返回”。"""
-    buttons = [_umb(t(lang, "btn_media_rm", n=i), "mrm", sub.id, i) for i in range(1, len(sub.items) + 1)]
+    buttons = [_umb(t(lang, "btn_media_rm", n=i), "mrm", sub.id, media_ref(i, sub.version))
+               for i in range(1, len(sub.items) + 1)]
     rows = [buttons[i : i + 5] for i in range(0, len(buttons), 5)]
     rows.append([_umb(t(lang, "btn_back"), "mback", sub.id)])
     return InlineKeyboardMarkup(inline_keyboard=rows)
@@ -220,10 +222,10 @@ def media_kb(sub: Submission, lang: str) -> InlineKeyboardMarkup:
     rows: list[list[InlineKeyboardButton]] = []
     if n < MAX_MEDIA:
         rows.append([_rb(t(lang, "btn_media_add"), "madd", sid, style=BLUE)])
-    replace = [_rb(t(lang, "btn_media_rep", n=i), "mrep", sid, i) for i in range(1, n + 1)]
+    replace = [_rb(t(lang, "btn_media_rep", n=i), "mrep", sid, media_ref(i, sub.version)) for i in range(1, n + 1)]
     rows += [replace[i : i + 5] for i in range(0, len(replace), 5)]
     if n > 1:
-        remove = [_rb(t(lang, "btn_media_rm", n=i), "mrm", sid, i) for i in range(1, n + 1)]
+        remove = [_rb(t(lang, "btn_media_rm", n=i), "mrm", sid, media_ref(i, sub.version)) for i in range(1, n + 1)]
         rows += [remove[i : i + 5] for i in range(0, len(remove), 5)]
     rows.append([_rb(t(lang, "btn_back"), "back", sid)])
     return InlineKeyboardMarkup(inline_keyboard=rows)

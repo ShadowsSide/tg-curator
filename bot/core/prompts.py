@@ -9,6 +9,7 @@ from aiogram.types import ForceReply, User as TgUser
 
 from ..db import Prompt
 from ..i18n import t
+from ..media import parse_media_ref
 from ..timeutil import now_ts
 
 from .base import CoreBase, PROMPT_TTL, _reply_to, mention
@@ -23,14 +24,14 @@ class PromptsMixin(CoreBase):
 
     async def ask(self, sid: int, kind: str, who: TgUser, reply_to: int, arg: int = 0) -> None:
         """在审核群发一条强制回复的提示（回复在控制消息下面，看得出是哪条投稿）。
-        “修改”先把当前文字（带格式）发出来，方便复制后修改。arg：替换第几个媒体。"""
+        “修改”先把当前文字（带格式）发出来，方便复制后修改。arg：替换第几个媒体（带内容版本，见 media.media_ref）。"""
         cleanup = []
         if kind == "edit":
             sub = await self.db.get(sid)
             echo = await self._send_current_text(sub, self.s.review_chat_id, reply_to) if sub else None
             cleanup = [echo.message_id] if echo else []
         prompt = await self.bot.send_message(
-            self.s.review_chat_id, t(self.lang, f"prompt_{kind}", who=mention(who), n=arg),
+            self.s.review_chat_id, t(self.lang, f"prompt_{kind}", who=mention(who), n=parse_media_ref(arg)[0]),
             reply_parameters=_reply_to(reply_to),
             reply_markup=ForceReply(selective=True, input_field_placeholder=PROMPT_PLACEHOLDER.get(kind)),
         )

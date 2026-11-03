@@ -21,6 +21,7 @@ from ..errors import Notice, notice
 from ..permissions import ReviewerCheck, ReviewerOnly, ReviewerPolicy
 from ..i18n import t
 from ..keyboards import AdminUserCB, ReviewCB, route, user_confirm_kb
+from ..media import parse_media_ref
 from ..render import dump_link_preview, extract_item, message_item, user_link
 from ..timeutil import TimeTooFar, parse_time
 
@@ -166,10 +167,12 @@ def build_router(settings: Settings) -> Router:
             err = await core.show_media_panel(sid)
             await cq.answer(err.text(lang) if err else None, show_alert=bool(err))
         elif action == "mrm":
-            err = await core.change_media(sid, "remove", v, [], who.full_name, REVIEWER_MEDIA, by_submitter=False)
+            index, version = parse_media_ref(v)
+            err = await core.change_media(sid, "remove", index, [], who.full_name, REVIEWER_MEDIA, by_submitter=False,
+                                          version=version)
             if err:
                 await core.refresh_control(sid)  # 收起确认面板
-            await cq.answer(err.text(lang) if err else t(lang, "toast_media_removed", n=v), show_alert=bool(err))
+            await cq.answer(err.text(lang) if err else t(lang, "toast_media_removed", n=index), show_alert=bool(err))
         elif action == "unsched":
             err = await core.unschedule(sid)
             await cq.answer(err.text(lang) if err else t(lang, "toast_unscheduled"))
@@ -316,8 +319,10 @@ def build_router(settings: Settings) -> Router:
         items = [extract_item(x) for x in messages]
         if any(it is None or it["type"] == "text" for it in items):
             return notice("media_only_photo_video")
-        return await core.change_media(prompt.sid, op, prompt.arg, items, messages[0].from_user.full_name,
-                                       REVIEWER_MEDIA, by_submitter=False)
+        index, version = parse_media_ref(prompt.arg)
+        # 添加不看序号；而且相册后到的部分要加在前面已经加过（版本已变）的内容后面，所以只有替换核对版本
+        return await core.change_media(prompt.sid, op, index, items, messages[0].from_user.full_name,
+                                       REVIEWER_MEDIA, by_submitter=False, version=version if op == "replace" else None)
 
     async def _answer_prompt(prompt: Prompt, m: Message, core: Core) -> tuple[Notice | None, str]:
         """按提示的种类执行，返回 (错误, 成功时的回复)。"""

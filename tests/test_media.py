@@ -187,10 +187,13 @@ def test_core_merge_respects_target_state_and_limit():
 
 def test_core_submitter_removes_own_media():
     async def check(core, db, sid):
-        assert (await core.remove_own_media(sid, 43, 1, "x")).key == "invalid_sub"
-        assert await core.remove_own_media(sid, 42, 1, "投稿人") is None
+        version = (await db.get(sid)).version
+        assert (await core.remove_own_media(sid, 43, 1, "x", version)).key == "invalid_sub"
+        assert await core.remove_own_media(sid, 42, 1, "投稿人", version) is None
         assert [it["file_id"] for it in (await db.get(sid)).items] == ["b"]
-        assert (await core.remove_own_media(sid, 42, 1, "投稿人")).key == "media_last_one"
+        # 删除面板是按删之前的内容显示的：序号已经变了，不执行
+        assert (await core.remove_own_media(sid, 42, 1, "投稿人", version)).key == "media_stale"
+        assert (await core.remove_own_media(sid, 42, 1, "投稿人", version + 1)).key == "media_last_one"
     _with_core([photo("a"), photo("b")], check)
 
 

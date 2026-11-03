@@ -95,7 +95,7 @@ CREATE TABLE IF NOT EXISTS prompts (
     message_id INTEGER NOT NULL,      -- 提示消息
     kind       TEXT    NOT NULL,      -- 等什么：time / edit / reason / madd / mrep，见 handlers/review.py（msg 已去掉，旧记录会作废）
     sid        INTEGER NOT NULL,
-    arg        INTEGER NOT NULL DEFAULT 0,  -- 附加参数：mrep = 替换第几个媒体
+    arg        INTEGER NOT NULL DEFAULT 0,  -- 附加参数：mrep = 替换第几个媒体（带内容版本，见 media.media_ref）
     user_id    INTEGER NOT NULL,      -- 点按钮的人；只有他的回复算数
     cleanup    TEXT,                  -- 完成后一起删掉的其他消息（JSON 列表），例如“修改”时发出的当前内容
     created_at INTEGER NOT NULL,

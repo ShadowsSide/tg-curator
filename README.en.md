@@ -22,7 +22,8 @@ Built with Python 3.12 + [aiogram 3](https://github.com/aiogram/aiogram) + SQLit
 - Submitters choose to post **signed** (with their name) or **anonymously**. Either way, admins can always see who sent it. Their previous choice is shown first
 - Channel posts end with *via* the submitter's name or *via* Anonymous (“via” in italics; the name links to the submitter in the review-group preview, but not in the channel)
 - **Formatting is kept exactly as sent**: links, bold, quotes, spoiler text, code, date/time and emoji all come through to the channel unchanged
-- Submitters can **edit their post** until the review starts, either with Telegram's built-in "Edit" or by **replying** to it with `/edit`; they can also **add or remove photos** (reply to their submission with a photo to add it)
+- Submitters can **edit their post** until the review starts, either with Telegram's built-in "Edit" or by **replying** to it with `/edit`; they can also **add or remove photos** (reply to their submission with a photo to add it). After each change they get a full preview of the submission
+- **Once a reviewer has edited a submission, the submitter can't change it anymore** (neither text nor photos) and has to use `/msg`, so their edits can't silently overwrite the reviewer's; they're told the first time a reviewer edits it
 - **Spam checks** (optional): keyword blacklist, a link limit (whitelisted domains don't count) and a cooldown for new submitters. By default a hit only puts a ⚠️ Possible spam note on the control message for reviewers to judge; it can also block the submission (edits after submitting are checked too). Submitters can use `/msg` and edits at most 5 times a minute, so they can't flood the review group
 
 **Reviewer ↔ submitter messaging**
@@ -189,7 +190,9 @@ Spam checks, messaging window, stats scope and so on; the defaults are usually f
 | Send several photos / videos at once (an album) | Becomes one submission. Telegram sometimes delivers an album in batches (say 1 photo, then 9 more a little later); parts arriving **within 10 minutes** join the same submission and the count in the prompt is updated. Parts that arrive after you submitted are added too, and reviewers get a new preview |
 | 🗑 Remove a photo / video | Shown on the bot's message while a draft or pending submission has 2 or more photos/videos; tap it and pick the one to remove. Nothing can be changed once the review has started (scheduled, published, rejected). Deleting the photo from the chat isn't synced: Telegram doesn't tell bots about deletions in private chats |
 | `/edit new content` | Only works as a **reply** to your submission (or the bot's message about it); without a reply nothing is changed |
-| `/edit` (as a reply) | Shows the current content with formatting, so you can copy and change it |
+| `/edit` (as a reply) | Sends a full preview of the submission as it stands (photos, text and signature, as it will be published); works after a reviewer edit or once the review has started. While you can still edit, it also sends the formatted text so you can copy and change it |
+| Preview after an edit | After each successful edit the bot sends a full preview of the submission, keeping only the newest one (previews older than 48 hours can't be deleted). Replying to it with `/edit` or `/msg` works too |
+| After a reviewer edit | You can't change the submission anymore (`/edit`, “Edit”, adding or removing photos are all refused); use `/msg` to talk to the reviewers. The bot tells you the first time a reviewer edits it |
 | `/msg message` | Message the reviewers: **reply** to the reviewer's message or your submission |
 | `/me` | Your submission stats |
 
@@ -223,7 +226,7 @@ The commands below do the same as the buttons, for those who prefer commands. Us
 
 | Command | Description |
 |---|---|
-| `/edit new content` | Changes the text or caption, keeping its formatting, and posts a new preview. The original is kept |
+| `/edit new content` | Changes the text or caption, keeping its formatting, and posts a new preview. The original is kept. Once a reviewer has edited a submission (the 🖼 Media panel counts too), the submitter can't change it anymore and is told the first time |
 | `/edit` | Shows the current content with formatting |
 | `/msg message` | Message the submitter as “Reviewer”; also works as a reply to a relayed submitter message |
 | `/no [reason]` | Rejects the submission; the reason is sent to the submitter |

@@ -285,7 +285,13 @@ def build_router(settings: Settings) -> Router:
                 await core.finish_prompt(prompt)
             return
         await core.finish_prompt(prompt)
-        await m.reply(done)
+        ack = await m.reply(done)
+        # 改稿成功：确认和审核员的那条回复都过一会儿删掉。添加 / 替换媒体只删确认：
+        # 相册后到的部分还要回复在审核员发的图片下面（见 _answer_late_media）
+        if prompt.kind == "edit":
+            core.delete_later([m.message_id, ack.message_id])
+        elif prompt.kind in ("madd", "mrep"):
+            core.delete_later([ack.message_id])
 
     async def _answer_media(prompt: Prompt, messages: list[Message], core: Core) -> Notice | None:
         """回复了“添加 / 替换”的提示：发来的图片视频（可以是相册）加进投稿或换掉第 arg 个。"""
@@ -422,7 +428,11 @@ def build_router(settings: Settings) -> Router:
             return
 
         err = await core.edit(sid, m.from_user.full_name, body, entities, dump_link_preview(m.link_preview_options))
-        await m.reply(err.text(core.lang) if err else t(core.lang, "admin_edited"))
+        if err:  # 失败的留着：审核员要看原因、改了再发
+            await m.reply(err.text(core.lang))
+            return
+        ack = await m.reply(t(core.lang, "admin_edited"))
+        core.delete_later([m.message_id, ack.message_id])  # 新预览和控制消息上的“已修改”已经说明了
 
     @router.message(Command("msg"))
     async def msg_cmd(m: Message, core: Core) -> None:

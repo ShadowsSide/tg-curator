@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import html
+import re
 import time
 from dataclasses import dataclass, field
 
@@ -28,6 +29,9 @@ MAX_REASON = 500
 RETRYABLE = ("prompt_text_needed", "custom_time_bad", "custom_time_far", "time_past", "too_long", "text_empty",
              "media_only_photo_video", "media_replace_one", "media_too_many")
 REVIEWER_MEDIA = ("pending",)  # 审核员只能在待审核时改媒体
+# 命令里的用户 ID：正整数，只认 ASCII 数字（isdigit 也认 ²、全角数字，int() 却不一定能转），位数在 SQLite 整数范围内
+USER_ID = re.compile(r"[1-9][0-9]{0,15}")
+MAX_ACTIVE_DAYS = 3650
 
 
 # 按钮 → 提示的种类；FOLD 里的按钮来自面板（理由面板、媒体面板），发提示时把控制消息恢复原样
@@ -55,9 +59,20 @@ def _is_owner(m: Message, prompt: Prompt) -> bool:
     return m.from_user.id == prompt.user_id or anonymous_admin
 
 
+def _parse_user_id(text: str) -> int | None:
+    return int(text) if USER_ID.fullmatch(text) else None
+
+
 def _user_id_arg(command: CommandObject) -> int | None:
+    return _parse_user_id((command.args or "").strip())
+
+
+def _days_arg(command: CommandObject, default: int = 30) -> int:
+    """/active 的天数：不是 1 以上的数字就用默认值，太大的按 MAX_ACTIVE_DAYS 算。"""
     arg = (command.args or "").strip()
-    return int(arg) if arg.lstrip("-").isdigit() else None
+    if not re.fullmatch(r"[0-9]{1,6}", arg) or int(arg) == 0:
+        return default
+    return min(int(arg), MAX_ACTIVE_DAYS)
 
 
 def _clean_reason(text: str) -> str | None:
@@ -68,9 +83,8 @@ def _clean_reason(text: str) -> str | None:
 def _split_user(args: str) -> tuple[int | None, str | None]:
     """'/ban 123456 理由'：开头是用户 ID 时返回 (用户ID, 理由)，否则 (None, None)。"""
     head, _, rest = args.strip().partition(" ")
-    if head.lstrip("-").isdigit():
-        return int(head), _clean_reason(rest)
-    return None, None
+    user_id = _parse_user_id(head)
+    return (user_id, _clean_reason(rest)) if user_id is not None else (None, None)
 
 
 async def _banned_submitter(core: Core, sid: int) -> bool:
@@ -360,8 +374,7 @@ def build_router(settings: Settings) -> Router:
 
     @router.message(Command("active"))
     async def active(m: Message, command: CommandObject, core: Core) -> None:
-        arg = (command.args or "").strip()
-        days = int(arg) if arg.isdigit() and int(arg) > 0 else 30
+        days = _days_arg(command)
         await m.answer(await core.activity_text(days), link_preview_options=NO_PREVIEW)
 
     @router.message(Command("user"))

@@ -79,6 +79,20 @@ async def scenario():
     check("remove a photo → preview has the other 2", p and [m["media"] for m in p["params"]["media"]] == ["A", "B"],
           p and p["params"]["media"])
 
+    # 删掉的那张还留在投稿人的聊天里：回复它只发 /edit 也找得到投稿；原生编辑它不会把它加回来
+    n = len(log); lt.pm("/edit", reply_to_message=own(mids[2]))
+    pv = await wait_for(lambda e: is_send(e, "sendMediaGroup", USER), since=n)
+    check("bare /edit replying to the removed photo → still finds the submission",
+          pv and [m["media"] for m in pv["params"]["media"]] == ["A", "B"], pv and pv["params"]["media"])
+    n = len(log)
+    lt.push(edited_message={"message_id": mids[2], "date": lt.now() - 5, "edit_date": lt.now(), "chat": lt.chat(USER),
+                            "from": {"id": USER, "is_bot": False, "first_name": "Alice"}, "media_group_id": "g",
+                            "photo": photo("C2")})
+    await asyncio.sleep(1)
+    check("native edit of the removed photo → ignored, not added back",
+          not [e for e in log[n:] if str(e["params"].get("chat_id")) == str(REVIEW) and e["method"].startswith("send")
+               and "#审核统计" not in str(e["params"])])
+
     # 发布后只发 /edit：只发预览，说明不能再改
     n = len(log); lt.cb(await lt.pub_ok(1), REVIEW, ADMIN)
     await wait_for(lambda e: is_send(e, "sendMediaGroup", CHANNEL), since=n)

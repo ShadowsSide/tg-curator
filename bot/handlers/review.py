@@ -286,12 +286,12 @@ def build_router(settings: Settings) -> Router:
             return
         await core.finish_prompt(prompt)
         ack = await m.reply(done)
-        # 改稿成功：确认和审核员的那条回复都过一会儿删掉。添加 / 替换媒体只删确认：
-        # 相册后到的部分还要回复在审核员发的图片下面（见 _answer_late_media）
+        # 改稿成功：审核员的那条回复和确认只留最近一次的。添加 / 替换媒体只记确认：
+        # 审核员发的图片留着，相册后到的部分还要回复在它下面（见 _answer_late_media）
         if prompt.kind == "edit":
-            core.delete_later([m.message_id, ack.message_id])
+            await core.replace_edit_ack(prompt.sid, [m.message_id, ack.message_id])
         elif prompt.kind in ("madd", "mrep"):
-            core.delete_later([ack.message_id])
+            await core.replace_edit_ack(prompt.sid, [ack.message_id])
 
     async def _answer_media(prompt: Prompt, messages: list[Message], core: Core) -> Notice | None:
         """回复了“添加 / 替换”的提示：发来的图片视频（可以是相册）加进投稿或换掉第 arg 个。"""
@@ -432,7 +432,7 @@ def build_router(settings: Settings) -> Router:
             await m.reply(err.text(core.lang))
             return
         ack = await m.reply(t(core.lang, "admin_edited"))
-        core.delete_later([m.message_id, ack.message_id])  # 新预览和控制消息上的“已修改”已经说明了
+        await core.replace_edit_ack(sid, [m.message_id, ack.message_id])  # 只留最近一次的修改消息和确认
 
     @router.message(Command("msg"))
     async def msg_cmd(m: Message, core: Core) -> None:

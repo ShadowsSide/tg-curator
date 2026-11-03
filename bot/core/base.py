@@ -36,7 +36,6 @@ STATS_DEBOUNCE = 3  # 秒：统计消息在这段时间内的多次更新合并�
 POSTPONE_MARGIN = 5  # 秒：发布被限流时，在 Telegram 要求的等待时间之后再多留一点余量
 SHUTDOWN_WAIT = 45  # 秒：停止时最多等进行中的处理这么久；docker-compose.yml 的 stop_grace_period 要比它长
 NO_PREVIEW = LinkPreviewOptions(is_disabled=True)
-EDIT_ACK_TTL = 5  # 秒：审核员改稿成功后，“已修改”的回复（和审核员发的修改消息）显示这么久再删掉
 
 
 def _reply_to(message_id: int | None) -> ReplyParameters | None:
@@ -63,7 +62,6 @@ class CoreBase:
         self._stopping = asyncio.Event()
         self.throttle = Throttle()  # 投稿人的 /msg 和改稿：都会在审核群发消息，限制频率
         self._album_locks: dict[tuple[int, str], tuple[asyncio.Lock, int]] = {}  # (投稿人, 相册编号) → (锁, 使用中的数量)
-        self._cleanups: set[asyncio.Task] = set()  # 等着删的审核群消息（见 delete_later）
 
     # ---------- lifecycle ----------
 
@@ -131,24 +129,22 @@ class CoreBase:
     async def stop_background(self) -> None:
         if self._stats_task:
             self._tasks.append(self._stats_task)
-        self._tasks += self._cleanups  # 还没到时间删的消息就留着
         for task in self._tasks:
             task.cancel()
         await asyncio.gather(*self._tasks, return_exceptions=True)
 
-    def delete_later(self, message_ids: list[int], delay: float = EDIT_ACK_TTL) -> None:
-        """过一会儿删掉审核群里的这些消息（改稿成功后的确认等），审核群里只留预览和控制消息。
-        删不掉（机器人没有“删除消息”权限等）就留着。"""
-        task = asyncio.create_task(self._delete_later(message_ids, delay), name="delete-later")
-        self._cleanups.add(task)
-        task.add_done_callback(self._cleanups.discard)
-
-    async def _delete_later(self, message_ids: list[int], delay: float) -> None:
-        await asyncio.sleep(delay)
-        try:
-            await self.bot.delete_messages(self.s.review_chat_id, message_ids)
-        except TelegramAPIError as e:
-            log.info("删除审核群消息 %s 失败：%s", message_ids, e)
+    async def replace_edit_ack(self, sid: int, message_ids: list[int]) -> None:
+        """审核员改稿成功后留下的修改消息和“已修改”确认，每条投稿只留最近一次：记下这次的，删掉上一次的。
+        删不掉（超过 48 小时、机器人没有“删除消息”权限等）就留着。"""
+        sub = await self.db.get(sid)
+        if not sub:
+            return
+        await self.db.update(sid, edit_ack=message_ids)
+        if sub.edit_ack:
+            try:
+                await self.bot.delete_messages(self.s.review_chat_id, sub.edit_ack)
+            except TelegramAPIError as e:
+                log.info("删除投稿 #%s 上一次改稿的消息失败：%s", sid, e)
 
     # ---------- 语言 ----------
 

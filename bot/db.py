@@ -63,7 +63,8 @@ CREATE TABLE IF NOT EXISTS submissions (
     media_group_id TEXT,
     version        INTEGER NOT NULL DEFAULT 0,
     reviewer_edited INTEGER NOT NULL DEFAULT 0,  -- 审核员改过稿：之后投稿人不能再改，只能 /msg
-    user_preview   TEXT                -- 投稿人私聊里最新一份完整预览的消息（JSON 列表），发新的时删掉旧的
+    user_preview   TEXT,               -- 投稿人私聊里最新一份完整预览的消息（JSON 列表），发新的时删掉旧的
+    edit_ack       TEXT                -- 审核群里最近一次改稿的修改消息和“已修改”确认（JSON 列表），下次改稿时删掉
 );
 
 CREATE INDEX IF NOT EXISTS idx_sub_status ON submissions(status, scheduled_at);
@@ -131,6 +132,7 @@ MIGRATIONS = [
     ("submissions", "reviewer_edited",
      "ALTER TABLE submissions ADD COLUMN reviewer_edited INTEGER NOT NULL DEFAULT 0"),
     ("submissions", "user_preview", "ALTER TABLE submissions ADD COLUMN user_preview TEXT"),
+    ("submissions", "edit_ack", "ALTER TABLE submissions ADD COLUMN edit_ack TEXT"),
 ]
 
 # 已移除功能留下的列：旧库里有就删掉 (表, 列)
@@ -140,7 +142,7 @@ DROPPED_COLUMNS = [
     ("submissions", "topic_status"),
 ]
 
-JSON_COLUMNS = ("items", "original_items", "spam_flags", "edit_preview", "user_preview")  # 存成 JSON 文本的列
+JSON_COLUMNS = ("items", "original_items", "spam_flags", "edit_preview", "user_preview", "edit_ack")  # 存成 JSON 文本的列
 
 OPEN_STATES = ("pending", "scheduled", "failed")  # 已提交、尚未发布或拒绝
 # 发布中途程序重启时记在 error 里的标记，显示时翻译成审核群的语言（见 render.control_text）
@@ -197,6 +199,7 @@ class Submission:
     version: int = 0  # 内容每改一次加 1：发布按钮带着它，确认时内容变过就不发；改稿时防止互相覆盖
     reviewer_edited: bool = False  # 审核员改过稿（文字或媒体）：之后投稿人不能再改，只能用 /msg 沟通
     user_preview: list[int] | None = None  # 投稿人私聊里最新一份完整预览（改稿后、只发 /edit 时发出）
+    edit_ack: list[int] | None = None  # 审核群里最近一次改稿留下的修改消息和“已修改”确认，下次改稿时删掉
 
     @property
     def spoilerable(self) -> bool:
@@ -210,6 +213,7 @@ class Submission:
         data["spam_flags"] = json.loads(data["spam_flags"]) if data.get("spam_flags") else None
         data["edit_preview"] = json.loads(data["edit_preview"]) if data.get("edit_preview") else None
         data["user_preview"] = json.loads(data["user_preview"]) if data.get("user_preview") else None
+        data["edit_ack"] = json.loads(data["edit_ack"]) if data.get("edit_ack") else None
         data["anonymous"] = bool(data["anonymous"])
         data["spoiler"] = bool(data["spoiler"])
         data["silent"] = bool(data["silent"])

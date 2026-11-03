@@ -46,10 +46,11 @@ class StatsMixin(CoreBase):
             self._stats_task = asyncio.create_task(self._stats_worker(), name="stats-refresh")
 
     async def _stats_worker(self) -> None:
-        # 等待期间又有变化会重新置位 dirty，循环再刷新一次，保证最后的状态一定会显示出来
+        # 等待期间的变化并进这一次（等完才清 dirty）；编辑期间又有变化会重新置位 dirty，循环再刷新一次，
+        # 保证最后的状态一定会显示出来
         while self._stats_dirty:
-            self._stats_dirty = False
             await asyncio.sleep(STATS_DEBOUNCE)
+            self._stats_dirty = False
             try:
                 await self._refresh_stats_now()
             except Exception:

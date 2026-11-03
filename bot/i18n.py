@@ -245,6 +245,16 @@ T: dict[str, dict[str, str]] = {
         "zh": '没有找到这条投稿。',
         "en": "Couldn't find that submission.",
     },
+    "u_preview_view_only": {
+        "zh": "↑ 这是投稿现在的内容。审核已经开始，不能再改了；有问题请用 <code>/msg</code> 告诉审核员。",
+        "en": "↑ This is your submission as it stands. The review has started, so it can't be changed; "
+              "use <code>/msg</code> to talk to the reviewers.",
+    },
+    "u_preview_locked": {
+        "zh": "↑ 这是投稿现在的内容（含审核员的修改）。审核员改过之后你不能再改了；有问题请用 <code>/msg</code> 告诉审核员。",
+        "en": "↑ This is your submission as it stands, including the reviewer's edits. You can't change it anymore; "
+              "use <code>/msg</code> to talk to the reviewers.",
+    },
     "u_edit_echo_hint": {
         "zh": "↑ 这是当前内容。复制、修改后，回复你的投稿发送 <code>/edit 新内容</code>。",
         "en": "↑ This is the current content. Copy and change it, then reply to your submission with "

@@ -142,6 +142,8 @@ class EditingMixin(CoreBase):
             await self.db.update(sub.id, edit_preview=ids)
             await self._delete_old_preview(sub.edit_preview)
             await self.refresh_control(sub.id)
+        if by_submitter:  # 投稿人自己的聊天里只有他当初发的那几条，看不出改完的样子
+            await self.send_user_preview(sub.id)
         if locking:  # 版本锁保证同一版本只有一次保存成功，所以只会通知一次
             await self.notify(sub, "notify_reviewer_edited")
             await self.refresh_user_kb(sub.id)  # 收起“删除图片”
@@ -158,6 +160,26 @@ class EditingMixin(CoreBase):
             log.info("删除旧预览失败：%s", e)
             return
         await self.db.unlink_review_messages(ids)
+
+    async def send_user_preview(self, sid: int, reply_to: int | None = None) -> None:
+        """在投稿人私聊里发出投稿当前的完整内容（发布时的样子；草稿还没选署名，不带落款），删掉上一份。
+        回复这份预览发 /edit、/msg、图片也能找到这条投稿（见 db.find_by_user_message）。"""
+        sub = await self.db.get(sid)
+        if not sub:
+            return
+        sig = await self._signature(sub, link=False) if sub.status != "draft" else ("", [])
+        try:
+            sent = await send_items(self.bot, sub.user_id, sub.items, sig=sig, spoiler=sub.spoiler,
+                                    reply_to=reply_to or sub.user_msg_id)
+        except TelegramAPIError as e:  # 投稿人拉黑了机器人等：只是看不到预览，不影响改稿
+            log.info("给投稿人发 #%s 的预览失败：%s", sid, e)
+            return
+        await self.db.update(sid, user_preview=[m.message_id for m in sent])
+        if sub.user_preview:
+            try:
+                await self.bot.delete_messages(sub.user_id, sub.user_preview)
+            except TelegramAPIError as e:  # 超过 48 小时、已被投稿人删掉
+                log.info("删除投稿人 #%s 的旧预览失败：%s", sid, e)
 
     async def show_text(self, sid: int, chat_id: int, reply_to: int) -> Notice | None:
         """把稿件当前的文字（带格式）发出来，方便复制后修改再 /edit。"""

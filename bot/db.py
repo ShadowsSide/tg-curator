@@ -62,7 +62,8 @@ CREATE TABLE IF NOT EXISTS submissions (
     merge_to       INTEGER,
     media_group_id TEXT,
     version        INTEGER NOT NULL DEFAULT 0,
-    reviewer_edited INTEGER NOT NULL DEFAULT 0  -- 审核员改过稿：之后投稿人不能再改，只能 /msg
+    reviewer_edited INTEGER NOT NULL DEFAULT 0,  -- 审核员改过稿：之后投稿人不能再改，只能 /msg
+    user_preview   TEXT                -- 投稿人私聊里最新一份完整预览的消息（JSON 列表），发新的时删掉旧的
 );
 
 CREATE INDEX IF NOT EXISTS idx_sub_status ON submissions(status, scheduled_at);
@@ -129,6 +130,7 @@ MIGRATIONS = [
     ("prompts", "arg", "ALTER TABLE prompts ADD COLUMN arg INTEGER NOT NULL DEFAULT 0"),
     ("submissions", "reviewer_edited",
      "ALTER TABLE submissions ADD COLUMN reviewer_edited INTEGER NOT NULL DEFAULT 0"),
+    ("submissions", "user_preview", "ALTER TABLE submissions ADD COLUMN user_preview TEXT"),
 ]
 
 # 已移除功能留下的列：旧库里有就删掉 (表, 列)
@@ -138,7 +140,7 @@ DROPPED_COLUMNS = [
     ("submissions", "topic_status"),
 ]
 
-JSON_COLUMNS = ("items", "original_items", "spam_flags", "edit_preview")  # 存成 JSON 文本的列
+JSON_COLUMNS = ("items", "original_items", "spam_flags", "edit_preview", "user_preview")  # 存成 JSON 文本的列
 
 OPEN_STATES = ("pending", "scheduled", "failed")  # 已提交、尚未发布或拒绝
 # 发布中途程序重启时记在 error 里的标记，显示时翻译成审核群的语言（见 render.control_text）
@@ -194,6 +196,7 @@ class Submission:
     media_group_id: str | None = None  # 由相册生成的投稿：Telegram 的相册编号，相册后到的部分靠它找回这条投稿
     version: int = 0  # 内容每改一次加 1：发布按钮带着它，确认时内容变过就不发；改稿时防止互相覆盖
     reviewer_edited: bool = False  # 审核员改过稿（文字或媒体）：之后投稿人不能再改，只能用 /msg 沟通
+    user_preview: list[int] | None = None  # 投稿人私聊里最新一份完整预览（改稿后、只发 /edit 时发出）
 
     @property
     def spoilerable(self) -> bool:
@@ -206,6 +209,7 @@ class Submission:
         data["original_items"] = json.loads(data["original_items"]) if data["original_items"] else None
         data["spam_flags"] = json.loads(data["spam_flags"]) if data.get("spam_flags") else None
         data["edit_preview"] = json.loads(data["edit_preview"]) if data.get("edit_preview") else None
+        data["user_preview"] = json.loads(data["user_preview"]) if data.get("user_preview") else None
         data["anonymous"] = bool(data["anonymous"])
         data["spoiler"] = bool(data["spoiler"])
         data["silent"] = bool(data["silent"])
@@ -363,7 +367,7 @@ class DB:
         """用户私聊里的某条消息属于哪条投稿：
         - 是投稿内容本身 → (投稿编号, 第几项)。同一条消息可能在两条投稿里（图片“加到”了旧投稿，
           新建的草稿随即作废），优先取没作废的那条
-        - 是机器人的“请选择投稿方式 / 已提交”提示 → (投稿编号, None)"""
+        - 是机器人的“请选择投稿方式 / 已提交”提示，或发给投稿人的完整预览 → (投稿编号, None)"""
         row = await self._one(
             """SELECT s.id, CAST(j.key AS INTEGER) FROM submissions s, json_each(s.items) j
                WHERE s.user_id=? AND json_extract(j.value, '$.msg_id')=?
@@ -374,6 +378,13 @@ class DB:
             return row[0], row[1]
         row = await self._one(
             "SELECT id FROM submissions WHERE user_id=? AND user_msg_id=? ORDER BY id DESC LIMIT 1",
+            (user_id, message_id),
+        )
+        if row:
+            return row[0], None
+        row = await self._one(
+            """SELECT s.id FROM submissions s, json_each(s.user_preview) j
+               WHERE s.user_id=? AND j.value=? ORDER BY s.id DESC LIMIT 1""",
             (user_id, message_id),
         )
         if row:

@@ -5,6 +5,7 @@ import asyncio
 import os
 import sys
 import tempfile
+from types import SimpleNamespace
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -96,8 +97,23 @@ def test_remove_limits():
     assert err_key(media.remove([photo("a"), photo("b")], 3)) == "media_bad_index"
 
 
+class _FakeBot:
+    """不连 Telegram：记下调用，发消息时返回带编号的消息（投稿人改稿后会收到一份完整预览）。"""
+    def __init__(self):
+        self.calls, self._next = [], 1000
+
+    def __getattr__(self, method):
+        async def call(*args, **kwargs):
+            self.calls.append(method)
+            self._next += 1
+            if method == "send_media_group":
+                return [SimpleNamespace(message_id=self._next + i) for i in range(len(args[1]))]
+            return SimpleNamespace(message_id=self._next)
+        return call
+
+
 def _with_core(items, check, status="draft"):
-    """真实的数据库 + Core（不连 Telegram：草稿状态下改稿不发任何请求），运行 check(core, db, sid)。
+    """真实的数据库 + Core（Telegram 换成 _FakeBot），运行 check(core, db, sid)。
     无论 check 是否失败都关闭数据库：否则 aiosqlite 的线程会让进程卡住，断言失败变成超时。"""
     async def run():
         os.environ.update(BOT_TOKEN="1:x", CHANNEL_ID="@c", REVIEW_CHAT_ID="-1001")
@@ -110,7 +126,7 @@ def _with_core(items, check, status="draft"):
             sid = await db.create_draft(42, items)
             if status != "draft":
                 await db.update(sid, status=status)
-            await check(Core(None, db, load_settings()), db, sid)
+            await check(Core(_FakeBot(), db, load_settings()), db, sid)
         finally:
             await db.close()
     asyncio.run(run())

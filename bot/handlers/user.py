@@ -61,7 +61,11 @@ def build_router() -> Router:
         if not sub or sub.user_id != uid:
             await m.reply(t(lang, "u_edit_not_found"))
             return
-        if not body.strip():
+        if not body.strip():  # 只发 /edit：看投稿现在的样子（审核员改过、锁定后也能看）；还能改时再发文字方便复制
+            await core.send_user_preview(sid, reply_to=m.message_id)
+            if sub.reviewer_edited or sub.status not in SUBMITTER_EDITABLE:
+                await m.reply(t(lang, "u_preview_locked") if sub.reviewer_edited else t(lang, "u_preview_view_only"))
+                return
             err = await core.show_text(sid, m.chat.id, reply_to=m.message_id)
             await m.reply(err.text(lang) if err else t(lang, "u_edit_echo_hint"))
             return

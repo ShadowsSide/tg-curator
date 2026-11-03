@@ -103,10 +103,12 @@ async def scenario():
     await asyncio.sleep(0.5)
     check("nothing the submitter tried reached the review group", not previews(n), [e["method"] for e in previews(n)])
 
-    # 只发 /edit 查看当前内容：不拦
+    # 只发 /edit 查看当前内容：不拦，发回完整预览（含审核员的修改），说明不能再改；不发供复制的文字
     n = len(log); lt.pm("/edit", reply_to_message=own(mids[0]))
-    r = await wait_for(lambda e: is_send(e, "sendMessage", USER, "审核员又改了一次"), since=n)
-    check("bare /edit still shows the current content", r)
+    r = await wait_for(lambda e: is_send(e, "sendMediaGroup", USER, "审核员又改了一次"), since=n)
+    hint = await wait_for(lambda e: is_send(e, "sendMessage", USER, "含审核员的修改"), since=n)
+    check("bare /edit still shows the current content (full preview), says it's locked",
+          r and hint and not [e for e in log[n:] if is_send(e, "sendMessage", USER, "审核员又改了一次")])
 
     # 审核员只切换静音：不算改稿，投稿人照样能改
     mids2, _, ctrl2 = await submit_album(3, "g2", ["C", "D"])

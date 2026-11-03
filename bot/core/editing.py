@@ -92,6 +92,11 @@ class EditingMixin(CoreBase):
 
     async def _save_edit(self, sub: Submission, items: list[dict], editor: str,
                          allowed: tuple[str, ...], *, by_submitter: bool) -> Notice | None:
+        # 审核员改过之后投稿人再改，会悄悄盖掉审核员的修改（/edit、原生编辑都是整段替换），只能 /msg 沟通
+        if by_submitter and sub.reviewer_edited:
+            return notice("locked_by_reviewer")
+        # 审核员第一次改稿（草稿还没进审核群，不算）：锁住投稿人的修改，并告诉他一次
+        locking = not by_submitter and sub.status != "draft" and not sub.reviewer_edited
         err = await self._length_error(sub, items, signed=sub.status != "draft")
         if err:
             return err
@@ -123,7 +128,7 @@ class EditingMixin(CoreBase):
             sub.id, allowed, version=sub.version, items=items, original_items=sub.original_items or sub.items,
             edited_by=editor, edited_at=now_ts(),
             spam_flags=hits or None,
-            **follow,
+            **follow, **({"reviewer_edited": 1} if locking else {}),
         )
         if not ok:
             await self._delete_old_preview(ids)  # 这份预览的内容没有保存，不能留在审核群里
@@ -137,6 +142,9 @@ class EditingMixin(CoreBase):
             await self.db.update(sub.id, edit_preview=ids)
             await self._delete_old_preview(sub.edit_preview)
             await self.refresh_control(sub.id)
+        if locking:  # 版本锁保证同一版本只有一次保存成功，所以只会通知一次
+            await self.notify(sub, "notify_reviewer_edited")
+            await self.refresh_user_kb(sub.id)  # 收起“删除图片”
         return None
 
     async def _delete_old_preview(self, ids: list[int] | None) -> None:

@@ -251,6 +251,18 @@ T: dict[str, dict[str, str]] = {
               "<code>/edit new content</code>.",
     },
     "submitter_label": {"zh": "投稿人 {name}", "en": "submitter {name}"},
+    "locked_by_reviewer": {
+        "zh": "审核员已经修改过这条投稿，你不能再改了。如需调整，请回复审核员的消息或你的投稿，"
+              "发送 <code>/msg 内容</code> 告诉审核员。",
+        "en": "A reviewer has already edited this submission, so you can't change it anymore. To ask for changes, "
+              "reply to the reviewer's message or your submission with <code>/msg your message</code>.",
+    },
+    "notify_reviewer_edited": {
+        "zh": "✏️ 审核员修改了你的投稿，之后不能再改，请用 <code>/msg</code> 与审核员沟通。"
+              "回复你的投稿发送 <code>/edit</code> 可以查看当前内容。",
+        "en": "✏️ A reviewer edited your submission, so you can't change it anymore; use <code>/msg</code> to talk "
+              "to the reviewers. Reply to your submission with <code>/edit</code> to see the current version.",
+    },
 
     # ---------- 通知投稿人 ----------
     "view_post": {"zh": "查看帖子", "en": "View post"},

@@ -61,7 +61,8 @@ CREATE TABLE IF NOT EXISTS submissions (
     edit_preview   TEXT,
     merge_to       INTEGER,
     media_group_id TEXT,
-    version        INTEGER NOT NULL DEFAULT 0
+    version        INTEGER NOT NULL DEFAULT 0,
+    reviewer_edited INTEGER NOT NULL DEFAULT 0  -- 审核员改过稿：之后投稿人不能再改，只能 /msg
 );
 
 CREATE INDEX IF NOT EXISTS idx_sub_status ON submissions(status, scheduled_at);
@@ -126,6 +127,8 @@ MIGRATIONS = [
     ("submissions", "media_group_id", "ALTER TABLE submissions ADD COLUMN media_group_id TEXT"),
     ("submissions", "version", "ALTER TABLE submissions ADD COLUMN version INTEGER NOT NULL DEFAULT 0"),
     ("prompts", "arg", "ALTER TABLE prompts ADD COLUMN arg INTEGER NOT NULL DEFAULT 0"),
+    ("submissions", "reviewer_edited",
+     "ALTER TABLE submissions ADD COLUMN reviewer_edited INTEGER NOT NULL DEFAULT 0"),
 ]
 
 # 已移除功能留下的列：旧库里有就删掉 (表, 列)
@@ -190,6 +193,7 @@ class Submission:
     merge_to: int | None = None  # 草稿：投稿人回复旧投稿发的图片，可以“加到”这条投稿里
     media_group_id: str | None = None  # 由相册生成的投稿：Telegram 的相册编号，相册后到的部分靠它找回这条投稿
     version: int = 0  # 内容每改一次加 1：发布按钮带着它，确认时内容变过就不发；改稿时防止互相覆盖
+    reviewer_edited: bool = False  # 审核员改过稿（文字或媒体）：之后投稿人不能再改，只能用 /msg 沟通
 
     @property
     def spoilerable(self) -> bool:
@@ -205,6 +209,7 @@ class Submission:
         data["anonymous"] = bool(data["anonymous"])
         data["spoiler"] = bool(data["spoiler"])
         data["silent"] = bool(data["silent"])
+        data["reviewer_edited"] = bool(data.get("reviewer_edited"))
         return cls(**data)
 
 

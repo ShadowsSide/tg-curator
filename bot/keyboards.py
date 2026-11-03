@@ -7,7 +7,7 @@ from aiogram.enums import ButtonStyle
 from aiogram.filters.callback_data import CallbackData
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
-from .db import Submission
+from .db import OPEN_STATES, Submission
 from .media import MAX_MEDIA, MEDIA_TYPES
 from .i18n import on_off, t
 from .timeutil import next_occurrence
@@ -154,7 +154,7 @@ def control_kb(sub: Submission, lang: str, banned: bool = False) -> InlineKeyboa
     """控制消息的按钮。banned：投稿人已被封禁，最后一行显示“解除封禁”和“删除 TA 的稿件”。"""
     sid = sub.id
     rows: list[list[InlineKeyboardButton]] = []
-    if sub.status in ("pending", "scheduled", "failed"):
+    if sub.status in OPEN_STATES:
         silent = t(lang, "btn_silent", icon="🔕" if sub.silent else "🔔", state=on_off(lang, sub.silent))
         options = [_rb(silent, "silent", sid, style=_toggle(sub.silent))]
         if sub.spoilerable:
@@ -173,7 +173,7 @@ def control_kb(sub: Submission, lang: str, banned: bool = False) -> InlineKeyboa
         rows.append([_rb(t(lang, "btn_unschedule"), "unsched", sid), reject])
     elif sub.status == "failed":
         rows.append([_rb(t(lang, "btn_retry"), "retry", sid, sub.version, style=GREEN), reject])
-    if sub.status in ("pending", "scheduled", "failed"):
+    if sub.status in OPEN_STATES:
         tools = [_rb(t(lang, "btn_edit"), "edit", sid)]  # 联系投稿人只用 /msg，不做按钮
         if sub.status == "pending":  # 审核员只能在待审核时改媒体
             tools.append(_rb(t(lang, "btn_media"), "media", sid))

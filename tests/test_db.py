@@ -156,6 +156,31 @@ def test_failed_publish_not_counted_as_approved():
         asyncio.run(run(os.path.join(d, "s.db")))
 
 
+def test_interrupted_publish_shown_in_review_language():
+    """发布中途重启：error 里存标记，控制消息按审核群的语言显示（英文审核群不出现中文）。"""
+    from zoneinfo import ZoneInfo
+    from bot.render import control_text
+
+    async def run(path):
+        db = DB(path)
+        await db.connect()
+        try:
+            sid = await db.create_draft(42, [{"type": "text", "text": "a", "entities": []}])
+            await db.update(sid, status="publishing", submitted_at=1)
+            await db.reset_stuck_publishing()
+            sub = await db.get(sid)
+            assert sub.status == "failed"
+            en = control_text(sub, None, ZoneInfo("UTC"), None, "en")
+            zh = control_text(sub, None, ZoneInfo("UTC"), None, "zh")
+            assert "restarted while publishing" in en and "程序重启" not in en, en
+            assert "发布过程中程序重启" in zh, zh
+        finally:
+            await db.close()
+
+    with tempfile.TemporaryDirectory() as d:
+        asyncio.run(run(os.path.join(d, "r.db")))
+
+
 if __name__ == "__main__":
     tests = [v for k, v in dict(globals()).items() if k.startswith("test_")]
     for fn in tests:

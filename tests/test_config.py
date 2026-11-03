@@ -50,6 +50,7 @@ def test_malformed_values():
         "REMINDER_QUIET_HOURS": ("night", "cfg_quiet_hours"),
         "LANGUAGE": ("fr", "cfg_choice"),
         "SPAM_ACTION": ("delete", "cfg_choice"),
+        "STATS_SCOPE": ("todya", "cfg_choice"),
     }
     for name, (value, key) in cases.items():
         got, zh, en = error(**{name: value})

@@ -392,6 +392,10 @@ T: dict[str, dict[str, str]] = {
     "view": {"zh": "查看", "en": "View"},
     "status_rejected": {"zh": "状态：❌ 已拒绝（{by}）", "en": "Status: ❌ rejected ({by})"},
     "status_failed": {"zh": "状态：⚠️ 发布失败：{error}", "en": "Status: ⚠️ failed to publish: {error}"},
+    "publish_interrupted": {
+        "zh": "发布过程中程序重启，请确认频道后决定是否重试",
+        "en": "the bot restarted while publishing; check the channel before deciding whether to retry",
+    },
     "status_other": {"zh": "状态：{status}", "en": "Status: {status}"},
     "reason_plain": {"zh": "理由：{reason}", "en": "Reason: {reason}"},
 

@@ -22,7 +22,7 @@ from aiogram.types import (
 )
 
 from . import entities as ent
-from .db import Submission, User
+from .db import PUBLISH_INTERRUPTED, Submission, User
 from .i18n import on_off, t
 from .timeutil import fmt_ts
 
@@ -238,7 +238,8 @@ def control_text(sub: Submission, user: User | None, tz: ZoneInfo, post_url: str
         if sub.reject_reason:
             lines.append(t(lang, "reason_plain", reason=html.escape(sub.reject_reason)))
     elif status == "failed":
-        lines.append(t(lang, "status_failed", error=html.escape(sub.error or "")))
+        error = t(lang, "publish_interrupted") if sub.error == PUBLISH_INTERRUPTED else html.escape(sub.error or "")
+        lines.append(t(lang, "status_failed", error=error))
     else:
         lines.append(t(lang, "status_other", status=status))
     return "\n".join(lines)

@@ -138,6 +138,8 @@ DROPPED_COLUMNS = [
 JSON_COLUMNS = ("items", "original_items", "spam_flags", "edit_preview")  # 存成 JSON 文本的列
 
 OPEN_STATES = ("pending", "scheduled", "failed")  # 已提交、尚未发布或拒绝
+# 发布中途程序重启时记在 error 里的标记，显示时翻译成审核群的语言（见 render.control_text）
+PUBLISH_INTERRUPTED = "@interrupted"
 SUBMITTER_EDITABLE = ("draft", "pending")  # 投稿人自己能修改的状态：审核开始（定时、发布、拒绝）之前
 
 SPOILERABLE = {"photo", "video", "animation"}
@@ -504,8 +506,7 @@ class DB:
     async def reset_stuck_publishing(self) -> None:
         """进程在发布中途退出时，把 publishing 标成 failed 让管理员决定是否重试。"""
         await self._exec(
-            "UPDATE submissions SET status='failed', error='发布过程中程序重启，请确认频道后决定是否重试' "
-            "WHERE status='publishing'"
+            "UPDATE submissions SET status='failed', error=? WHERE status='publishing'", (PUBLISH_INTERRUPTED,)
         )
 
     # ---------- stats ----------

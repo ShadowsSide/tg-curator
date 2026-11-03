@@ -277,8 +277,10 @@ def build_router(settings: Settings) -> Router:
         else:
             core.albums.add(m, lambda messages: _hint_relay_reply(messages[0], core))
 
-    async def _finish(prompt: Prompt, m: Message, core: Core, err: Notice | None, done: str) -> None:
-        """回复提示的结果：成功就删掉提示；出错时能改了再试的保留提示，其他的作废。"""
+    async def _finish(prompt: Prompt, m: Message, core: Core, err: Notice | None, done: str,
+                      replies: list[Message] | None = None) -> None:
+        """回复提示的结果：成功就删掉提示；出错时能改了再试的保留提示，其他的作废。
+        replies：审核员回复提示发的全部消息（相册是每一项），默认就是 m。"""
         if err:
             await m.reply(err.text(core.lang))
             if err.key not in RETRYABLE:
@@ -286,17 +288,15 @@ def build_router(settings: Settings) -> Router:
             return
         await core.finish_prompt(prompt)
         ack = await m.reply(done)
-        # 改稿成功：审核员的那条回复和确认只留最近一次的。添加 / 替换媒体只记确认：
-        # 审核员发的图片留着，相册后到的部分还要回复在它下面（见 _answer_late_media）
-        if prompt.kind == "edit":
-            await core.replace_edit_ack(prompt.sid, [m.message_id, ack.message_id])
-        elif prompt.kind in ("madd", "mrep"):
-            await core.replace_edit_ack(prompt.sid, [ack.message_id])
+        # 改稿成功：审核员回复的内容（文字，或添加 / 替换用的图片）和确认只留最近一次的，下次改稿时删掉。
+        # 相册后到的部分回复在它自己下面（见 _answer_late_media），删掉前面这几张不影响
+        if prompt.kind in ("edit", "madd", "mrep"):
+            await core.replace_edit_ack(prompt.sid, [x.message_id for x in replies or [m]] + [ack.message_id])
 
     async def _answer_media(prompt: Prompt, messages: list[Message], core: Core) -> Notice | None:
         """回复了“添加 / 替换”的提示：发来的图片视频（可以是相册）加进投稿或换掉第 arg 个。"""
         err = await _apply_media(prompt, messages, "add" if prompt.kind == "madd" else "replace", core)
-        await _finish(prompt, messages[0], core, err, t(core.lang, "admin_edited"))
+        await _finish(prompt, messages[0], core, err, t(core.lang, "admin_edited"), replies=messages)
         return err
 
     async def _answer_album(prompt: Prompt, album: str, messages: list[Message], core: Core) -> None:
@@ -315,11 +315,15 @@ def build_router(settings: Settings) -> Router:
         prompt, first, n = ans.prompt, messages[0], len(messages)
         async with ans.lock:
             if prompt.kind == "mrep":
-                await first.reply(t(core.lang, "media_late_unused", n=n))
-                return
-            err = ans.error or await _apply_media(prompt, messages, "add", core)
-            await first.reply(t(core.lang, "media_late_failed", n=n, reason=err.text(core.lang)) if err
-                              else t(core.lang, "media_late_added", n=n))
+                note = await first.reply(t(core.lang, "media_late_unused", n=n))
+            else:
+                err = ans.error or await _apply_media(prompt, messages, "add", core)
+                if err:  # 没加进去：留着，审核员要看原因
+                    await first.reply(t(core.lang, "media_late_failed", n=n, reason=err.text(core.lang)))
+                    return
+                note = await first.reply(t(core.lang, "media_late_added", n=n))
+            # 和前面那批一起，算这次改稿留下的消息，下次改稿时删掉
+            await core.add_edit_ack(prompt.sid, [x.message_id for x in messages] + [note.message_id])
 
     async def _apply_media(prompt: Prompt, messages: list[Message], op: str, core: Core) -> Notice | None:
         items = [extract_item(x) for x in messages]

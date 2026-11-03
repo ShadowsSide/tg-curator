@@ -146,6 +146,12 @@ class CoreBase:
             except TelegramAPIError as e:
                 log.info("删除投稿 #%s 上一次改稿的消息失败：%s", sid, e)
 
+    async def add_edit_ack(self, sid: int, message_ids: list[int]) -> None:
+        """这次改稿又多了几条消息（相册后到的部分和对应的回复）：一起记下，下次改稿时删掉。"""
+        sub = await self.db.get(sid)
+        if sub:
+            await self.db.update(sid, edit_ack=[*(sub.edit_ack or []), *message_ids])
+
     # ---------- 语言 ----------
 
     def lang_of(self, user: TgUser) -> str:

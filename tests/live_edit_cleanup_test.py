@@ -1,6 +1,6 @@
 """审核员改稿成功后留下的修改消息和“已修改”确认，每条投稿只留最近一次：下次改稿成功时删掉上一次的。
 - /edit 新内容、回复“✏️ 修改”的提示：审核员的消息和确认都算
-- 添加 / 替换媒体：只算确认（审核员的图片留着，相册后到的部分还要回复在它下面）
+- 添加 / 替换媒体：审核员发的图片和确认都算；相册后到的部分和“后到的也已加进去”的回复也算
 - 失败的（比如没回复投稿）留着，也不顶掉上一次的
 - 每条投稿各留各的
 
@@ -60,11 +60,27 @@ async def scenario():
     ack = await wait_for(lambda e: is_send(e, "sendMessage", REVIEW, "已修改"), since=n)
     await asyncio.sleep(0.5)
     third = ack and ack["result"]["message_id"]
-    check("add media → previous edit's messages deleted, this confirmation stays",
-          set(second) <= set(deleted(n)) and third not in deleted(n), deleted(n))
+    check("add media → previous edit's messages deleted, this photo and confirmation stay",
+          set(second) <= set(deleted(n)) and not {pic, third} & set(deleted(n)), deleted(n))
     n = len(log); await edit_cmd("/edit 加图之后再改", ctrl)
-    check("next edit after adding media → only the confirmation goes, the reviewer's photo stays",
-          third in deleted(n) and pic not in deleted(n), deleted(n))
+    check("next edit after adding media → the reviewer's photo and the confirmation go too",
+          {pic, third} <= set(deleted(n)), deleted(n))
+
+    # 相册添加，后几张晚到：前面几张、后到的、两条确认，下次改稿时全部删掉
+    p = await ask("madd", 1, ctrl, "要添加的图片")
+    n = len(log); pics = []
+    for fid in ("Y1", "Y2"):
+        pics.append(7000 + lt.uid[0]); admin_media(p["result"]["message_id"], group="ga", photo=photo(fid))
+    ack = await wait_for(lambda e: is_send(e, "sendMessage", REVIEW, "已修改"), since=n)
+    await asyncio.sleep(1)  # 超过 ALBUM_DELAY：后到的部分单独处理
+    pics.append(7000 + lt.uid[0]); admin_media(p["result"]["message_id"], group="ga", photo=photo("Y3"))
+    late = await wait_for(lambda e: is_send(e, "sendMessage", REVIEW, "也已加进去"), since=n)
+    await asyncio.sleep(0.5)
+    album = {*pics, ack and ack["result"]["message_id"], late and late["result"]["message_id"]}
+    check("album add with a late part → nothing deleted yet", ack and late and not album & set(deleted(n)), deleted(n))
+    n = len(log); await edit_cmd("/edit 相册之后再改", ctrl)
+    check("next edit → the whole album, the late part and both confirmations deleted",
+          album <= set(deleted(n)), (sorted(album), deleted(n)))
 
     # 失败的留着，也不顶掉上一次的
     n = len(log); gm("/edit 没回复投稿")

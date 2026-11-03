@@ -20,7 +20,7 @@ PROJECT = sys.argv[1] if len(sys.argv) > 1 else os.path.dirname(os.path.dirname(
 USER, REVIEW, CHANNEL, ADMIN = 42, -1001, -1002, 7
 LINKED = -8000  # 发布频道的关联群组（评论区）
 BASIC_GROUP = -4001234  # 普通群（不是超级群），getChat 返回 type=group
-CTRL = "新投稿"  # 控制消息标题（不再显示投稿编号；测试按顺序取紧接着的那一条）
+CTRL = "新投稿"  # 控制按钮消息标题（不再显示投稿编号；测试按顺序取紧接着的那一条）
 T0 = time.time()
 
 updates: list[dict] = []
@@ -209,8 +209,8 @@ def cb(data, chat_id, from_id, message_id=999):
 
 
 async def pub_ok(sid, quiet=0.3, timeout=5.0):
-    """“确认发布”的按钮数据。发布按钮带着内容版本（改一次稿加 1），这里取控制消息上最新的那个。
-    改稿后机器人先发新预览、再刷新控制消息：等它这一轮请求都发完（quiet 秒内没有新请求）再取，免得取到旧版本。"""
+    """“确认发布”的按钮数据。发布按钮带着内容版本（改一次稿加 1），这里取控制按钮消息上最新的那个。
+    改稿后机器人先发新预览、再刷新控制按钮消息：等它这一轮请求都发完（quiet 秒内没有新请求）再取，免得取到旧版本。"""
     end, last, still = time.time() + timeout, len(log), time.time()
     while time.time() < end:
         await asyncio.sleep(0.05)
@@ -262,7 +262,7 @@ PROMPTS = ("请选择投稿方式", "How would you like")  # “选择投稿方�
 
 
 async def submit(text, sid, who=USER):
-    """投稿人发一条文字投稿并选“署名”。返回审核群里控制消息的 sendMessage 记录（没进审核群时为 None）。
+    """投稿人发一条文字投稿并选“署名”。返回审核群里控制按钮消息的 sendMessage 记录（没进审核群时为 None）。
     其他测试文件共用；本文件的场景里另有一个带额外检查的同名局部函数。"""
     n = len(log); pm(text, who=who)
     await wait_for(lambda e: any(is_send(e, "sendMessage", who, p) for p in PROMPTS), since=n)
@@ -565,7 +565,7 @@ async def scenario():
           and to_user["params"]["reply_parameters"]["message_id"] == pr["result"]["message_id"]
           and "Admin" not in to_user["params"]["text"], to_user and to_user["params"])
     cnt = await wait_for(lambda e: e["method"] == "editMessageText" and "💬 沟通 1 条" in e["params"].get("text", ""), since=n)
-    check("control message shows message count", cnt)
+    check("control panel message shows message count", cnt)
 
     n = len(log); gm("/msg 没回复")
     e = await wait_for(lambda e: is_send(e, "sendMessage", REVIEW, "用法"), since=n)
@@ -582,7 +582,7 @@ async def scenario():
     n = len(log); pm("/msg 出处是官网", reply_to_message=reply_to(relay_id, by_bot=True))
     to_rev = await wait_for(lambda e: is_send(e, "sendMessage", REVIEW, "出处是官网"), since=n)
     ok = await wait_for(lambda e: is_send(e, "sendMessage", USER, "已发送给审核员"), since=n)
-    check("submitter /msg by reply → reviewers get it under the control message",
+    check("submitter /msg by reply → reviewers get it under the control panel message",
           to_rev and ok and to_rev["params"]["text"].startswith("💬 投稿人：")
           and to_rev["params"]["reply_parameters"]["message_id"] == ctrl_m["result"]["message_id"])
 

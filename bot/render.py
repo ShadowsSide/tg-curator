@@ -201,7 +201,7 @@ async def _send(bot: Bot, chat_id: int | str, items: list[dict[str, Any]], sig: 
 
 
 def control_text(sub: Submission, user: User | None, tz: ZoneInfo, post_url: str | None, lang: str) -> str:
-    """审核群里每条投稿下方的“控制消息”。"""
+    """审核群里每条投稿下方的“控制按钮消息”。"""
     lines = [
         t(lang, "ctrl_title", sid=sub.id),
         t(lang, "ctrl_from", link=user_link(user, sub.user_id), uid=sub.user_id)

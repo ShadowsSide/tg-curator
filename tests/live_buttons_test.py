@@ -19,7 +19,7 @@ def control_edit(ctrl, since, contains):
 
 
 async def schedule(ctrl, sid):
-    """定时发布 → 选第一个快捷时间。返回 (控制消息的更新, 投稿人收到的“将于…发布”通知)。"""
+    """定时发布 → 选第一个快捷时间。返回 (控制按钮消息的更新, 投稿人收到的“将于…发布”通知)。"""
     n = len(log); lt.cb(f"r:sched:{sid}:0", REVIEW, ADMIN)
     picker = await wait_for(lambda e: e["method"] == "editMessageReplyMarkup", since=n)
     preset = next(v for v in buttons(picker).values() if v.startswith("r:preset:"))
@@ -38,7 +38,7 @@ async def scenario():
     c1 = await submit("按钮测试 1", 1)
     c2 = await submit("按钮测试 2", 2)
 
-    # 1. 发布失败 → 状态“发布失败”，控制消息上出现“重试发布”，审核员看到原因
+    # 1. 发布失败 → 状态“发布失败”，控制按钮消息上出现“重试发布”，审核员看到原因
     lt.MOCK["fail"][f"sendMessage:{CHANNEL}"] = ["Bad Request: message is too long"]
     n = len(log); lt.cb("r:pub_ok:1:0", REVIEW, ADMIN)
     failed = await control_edit(c1, n, "发布失败")

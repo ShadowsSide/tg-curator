@@ -29,7 +29,7 @@ def deleted(since):
 
 
 async def edit_cmd(text, ctrl):
-    """审核员回复控制消息发 /edit，返回 (命令消息, 确认消息)。"""
+    """审核员回复控制按钮消息发 /edit，返回 (命令消息, 确认消息)。"""
     n = len(log); cmd = 5000 + lt.uid[0]; gm(text, reply_to=ctrl)
     ack = await wait_for(lambda e: is_send(e, "sendMessage", REVIEW, "已修改"), since=n)
     await asyncio.sleep(0.5)

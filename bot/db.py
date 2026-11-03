@@ -71,7 +71,7 @@ CREATE TABLE IF NOT EXISTS submissions (
 CREATE INDEX IF NOT EXISTS idx_sub_status ON submissions(status, scheduled_at);
 CREATE INDEX IF NOT EXISTS idx_sub_user   ON submissions(user_id, submitted_at);
 
--- 审核群里属于某条投稿的所有消息（预览 + 控制消息），用于 /no、/ban 回复定位投稿
+-- 审核群里属于某条投稿的所有消息（预览 + 控制按钮消息），用于 /no、/ban 回复定位投稿
 CREATE TABLE IF NOT EXISTS review_messages (
     message_id INTEGER PRIMARY KEY,
     sid        INTEGER NOT NULL
@@ -478,7 +478,7 @@ class DB:
 
     async def review_traces(self, chat_id: int, user_id: int) -> dict[int, list[int]]:
         """这个用户的投稿在审核群里还留着的消息：{投稿编号: [消息编号]}。
-        包括预览、控制消息、改稿后的预览、转达的 /msg（都在 review_messages 里）和等待回复的提示（连同它要一起删的消息）。"""
+        包括预览、控制按钮消息、改稿后的预览、转达的 /msg（都在 review_messages 里）和等待回复的提示（连同它要一起删的消息）。"""
         traces: dict[int, set[int]] = {}
         rows = await self._all(
             """SELECT rm.sid, rm.message_id FROM review_messages rm JOIN submissions s ON s.id = rm.sid WHERE s.user_id=?
@@ -496,7 +496,7 @@ class DB:
         return {sid: sorted(ids) for sid, ids in sorted(traces.items())}
 
     async def forget_review_messages(self, chat_id: int, sids: list[int]) -> None:
-        """这些投稿在审核群里的消息已经删掉了：清掉对应记录（投稿本身保留，控制消息编号置空，之后不再刷新）。"""
+        """这些投稿在审核群里的消息已经删掉了：清掉对应记录（投稿本身保留，控制按钮消息编号置空，之后不再刷新）。"""
         marks = ", ".join("?" * len(sids))
         await self.conn.execute(f"DELETE FROM review_messages WHERE sid IN ({marks})", sids)
         await self.conn.execute(f"DELETE FROM prompts WHERE chat_id=? AND sid IN ({marks})", (chat_id, *sids))

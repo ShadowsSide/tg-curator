@@ -49,7 +49,7 @@ class SchedulerMixin(CoreBase):
                 await asyncio.wait_for(self._stopping.wait(), SCHEDULER_TICK)
 
     async def _report_scheduled(self, sub: Submission, err: Notice) -> None:
-        """定时发布没有成功（发布失败 / 被限流改了时间）：没人点按钮，控制消息变了也没人注意，回复在它下面提醒审核员。"""
+        """定时发布没有成功（发布失败 / 被限流改了时间）：没人点按钮，控制按钮消息变了也没人注意，回复在它下面提醒审核员。"""
         try:
             await self.bot.send_message(
                 self.s.review_chat_id, t(self.lang, "sched_publish_failed", reason=err.text(self.lang)),

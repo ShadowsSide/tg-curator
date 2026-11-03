@@ -60,7 +60,7 @@ def _with_core(check, bot=None):
 
 
 async def _sub(db, user_id, status, control, linked=()):
-    """一条进过审核群的投稿：控制消息 control，其他属于它的审核群消息 linked（预览、改稿预览、转达）。"""
+    """一条进过审核群的投稿：控制按钮消息 control，其他属于它的审核群消息 linked（预览、改稿预览、转达）。"""
     sid = await db.create_draft(user_id, TEXT)
     await db.update(sid, status=status, review_msg_id=control)
     await db.link_review_messages(sid, [*linked, control])
@@ -125,9 +125,9 @@ def test_failed_batch_is_kept_for_retry():
         assert (res.key, res.params) == ("purge_partial", {"n": 1, "failed": 1, "note": ""}), res
         assert (await db.get(s2)).review_msg_id is None
         assert core.bot.deleted == set(range(100, 160)) - {130} | set(range(200, 260)), "能删的都删了"
-        assert await db.review_traces(REVIEW, 42) == {s1: [100, 130]}  # 控制消息编号还记着，重试时会找不到，算删掉
+        assert await db.review_traces(REVIEW, 42) == {s1: [100, 130]}  # 控制按钮消息编号还记着，重试时会找不到，算删掉
         core.bot.broken = set()
-        res = await core.purge_review_messages(42)  # 重试：只剩删不掉的那条和控制消息
+        res = await core.purge_review_messages(42)  # 重试：只剩删不掉的那条和控制按钮消息
         assert (res.key, res.params) == ("purge_done", {"n": 1, "note": ""}), res
         assert await db.review_traces(REVIEW, 42) == {}
     _with_core(check, FakeBot(broken={130}))

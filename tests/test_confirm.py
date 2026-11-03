@@ -47,7 +47,7 @@ def test_user_card_buttons():
             assert AdminUserCB.unpack(confirm.callback_data) == AdminUserCB(a=action + CONFIRMED, uid=uid)
             assert AdminUserCB.unpack(back.callback_data).a == "back"
             assert len(confirm.callback_data.encode()) <= 64
-    # 和控制消息的按钮互不混淆：前缀不同
+    # 和控制按钮消息的按钮互不混淆：前缀不同
     assert user_card_kb(1, False, "zh").inline_keyboard[0][0].callback_data.startswith("au:")
 
 

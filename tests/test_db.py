@@ -157,7 +157,7 @@ def test_failed_publish_not_counted_as_approved():
 
 
 def test_interrupted_publish_shown_in_review_language():
-    """发布中途重启：error 里存标记，控制消息按审核群的语言显示（英文审核群不出现中文）。"""
+    """发布中途重启：error 里存标记，控制按钮消息按审核群的语言显示（英文审核群不出现中文）。"""
     from zoneinfo import ZoneInfo
     from bot.render import control_text
 

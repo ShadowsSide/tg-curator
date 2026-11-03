@@ -1,4 +1,4 @@
-"""Core 的公共部分：初始化、生命周期、语言、通知、控制消息，以及各模块共用的常量和工具函数。
+"""Core 的公共部分：初始化、生命周期、语言、通知、控制按钮消息，以及各模块共用的常量和工具函数。
 
 语言：审核群、频道相关文字用 self.lang（LANGUAGE 配置）；发给投稿人的文字用投稿人自己的语言（user_lang）。
 """
@@ -82,7 +82,7 @@ class CoreBase:
             raise ConfigError("cfg_channel_admin", value=self.s.channel_id)
         review = await self._config_chat(self.s.review_chat_id, "cfg_review_not_found")
         if review.type == ChatType.GROUP:
-            # 普通群升级成超级群后 ID 会变（之后所有发送都失败），控制消息的 t.me/c 链接也只对超级群有效
+            # 普通群升级成超级群后 ID 会变（之后所有发送都失败），控制按钮消息的 t.me/c 链接也只对超级群有效
             raise ConfigError("cfg_review_basic_group", value=self.s.review_chat_id)
         if review.type != ChatType.SUPERGROUP:
             raise ConfigError("cfg_review_type", value=self.s.review_chat_id)
@@ -192,7 +192,7 @@ class CoreBase:
         return await self.db.get_user(user_id)
 
     async def sid_for_review_message(self, message_id: int) -> int | None:
-        """审核群里这条消息（预览、控制消息、转来的 /msg）属于哪条投稿。"""
+        """审核群里这条消息（预览、控制按钮消息、转来的 /msg）属于哪条投稿。"""
         return await self.db.sid_by_review_message(message_id)
 
     async def find_user_message(self, user_id: int, message_id: int) -> tuple[int, int | None] | None:
@@ -213,7 +213,7 @@ class CoreBase:
         return None
 
     def review_link(self, sub: Submission) -> str | None:
-        """审核群里这条投稿控制消息的链接（群成员可点开跳转），代替投稿编号来指认投稿。"""
+        """审核群里这条投稿控制按钮消息的链接（群成员可点开跳转），代替投稿编号来指认投稿。"""
         if not sub.review_msg_id:
             return None
         chat = str(self.s.review_chat_id).removeprefix("-100")
@@ -275,13 +275,13 @@ class CoreBase:
             )
         except TelegramAPIError as e:  # 只是显示没更新，不能打断调用方（比如发布）接下来的状态变化
             if "not modified" not in str(e):
-                log.warning("更新控制消息 #%s 失败：%s", sid, e)
+                log.warning("更新控制按钮消息 #%s 失败：%s", sid, e)
 
     async def show_schedule_picker(self, sid: int) -> None:
         await self._swap_control_kb(sid, schedule_kb(sid, self.s.schedule_presets, self.s.tz, self.lang))
 
     async def show_confirm(self, sid: int, action: str, v: int = 0) -> None:
-        """发布 / 拒绝 / 封禁的二次确认：把控制消息的按钮换成“确认 / 返回”。拒绝时 v 是选的理由。"""
+        """发布 / 拒绝 / 封禁的二次确认：把控制按钮消息的按钮换成“确认 / 返回”。拒绝时 v 是选的理由。"""
         detail = {"reject": self.s.reject_template(v), "mrm": t(self.lang, "media_nth", n=parse_media_ref(v)[0])}.get(action)
         await self._swap_control_kb(sid, confirm_kb(sid, action, self.lang, v, detail))
 
@@ -320,7 +320,7 @@ class CoreBase:
         await self._swap_control_kb(sid, reasons_kb(sid, self.s.reject_templates, self.lang))
 
     async def _swap_control_kb(self, sid: int, kb: InlineKeyboardMarkup) -> None:
-        """只换控制消息的按钮（定时面板、确认面板），文字不变；点“返回”时由 refresh_control 恢复。"""
+        """只换控制按钮消息的按钮（定时面板、确认面板），文字不变；点“返回”时由 refresh_control 恢复。"""
         sub = await self.db.get(sid)
         if not sub or not sub.review_msg_id:
             return

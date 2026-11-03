@@ -61,7 +61,7 @@ class MessagingMixin(CoreBase):
         return None
 
     async def relay_to_review(self, sid: int, user: TgUser, items: list[dict], user_msg_ids: list[int]) -> Notice | None:
-        """投稿人 → 审核员：发到审核群，回复在这条投稿的控制消息下面。items：一条，或相册的每一项。"""
+        """投稿人 → 审核员：发到审核群，回复在这条投稿的控制按钮消息下面。items：一条，或相册的每一项。"""
         sub = await self.db.get(sid)
         if not sub or sub.user_id != user.id:
             return notice("u_edit_not_found")

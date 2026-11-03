@@ -23,7 +23,7 @@ class PromptsMixin(CoreBase):
     # ---------- 等待回复的提示 ----------
 
     async def ask(self, sid: int, kind: str, who: TgUser, reply_to: int, arg: int = 0) -> None:
-        """在审核群发一条强制回复的提示（回复在控制消息下面，看得出是哪条投稿）。
+        """在审核群发一条强制回复的提示（回复在控制按钮消息下面，看得出是哪条投稿）。
         “修改”先把当前文字（带格式）发出来，方便复制后修改。arg：替换第几个媒体（带内容版本，见 media.media_ref）。"""
         cleanup = []
         if kind == "edit":

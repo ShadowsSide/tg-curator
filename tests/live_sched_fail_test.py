@@ -1,4 +1,4 @@
-"""定时发布没有成功时提醒审核员：回复在这条稿件的控制消息下面。
+"""定时发布没有成功时提醒审核员：回复在这条稿件的控制按钮消息下面。
 
 用法（项目根目录下）：python tests/live_sched_fail_test.py
 复用 live_test.py 的模拟 Bot API 服务器。调度每 15 秒一轮，约 40 秒。
@@ -41,7 +41,7 @@ async def scenario():
     lt.MOCK["fail"][f"sendMessage:{CHANNEL}"] = ["Bad Request: <chat> not found"]
     n = len(log); due_now(1)
     alert = await wait_for(alert_for(c1), timeout=TICK, since=n)
-    check("scheduled publish fails → reviewers told under the control message, with the reason",
+    check("scheduled publish fails → reviewers told under the control panel message, with the reason",
           alert and "&lt;chat&gt; not found" in alert["params"]["text"] and status(1) == "failed",
           alert and alert["params"]["text"])
 

@@ -35,7 +35,7 @@ USER_ID = re.compile(r"[1-9][0-9]{0,15}")
 MAX_ACTIVE_DAYS = 3650
 
 
-# 按钮 → 提示的种类；FOLD 里的按钮来自面板（理由面板、媒体面板），发提示时把控制消息恢复原样
+# 按钮 → 提示的种类；FOLD 里的按钮来自面板（理由面板、媒体面板），发提示时把控制按钮消息恢复原样
 PROMPT_KIND = {"custom": "time", "edit": "edit", "creason": "reason", "madd": "madd", "mrep": "mrep"}
 FOLD = ("creason", "madd", "mrep")
 
@@ -95,7 +95,7 @@ async def _banned_submitter(core: Core, sid: int) -> bool:
 
 
 async def _replied_sid(m: Message, core: Core) -> int | None:
-    """命令针对的投稿：回复的那条投稿消息（预览、控制消息、转来的留言）。"""
+    """命令针对的投稿：回复的那条投稿消息（预览、控制按钮消息、转来的留言）。"""
     reply = explicit_reply(m)
     return await core.sid_for_review_message(reply.message_id) if reply else None
 
@@ -125,7 +125,7 @@ def build_router(settings: Settings) -> Router:
             await cq.answer(t(lang, "toast_pick_reason"))
             return
         if step == "confirm" and action in ("unban", "purge") and not await _banned_submitter(core, sid):
-            # 早就解封了（比如用了 /unban），控制消息上的按钮是旧的：不出确认面板，直接收起
+            # 早就解封了（比如用了 /unban），控制按钮消息上的按钮是旧的：不出确认面板，直接收起
             await core.refresh_control(sid)
             await cq.answer(t(lang, "toast_not_banned"), show_alert=True)
             return
@@ -142,7 +142,7 @@ def build_router(settings: Settings) -> Router:
             await cq.answer(t(lang, "toast_publishing"))
             err = await core.publish(sid, reviewer=who, version=v)
             if err:
-                await cq.message.reply(err.text(lang))  # 回复在这条投稿的控制消息下面
+                await cq.message.reply(err.text(lang))  # 回复在这条投稿的控制按钮消息下面
         elif action == "retry":
             await cq.answer(t(lang, "toast_retrying"))
             err = await core.publish(sid, reviewer=who, from_states=("failed",), version=v)
@@ -197,7 +197,7 @@ def build_router(settings: Settings) -> Router:
         elif action == "purge":
             sub = await core.get_submission(sid)
             res = await core.purge_review_messages(sub.user_id) if sub else notice("sub_not_found", sid=sid)
-            await core.refresh_control(sid)  # 删成功时这条控制消息已经没了（不会再刷新）；没删掉就收起确认面板
+            await core.refresh_control(sid)  # 删成功时这条控制按钮消息已经没了（不会再刷新）；没删掉就收起确认面板
             await cq.answer(res.text(lang), show_alert=True)
         else:
             await cq.answer()
@@ -499,7 +499,7 @@ def build_router(settings: Settings) -> Router:
         if not await core.unban_user(uid):
             await m.reply(t(core.lang, "not_banned", uid=uid))
             return
-        if sid is not None:  # 收起回复的那条控制消息上的“解除封禁”；别的控制消息上的旧按钮点了再收起
+        if sid is not None:  # 收起回复的那条控制按钮消息上的“解除封禁”；别的控制按钮消息上的旧按钮点了再收起
             await core.refresh_control(sid)
         await m.reply(t(core.lang, "unbanned_reply", uid=uid))
 

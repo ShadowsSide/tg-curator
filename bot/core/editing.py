@@ -150,7 +150,7 @@ class EditingMixin(CoreBase):
         return None
 
     async def _delete_old_preview(self, ids: list[int] | None) -> None:
-        """改稿后删掉上一份修改后的预览，审核群里只留最初的预览（控制消息回复的就是它）和最新一份。
+        """改稿后删掉上一份修改后的预览，审核群里只留最初的预览（控制按钮消息回复的就是它）和最新一份。
         删不掉（超过 48 小时、已被手动删掉）就留着，它仍然能用来回复定位投稿。"""
         if not ids:
             return

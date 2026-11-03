@@ -89,7 +89,7 @@ def user_card_kb(uid: int, banned: bool, lang: str, purgeable: int = 0) -> Inlin
 
 
 def user_confirm_kb(uid: int, action: str, lang: str) -> InlineKeyboardMarkup:
-    """/user 卡片的二次确认面板，和控制消息上的确认面板用同样的文字和颜色。"""
+    """/user 卡片的二次确认面板，和控制按钮消息上的确认面板用同样的文字和颜色。"""
     return InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text=t(lang, f"btn_confirm_{action}"), style=CONFIRMABLE[action],
                               callback_data=AdminUserCB(a=action + CONFIRMED, uid=uid).pack())],
@@ -153,7 +153,7 @@ def user_media_kb(sub: Submission, lang: str) -> InlineKeyboardMarkup:
 
 
 def control_kb(sub: Submission, lang: str, banned: bool = False) -> InlineKeyboardMarkup | None:
-    """控制消息的按钮。banned：投稿人已被封禁，最后一行显示“解除封禁”和“删除 TA 的稿件”。"""
+    """控制按钮消息的按钮。banned：投稿人已被封禁，最后一行显示“解除封禁”和“删除 TA 的稿件”。"""
     sid = sub.id
     rows: list[list[InlineKeyboardButton]] = []
     if sub.status in OPEN_STATES:

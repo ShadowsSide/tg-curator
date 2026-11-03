@@ -222,7 +222,7 @@ class SubmissionsMixin(CoreBase):
                 reply_parameters=_reply_to(preview[0].message_id),
                 link_preview_options=NO_PREVIEW,
             )
-        except Exception:  # 没有控制消息的预览没法操作，重新提交时还会再发一份
+        except Exception:  # 没有控制按钮消息的预览没法操作，重新提交时还会再发一份
             await self._delete_old_preview([m.message_id for m in preview])
             raise
         await self.db.update(sid, review_msg_id=ctrl.message_id)

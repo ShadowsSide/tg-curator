@@ -24,15 +24,15 @@ Built with Python 3.12 + [aiogram 3](https://github.com/aiogram/aiogram) + SQLit
 - **Formatting is kept exactly as sent**: links, bold, quotes, spoiler text, code, date/time and emoji all come through to the channel unchanged
 - Submitters can **edit their post** until the review starts, either with Telegram's built-in "Edit" or by **replying** to it with `/edit`; they can also **add or remove photos** (reply to their submission with a photo to add it). After each change they get a full preview of the submission
 - **Once a reviewer has edited a submission, the submitter can't change it anymore** (neither text nor photos) and has to use `/msg`, so their edits can't silently overwrite the reviewer's; they're told the first time a reviewer edits it
-- **Spam checks** (optional): keyword blacklist, a link limit (whitelisted domains don't count) and a cooldown for new submitters. By default a hit only puts a ⚠️ Possible spam note on the control message for reviewers to judge; it can also block the submission (edits after submitting are checked too). Submitters can use `/msg` and edits at most 5 times a minute, so they can't flood the review group
+- **Spam checks** (optional): keyword blacklist, a link limit (whitelisted domains don't count) and a cooldown for new submitters. By default a hit only puts a ⚠️ Possible spam note on the control panel message for reviewers to judge; it can also block the submission (edits after submitting are checked too). Submitters can use `/msg` and edits at most 5 times a minute, so they can't flood the review group
 
 **Reviewer ↔ submitter messaging**
-- Both sides use `/msg message`: reviewers reply to the submission's preview or control message, submitters reply to the reviewer's message or their own submission, and the bot relays it. A plain reply without `/msg` only gets a hint and isn't relayed. Submitters always see the sender as “Reviewer”; neither side sees the other's account
-- Formatting is kept, and a single photo or file can be attached; the conversation is stored and the control message shows the message count
+- Both sides use `/msg message`: reviewers reply to the submission's preview or control panel message, submitters reply to the reviewer's message or their own submission, and the bot relays it. A plain reply without `/msg` only gets a hint and isn't relayed. Submitters always see the sender as “Reviewer”; neither side sees the other's account
+- Formatting is kept, and a single photo or file can be attached; the conversation is stored and the control panel message shows the message count
 - Possible any time during review, and for 3 days after it's published or rejected (`MSG_WINDOW_DAYS`); banned users can't send
 
 **Reviewing**
-- Each submission gets a preview in the review group (exactly what the channel will show), followed by a control message with colored buttons
+- Each submission gets a preview in the review group (exactly what the channel will show), followed by a control panel message with colored buttons
 - Publish now · Schedule · Reject · Ban submitter
 - Publishing options: 🙈 **spoiler** (blur the media) and 🔕 **silent** (subscribers get a notification without sound). The spoiler starts on if the submitter blurred their own media, and follows them if they turn it on or off in a later edit
 - Pick a common reject reason with one tap (`REJECT_TEMPLATES`)
@@ -46,7 +46,7 @@ Built with Python 3.12 + [aiogram 3](https://github.com/aiogram/aiogram) + SQLit
 - **Only answers in private chats and the review group**: it never replies in other groups, and leaves any other group or channel it's added to. The publishing channel and its linked discussion group are whitelisted and never left
 
 **Scheduling and stats**
-- Schedule with quick buttons or a custom time (`20:30`, `10-20 09:00`, `+2h`, `+1d`, …). Schedules are stored in the database and survive restarts; if a scheduled post fails to go out, reviewers are told under its control message
+- Schedule with quick buttons or a custom time (`20:30`, `10-20 09:00`, `+2h`, `+1d`, …). Schedules are stored in the database and survive restarts; if a scheduled post fails to go out, reviewers are told under its control panel message
 - A review summary is posted to the review group at a set interval and refreshed after each review action:
   ```
   Accepted 3 Rejected 1 Pending 4
@@ -70,7 +70,7 @@ Built with Python 3.12 + [aiogram 3](https://github.com/aiogram/aiogram) + SQLit
                                         ▼
                            Chooses signed / anonymous
                                         ▼
-                     Review group: preview + control message
+                     Review group: preview + control panel message
                                         │
  Before deciding: 🙈 Spoiler · 🔕 Silent · ✏️ Edit · 🖼 Media; /msg the submitter
                                         │
@@ -167,7 +167,7 @@ Spam checks, messaging window, stats scope and so on; the defaults are usually f
 | Variable | Default | Description |
 |---|---|---|
 | `SPAM_KEYWORDS` | empty | Keyword blacklist, comma-separated, case-insensitive; checks both the text and link addresses |
-| `SPAM_ACTION` | `flag` | On a keyword or link-limit hit: `flag` = submit as usual and mark the control message; `block` = refuse it, the submitter can edit and resubmit |
+| `SPAM_ACTION` | `flag` | On a keyword or link-limit hit: `flag` = submit as usual and mark the control panel message; `block` = refuse it, the submitter can edit and resubmit |
 | `MAX_LINKS` | `0` | Maximum links per submission, `0` = no limit; domains in `LINK_WHITELIST` don't count |
 | `LINK_WHITELIST` | empty | Domains that don't count toward the link limit, comma-separated, subdomains included, e.g. `t.me,github.com` |
 | `NEW_USER_COOLDOWN_MINUTES` | `0` | Submitters with nothing published yet must wait this many minutes between submissions; `0` = no limit |
@@ -198,7 +198,7 @@ Spam checks, messaging window, stats scope and so on; the defaults are usually f
 
 ### Admins (review group)
 
-Buttons on the control message: **✅ Publish now**, **⏰ Schedule**, **❌ Reject**, **🚫 Ban submitter**, **✏️ Edit**, **🖼 Media**, plus the **🙈 Spoiler** and **🔕 Silent** toggles. Once a submitter is banned, their control messages show **🔓 Unban** and **🗑 Delete their posts**: after you confirm, it deletes the previews, control messages and relayed messages of all their submissions (published ones too) from the review group. The submissions and stats stay in the database. Telegram doesn't let bots delete messages older than 48 hours (not even as an admin); the reply says how many there are, and an admin has to delete them by hand.
+Buttons on the control panel message: **✅ Publish now**, **⏰ Schedule**, **❌ Reject**, **🚫 Ban submitter**, **✏️ Edit**, **🖼 Media**, plus the **🙈 Spoiler** and **🔕 Silent** toggles. Once a submitter is banned, their control panel messages show **🔓 Unban** and **🗑 Delete their posts**: after you confirm, it deletes the previews, control panel messages and relayed messages of all their submissions (published ones too) from the review group. The submissions and stats stay in the database. Telegram doesn't let bots delete messages older than 48 hours (not even as an admin); the reply says how many there are, and an admin has to delete them by hand.
 
 #### Reply prompts
 
@@ -222,7 +222,7 @@ To avoid accidental taps, **Publish now, Reject, Ban and Unban** first switch to
 
 #### Commands
 
-The commands below do the same as the buttons, for those who prefer commands. Use them by **replying** to a submission's preview or control message. The bot never shows submission numbers, and no command needs one:
+The commands below do the same as the buttons, for those who prefer commands. Use them by **replying** to a submission's preview or control panel message. The bot never shows submission numbers, and no command needs one:
 
 | Command | Description |
 |---|---|
@@ -231,29 +231,29 @@ The commands below do the same as the buttons, for those who prefer commands. Us
 | `/msg message` | Message the submitter as “Reviewer”; also works as a reply to a relayed submitter message |
 | `/no [reason]` | Rejects the submission; the reason is sent to the submitter |
 | `/ban [reason]` | Bans the submitter and rejects all their open submissions |
-| `/unban <user ID>` | Lifts a ban (same as 🔓 Unban on the control message) |
+| `/unban <user ID>` | Lifts a ban (same as 🔓 Unban on the control panel message) |
 | `/stats` | Posts the latest review summary |
 | `/queue` | Lists scheduled posts |
 | `/active [days]` | Contributor activity ranking (default: 30 days) |
 | `/user <user ID>` | Shows one contributor's stats, with a 🚫 Ban / 🔓 Unban button below (asks to confirm); works for users with no submissions too, to ban in advance. If they're banned and still have posts in the review group, there's also a 🗑 delete button |
 | `/cancel` | Drops prompts waiting for your reply: as a reply to a prompt it drops that one; on its own it drops all of yours |
 
-`/ban` and `/unban` also accept a user ID (`/ban <user ID> reason`) for users with nothing under review, or to ban someone in advance. Each scheduled post in `/queue` has a “view” link that jumps to its control message.
+`/ban` and `/unban` also accept a user ID (`/ban <user ID> reason`) for users with nothing under review, or to ban someone in advance. Each scheduled post in `/queue` has a “view” link that jumps to its control panel message.
 
 ## Known limitations and risks
 
 **Review actions**
 - **More taps**: Publish now, Reject, Ban and Unban always need a second tap, and Reject first asks for a reason by default (Reject → reason → Confirm, three taps). Set `REJECT_TEMPLATES=` to skip the reason; the confirmation itself can't be turned off
-- **The confirm panel can be reset**: if the control message refreshes while you're about to confirm (the submitter edits, someone sends `/msg`, …), the buttons go back to normal and you need to tap again. Nothing runs by accident
+- **The confirm panel can be reset**: if the control panel message refreshes while you're about to confirm (the submitter edits, someone sends `/msg`, …), the buttons go back to normal and you need to tap again. Nothing runs by accident
 - **Changing `REJECT_TEMPLATES` can shift old panels**: buttons store the reason's position. After reordering the reasons and restarting, a panel opened before the restart picks the reason by the new order; an out-of-range position means “No reason”. Finish any rejection in progress before changing it
 - **Reasons can't contain `|`**: it's the separator
-- **Old 🔓 / 🗑 buttons don't disappear by themselves**: a ban only refreshes the control messages it rejects. After `/unban <user ID>`, the 🔓 / 🗑 on those messages stay until someone taps them; tapping one then says the user isn't banned and removes them (the submitter isn't notified again). This avoids refreshing all of that user's control messages at once and hitting rate limits
-- **The review group hits rate limits sooner**: the confirm and reason panels each edit the control message once more, so with heavy review traffic Telegram's limits come sooner. The bot waits and retries automatically, but actions get slower
+- **Old 🔓 / 🗑 buttons don't disappear by themselves**: a ban only refreshes the control panel messages it rejects. After `/unban <user ID>`, the 🔓 / 🗑 on those messages stay until someone taps them; tapping one then says the user isn't banned and removes them (the submitter isn't notified again). This avoids refreshing all of that user's control panel messages at once and hitting rate limits
+- **The review group hits rate limits sooner**: the confirm and reason panels each edit the control panel message once more, so with heavy review traffic Telegram's limits come sooner. The bot waits and retries automatically, but actions get slower
 
 **Changing photos and videos**
 - **Adding photos to a text submission**: the text limit drops from 4096 to 1024 characters (longer text can't take photos), the link preview goes away, it can't turn back into plain text, and the post looks different in the channel (text under the photos)
 - **Replaced or removed photos can't be brought back**: the original is stored (`original_items`), but the bot has no way to restore it
-- **Reviewers aren't notified when a submitter changes photos**: a new preview appears and the control message shows “edited (submitter)”
+- **Reviewers aren't notified when a submitter changes photos**: a new preview appears and the control panel message shows “edited (submitter)”
 - **Submitters keep the old button after the review starts**: tapping it explains that nothing can be changed any more and removes the button
 
 **Spam checks**
@@ -267,7 +267,7 @@ The commands below do the same as the buttons, for those who prefer commands. Us
 
 **Other**
 - **An album being collected during a crash is lost**: the items of an album arrive separately, and the bot waits `ALBUM_DELAY` seconds in memory to collect them. On a normal stop (`docker stop`, updates) it handles the items that already arrived first, and the ones arriving after the restart join the same submission; but if it crashes, loses power or is killed within those seconds, the items that already arrived are lost and the submitter needs to send them again
-- **The late part of an album isn't always merged**: items arriving later than `ALBUM_DELAY` join the submission made from the same album for up to 10 minutes. If that submission is already being reviewed, was cancelled, or would go over 10 items, the late part becomes a separate submission and the prompt says why. When it joins a pending submission, the review group gets an updated preview and the control message shows “edited (submitter)”. When a reviewer replies to “Add” with an album, its late part is added too (within 10 minutes, same reviewer only); a reply to “Replace” uses only the first item that arrived, and the bot says the late ones weren't used. On the reviewer side this is kept in memory only, so items arriving after a restart are lost
+- **The late part of an album isn't always merged**: items arriving later than `ALBUM_DELAY` join the submission made from the same album for up to 10 minutes. If that submission is already being reviewed, was cancelled, or would go over 10 items, the late part becomes a separate submission and the prompt says why. When it joins a pending submission, the review group gets an updated preview and the control panel message shows “edited (submitter)”. When a reviewer replies to “Add” with an album, its late part is added too (within 10 minutes, same reviewer only); a reply to “Replace” uses only the first item that arrived, and the bot says the late ones weren't used. On the reviewer side this is kept in memory only, so items arriving after a restart are lost
 
 ## FAQ
 
@@ -281,7 +281,7 @@ Two processes are using the same token.
 > Run only one instance per token, and use a separate bot for testing.
 
 **A post failed to publish. What now?**
-The control message shows the reason and a 🔁 Retry button; a failed scheduled post also gets a reply under its control message. A common cause is that the bot lost the "Post messages" right in the channel. Length, including the signature, is already checked when submitting and editing (1024 characters for media captions, 4096 for text), so posts rarely fail for being too long.
+The control panel message shows the reason and a 🔁 Retry button; a failed scheduled post also gets a reply under its control panel message. A common cause is that the bot lost the "Post messages" right in the channel. Length, including the signature, is already checked when submitting and editing (1024 characters for media captions, 4096 for text), so posts rarely fail for being too long.
 
 **"Delete their posts" says some couldn't be deleted?**
 Telegram doesn't let bots delete messages older than 48 hours; the reply says how many there are, an admin has to delete them by hand, and pressing again won't retry them. Messages that couldn't be deleted for other reasons (a network error, say) are logged and retried when you press again. Run `docker compose logs bot | grep 删除审核群消息失败` to see the submission, the message IDs and Telegram's reason.
@@ -323,7 +323,7 @@ bot/
   config.py       environment variables
   db.py           SQLite schema, migrations and queries
   core/           business logic, combined into one Core; handlers only go through it
-    base.py         setup, language, notifications, control messages, lookups for handlers
+    base.py         setup, language, notifications, control panel messages, lookups for handlers
     submissions.py  receiving, drafts, sending for review
     editing.py      editing (/edit and Telegram's built-in edit)
     review.py       publish, schedule, reject, ban, spoiler / silent toggles

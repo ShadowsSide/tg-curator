@@ -203,5 +203,5 @@ def _edited_text(lang: str, sid: int, status: str) -> str:
 
 
 def _editor(core: Core, m: Message) -> str:
-    """控制消息上“已修改（谁）”的显示，用审核群的语言。"""
+    """控制按钮消息上“已修改（谁）”的显示，用审核群的语言。"""
     return t(core.lang, "submitter_label", name=m.from_user.full_name)

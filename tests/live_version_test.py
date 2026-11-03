@@ -28,7 +28,7 @@ def buttons(e):
 
 
 async def submit(text, sid):
-    """返回 (投稿人那条消息的编号, 控制消息的编号)。"""
+    """返回 (投稿人那条消息的编号, 控制按钮消息的编号)。"""
     n = len(log); mid = pm(text)
     await wait_for(lambda e: any(is_send(e, "sendMessage", USER, p) for p in lt.PROMPTS), since=n)
     n = len(log); lt.cb(f"u:sign:{sid}", USER, USER)

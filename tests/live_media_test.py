@@ -9,7 +9,9 @@ import os
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import live_test as lt  # noqa: E402
+from bot.media import parse_media_ref  # noqa: E402
 from live_test import ADMIN, REVIEW, USER, buttons, check, is_send, log, submit, wait_for  # noqa: E402
 
 
@@ -75,6 +77,20 @@ def toast(since, contains):
                     since=since)
 
 
+def index_of(data):
+    """mrep / mrm 按钮数据里的“第几个”（v 带着内容版本，见 media.media_ref）。"""
+    return data and parse_media_ref(int(data.rsplit(":", 1)[1]))[0]
+
+
+async def panel_button(sid, ctrl_id, label):
+    """打开审核员的媒体面板，取某个按钮的数据（不带 “r:” 前缀，可以直接交给 ask）。"""
+    n = len(log); lt.cb(f"r:media:{sid}:0", REVIEW, ADMIN, message_id=ctrl_id)
+    # 等的是这次打开的面板：之前的操作可能还有一次控制消息刷新没发完
+    panel = await wait_for(lambda e: e["method"] == "editMessageReplyMarkup" and label in buttons(e), since=n)
+    data = buttons(panel).get(label) if panel else None
+    return data and data.removeprefix("r:")
+
+
 async def ask(action, sid, ctrl_id, marker):
     n = len(log); lt.cb(f"r:{action}:{sid}:0" if ":" not in action else f"r:{action}", REVIEW, ADMIN, message_id=ctrl_id)
     return await wait_for(lambda e: is_send(e, "sendMessage", REVIEW, marker)
@@ -119,20 +135,22 @@ async def scenario():
     n = len(log); lt.cb("r:media:1:0", REVIEW, ADMIN, message_id=ctrl1)
     panel = await kb_edit(REVIEW, n)
     b = buttons(panel) if panel else {}
+    rm2 = b.get("🗑 删第 2 个", "")
     check("3 photos → Replace 1-3 and Remove 1-3",
-          b.get("🔁 换第 3 个") == "r:mrep:1:3" and b.get("🗑 删第 2 个") == "r:mrm:1:2" and len(b) == 8, b)
-    n = len(log); lt.cb("r:mrm:1:2", REVIEW, ADMIN, message_id=ctrl1)
+          index_of(b.get("🔁 换第 3 个")) == 3 and rm2.startswith("r:mrm:1:") and index_of(rm2) == 2 and len(b) == 8, b)
+    n = len(log); lt.cb(rm2, REVIEW, ADMIN, message_id=ctrl1)
     confirm = await kb_edit(REVIEW, n)
+    rm2_ok = rm2.replace("r:mrm:", "r:mrm_ok:")
     check("Remove → confirm panel naming the item",
-          confirm and buttons(confirm).get("🗑 确认删除：第 2 个") == "r:mrm_ok:1:2", confirm and buttons(confirm))
-    n = len(log); lt.cb("r:mrm_ok:1:2", REVIEW, ADMIN, message_id=ctrl1)
+          confirm and buttons(confirm).get("🗑 确认删除：第 2 个") == rm2_ok, confirm and buttons(confirm))
+    n = len(log); lt.cb(rm2_ok, REVIEW, ADMIN, message_id=ctrl1)
     t = await toast(n, "已删除第 2 个")
     await wait_for(lambda e: e["method"] == "sendMediaGroup", since=n)
     pv = previews(n, 2)
     check("confirm → removed, preview has the other 2", t and pv and group_ids(pv[0]) == ["A1", "A3"])
 
     # 5. 替换第 1 个：发文字不行（提示保留），再发视频
-    p = await ask("mrep:1:1", 1, ctrl1, "换掉第 1 个")
+    p = await ask(await panel_button(1, ctrl1, "🔁 换第 1 个"), 1, ctrl1, "换掉第 1 个")
     n = len(log); admin_media(p["result"]["message_id"], text="不是图片")
     err = await wait_for(lambda e: is_send(e, "sendMessage", REVIEW, "只能添加图片或视频"), since=n)
     n = len(log)
@@ -189,10 +207,11 @@ async def scenario():
     # 9. 投稿人删掉第 1 张（不需要确认）
     n = len(log); lt.cb("um:mdel:3:0", USER, USER, message_id=user_prompt)
     panel = await kb_edit(USER, n)
-    check("Remove photo → numbered buttons + Back", panel and buttons(panel) == {
-        "🗑 删第 1 个": "um:mrm:3:1", "🗑 删第 2 个": "um:mrm:3:2", "🗑 删第 3 个": "um:mrm:3:3", "« 返回": "um:mback:3:0"},
-        panel and buttons(panel))
-    n = len(log); lt.cb("um:mrm:3:1", USER, USER, message_id=user_prompt)
+    b = buttons(panel) if panel else {}
+    check("Remove photo → numbered buttons + Back",
+          list(b) == ["🗑 删第 1 个", "🗑 删第 2 个", "🗑 删第 3 个", "« 返回"] and b["« 返回"] == "um:mback:3:0"
+          and [index_of(b[f"🗑 删第 {i} 个"]) for i in (1, 2, 3)] == [1, 2, 3], b)
+    n = len(log); lt.cb(b.get("🗑 删第 1 个", ""), USER, USER, message_id=user_prompt)
     t = await toast(n, "已删除第 1 个")
     await wait_for(lambda e: e["method"] == "sendMediaGroup", since=n)
     pv = previews(n, 2)

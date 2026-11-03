@@ -1,6 +1,8 @@
 """沟通（/msg）：审核员 ↔ 投稿人，由机器人转达，双方都看不到对方账号。"""
 from __future__ import annotations
 
+import html
+
 from aiogram.exceptions import TelegramAPIError
 from aiogram.types import User as TgUser
 
@@ -52,7 +54,7 @@ class MessagingMixin(CoreBase):
                 spoiler=any(it.get("spoiler") for it in items), reply_to=sub.user_msg_id,
             )
         except TelegramAPIError as e:
-            return notice("msg_undelivered", error=str(e))
+            return notice("msg_undelivered", error=html.escape(str(e)))  # 错误原文可能带 < >，消息按 HTML 解析
         await self.db.log_message(sid, "to_user", reviewer.id, reviewer.full_name,
                                   [(it, m.message_id, None) for it, m in zip(items, sent)])
         await self.refresh_control(sid)
@@ -75,7 +77,7 @@ class MessagingMixin(CoreBase):
                 sig=("", []), spoiler=any(it.get("spoiler") for it in items), reply_to=sub.review_msg_id,
             )
         except TelegramAPIError as e:
-            return notice("msg_failed", error=str(e))
+            return notice("msg_failed", error=html.escape(str(e)))  # 错误原文可能带 < >，消息按 HTML 解析
         # 审核员回复这条转来的消息发 /msg，就能定位到这条投稿
         await self.db.link_review_messages(sid, [m.message_id for m in sent])
         await self.db.log_message(sid, "to_review", user.id, user.full_name,

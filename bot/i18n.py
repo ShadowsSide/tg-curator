@@ -360,6 +360,11 @@ T: dict[str, dict[str, str]] = {
     },
     "media_nth": {"zh": "第 {n} 个", "en": "no. {n}"},
     "toast_media_removed": {"zh": "已删除第 {n} 个", "en": "Removed no. {n}"},
+    "media_stale": {
+        "zh": "这条投稿的内容刚被改过，序号可能已经变了，没有执行。请看最新的预览后重新操作。",
+        "en": "This submission was just changed and the numbering may have shifted, so nothing was done. "
+              "Check the latest preview and try again.",
+    },
     "type_change": {
         "zh": "不能把文字投稿改成媒体投稿（或反过来），请重新投稿",
         "en": "A text submission can't become a media submission (or the other way round). Please submit again",
@@ -392,6 +397,10 @@ T: dict[str, dict[str, str]] = {
     "view": {"zh": "查看", "en": "View"},
     "status_rejected": {"zh": "状态：❌ 已拒绝（{by}）", "en": "Status: ❌ rejected ({by})"},
     "status_failed": {"zh": "状态：⚠️ 发布失败：{error}", "en": "Status: ⚠️ failed to publish: {error}"},
+    "publish_interrupted": {
+        "zh": "发布过程中程序重启，请确认频道后决定是否重试",
+        "en": "the bot restarted while publishing; check the channel before deciding whether to retry",
+    },
     "status_other": {"zh": "状态：{status}", "en": "Status: {status}"},
     "reason_plain": {"zh": "理由：{reason}", "en": "Reason: {reason}"},
 

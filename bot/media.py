@@ -16,6 +16,18 @@ from .errors import Notice, notice
 
 MEDIA_TYPES = ("photo", "video")
 MAX_MEDIA = 10  # Telegram 相册最多 10 项
+# 按钮和提示里的“第几个”带着内容版本一起存（按钮数据加字段会让旧消息上的按钮解析失败，所以打包进同一个数）：
+# 点按钮 / 回复提示时内容已经被改过，序号可能指向另一张，就不执行。旧按钮只有序号，解出来版本是 0
+REF_BASE = 16  # 大于 MAX_MEDIA
+
+
+def media_ref(index: int, version: int) -> int:
+    return version * REF_BASE + index
+
+
+def parse_media_ref(ref: int) -> tuple[int, int]:
+    """media_ref 的反过程：(第几个, 内容版本)。"""
+    return ref % REF_BASE, ref // REF_BASE
 
 Items = list[dict[str, Any]]
 

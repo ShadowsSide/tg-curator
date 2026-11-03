@@ -21,6 +21,7 @@ from ..db import DB, Submission, User
 from ..errors import ConfigError, Notice, notice
 from ..i18n import normalize, t
 from ..throttle import Throttle
+from ..media import parse_media_ref
 from ..keyboards import confirm_kb, control_kb, media_count, media_kb, reasons_kb, schedule_kb, user_kb
 from ..render import caption_index, control_text, signature
 from ..timeutil import fmt_ts
@@ -249,7 +250,7 @@ class CoreBase:
 
     async def show_confirm(self, sid: int, action: str, v: int = 0) -> None:
         """发布 / 拒绝 / 封禁的二次确认：把控制消息的按钮换成“确认 / 返回”。拒绝时 v 是选的理由。"""
-        detail = {"reject": self.s.reject_template(v), "mrm": t(self.lang, "media_nth", n=v)}.get(action)
+        detail = {"reject": self.s.reject_template(v), "mrm": t(self.lang, "media_nth", n=parse_media_ref(v)[0])}.get(action)
         await self._swap_control_kb(sid, confirm_kb(sid, action, self.lang, v, detail))
 
     async def show_media_panel(self, sid: int) -> Notice | None:

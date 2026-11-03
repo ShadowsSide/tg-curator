@@ -131,7 +131,7 @@ def load_settings() -> Settings:
         reminder_interval_min=_num("REMINDER_INTERVAL_MINUTES", "60"),
         reminder_only_when_pending=_bool(_env("REMINDER_ONLY_WHEN_PENDING", "true")),
         quiet_hours=_quiet_hours(_env("REMINDER_QUIET_HOURS", "")),
-        stats_scope=_env("STATS_SCOPE", "today"),
+        stats_scope=_choice(_env("STATS_SCOPE", "today"), ("today", "all"), "STATS_SCOPE"),
         default_silent=_bool(_env("DEFAULT_SILENT", "false")),
         proxy=_env("PROXY"),
         api_url=_env("TELEGRAM_API_URL"),

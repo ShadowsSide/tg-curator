@@ -104,7 +104,7 @@ docker compose logs -f
 > [!NOTE]
 > The configuration is checked at startup. If a required value is missing or malformed, Telegram rejects the token, the channel or review group can't be found, the two IDs are swapped, or the bot isn't a channel admin with the “Post messages” right, the log shows one “Configuration error: …” line and the container is marked `unhealthy`. The bot then stays idle instead of restarting over and over; fix `.env` and run `docker compose up -d`. Network errors are not configuration errors: the container restarts and tries again.
 
-Image tags: `latest` is the newest build of the main branch, `vX.Y.Z` are releases, and `sha-xxxxxxx` points to a specific build, which is handy for rolling back. To use another tag or image, set `IMAGE` in `.env`.
+Image tags: `latest` is the newest build of the main branch, `dev` tracks the DEV branch (unmerged features, may be unstable), `vX.Y.Z` are releases, and `sha-xxxxxxx` points to a specific build, which is handy for rolling back. To use another tag or image, set `IMAGE` in `.env`.
 
 To build from source instead, clone the whole repository and run `docker compose -f docker-compose.yml -f docker-compose.build.yml up -d --build`.
 
@@ -306,7 +306,7 @@ The tests need no token and no network access. `tests/test_*.py` are unit tests;
 for f in tests/test_*.py tests/live_*.py; do .venv/bin/python "$f" || echo "FAILED: $f"; done
 ```
 
-GitHub Actions (`.github/workflows/test.yml`) first checks the code with pyflakes (undefined names, unused imports and variables, …), then runs all the tests on every pull request, and on every push to `main` or tag (called from `docker.yml`, which only builds the image if they pass). To check locally:
+GitHub Actions (`.github/workflows/test.yml`) first checks the code with pyflakes (undefined names, unused imports and variables, …), then runs all the tests on every pull request, and on every push to `main`, `DEV` or a tag (called from `docker.yml`, which only builds the image if they pass). To check locally:
 
 ```bash
 .venv/bin/python -m pyflakes bot tests
@@ -351,7 +351,7 @@ scripts/          multi-arch image build script
 
 ### Publishing images (for your own fork)
 
-On every push to `main` or `v*` tag, GitHub Actions runs all the tests first and, if they pass, builds amd64 + arm64 images and publishes them to `ghcr.io/<owner>/tg-curator`. To run your own image, set `IMAGE=ghcr.io/<owner>/tg-curator:latest` in `.env`; otherwise this repository's image is pulled.
+On every push to `main`, `DEV` or a `v*` tag, GitHub Actions runs all the tests first and, if they pass, builds amd64 + arm64 images (`DEV` is tagged `dev` and never touches `latest`) and publishes them to `ghcr.io/<owner>/tg-curator`. To run your own image, set `IMAGE=ghcr.io/<owner>/tg-curator:latest` in `.env`; otherwise this repository's image is pulled.
 
 To publish to Docker Hub as well, add the variable `DOCKERHUB_USERNAME` and the secret `DOCKERHUB_TOKEN` (a Docker Hub access token with Read & Write permission) under **Settings → Secrets and variables → Actions** in your repository.
 

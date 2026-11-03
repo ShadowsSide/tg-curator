@@ -31,7 +31,7 @@ class ReviewMixin(CoreBase):
 
     async def toggle_spoiler(self, sid: int) -> Notice:
         sub = await self.db.get(sid)
-        if not sub or sub.status not in ("pending", "scheduled", "failed"):
+        if not sub or sub.status not in OPEN_STATES:
             return notice("toast_state_locked")
         await self.db.update(sid, spoiler=int(not sub.spoiler))
         await self.refresh_control(sid)
@@ -39,14 +39,14 @@ class ReviewMixin(CoreBase):
 
     async def toggle_silent(self, sid: int) -> Notice:
         sub = await self.db.get(sid)
-        if not sub or sub.status not in ("pending", "scheduled", "failed"):
+        if not sub or sub.status not in OPEN_STATES:
             return notice("toast_state_locked")
         await self.db.update(sid, silent=int(not sub.silent))
         await self.refresh_control(sid)
         return notice("toast_silent", state=notice("on" if not sub.silent else "off"))
 
     async def publish(self, sid: int, reviewer: TgUser | None = None,
-                      from_states: tuple[str, ...] = ("pending", "scheduled", "failed"),
+                      from_states: tuple[str, ...] = OPEN_STATES,
                       version: int | None = None) -> Notice | None:
         """立即发布到频道。返回错误信息，成功返回 None。
         version：审核员点按钮时看到的内容版本；之后内容又被改过就不发（定时发布不带，按到点时的内容发）。"""
@@ -103,7 +103,7 @@ class ReviewMixin(CoreBase):
         key = ("notify_scheduled" if sub.status == "pending"
                else "notify_rescheduled" if sub.status == "scheduled" and sub.scheduled_at != ts else None)
         fields = self._review_fields(sub, reviewer, "approved")
-        if not await self.db.transition(sid, ("pending", "scheduled", "failed"), "scheduled",
+        if not await self.db.transition(sid, OPEN_STATES, "scheduled",
                                         scheduled_at=ts, error=None, **fields):
             return notice("status_changed")
         if key:

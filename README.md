@@ -104,7 +104,7 @@ docker compose logs -f
 > [!NOTE]
 > 启动时会检查配置：必填项没填或格式不对、Telegram 不认 token、找不到频道或审核群、两个 ID 填反、机器人不是频道管理员或没有“发布消息”权限，日志里会出现一行“配置错误：……”，容器状态显示 `unhealthy`。这时机器人不运行，也不会反复重启；改好 `.env` 后执行 `docker compose up -d`。网络不通不算配置错误，容器会自动重启重试。
 
-镜像标签：`latest` 对应 main 分支的最新版本；`vX.Y.Z` 是发布版本；`sha-xxxxxxx` 对应某次具体构建，方便回滚。要换标签或换成别的镜像，在 `.env` 里设置 `IMAGE`。
+镜像标签：`latest` 对应 main 分支的最新版本；`dev` 对应 DEV 分支（还没合并的新功能，可能不稳定）；`vX.Y.Z` 是发布版本；`sha-xxxxxxx` 对应某次具体构建，方便回滚。要换标签或换成别的镜像，在 `.env` 里设置 `IMAGE`。
 
 想从源码自己构建：clone 整个仓库，然后执行 `docker compose -f docker-compose.yml -f docker-compose.build.yml up -d --build`。
 
@@ -306,7 +306,7 @@ DB_PATH=./data/bot.db .venv/bin/python -m bot
 for f in tests/test_*.py tests/live_*.py; do .venv/bin/python "$f" || echo "FAILED: $f"; done
 ```
 
-每个 PR，以及推送到 `main` 或打标签时（由 `docker.yml` 调用，通过后才构建镜像），GitHub Actions（`.github/workflows/test.yml`）会先用 pyflakes 检查代码（未定义的名字、没用到的 import 和变量等），再运行全部测试。本地检查：
+每个 PR，以及推送到 `main`、`DEV` 或打标签时（由 `docker.yml` 调用，通过后才构建镜像），GitHub Actions（`.github/workflows/test.yml`）会先用 pyflakes 检查代码（未定义的名字、没用到的 import 和变量等），再运行全部测试。本地检查：
 
 ```bash
 .venv/bin/python -m pyflakes bot tests
@@ -351,7 +351,7 @@ scripts/          多架构镜像构建脚本
 
 ### 发布镜像（Fork 后自用）
 
-推送到 `main` 或打 `v*` 标签时，GitHub Actions 会先运行全部测试，通过后再构建 amd64 + arm64 镜像，并发布到 `ghcr.io/<owner>/tg-curator`。部署时在 `.env` 里设置 `IMAGE=ghcr.io/<owner>/tg-curator:latest` 才会用上自己的镜像，否则默认拉取本仓库的镜像。
+推送到 `main`、`DEV` 或打 `v*` 标签时，GitHub Actions 会先运行全部测试，通过后再构建 amd64 + arm64 镜像（`DEV` 打 `dev` 标签，不影响 `latest`），并发布到 `ghcr.io/<owner>/tg-curator`。部署时在 `.env` 里设置 `IMAGE=ghcr.io/<owner>/tg-curator:latest` 才会用上自己的镜像，否则默认拉取本仓库的镜像。
 
 如果还想同时发布到 Docker Hub，在仓库的 **Settings → Secrets and variables → Actions** 里添加变量 `DOCKERHUB_USERNAME` 和密钥 `DOCKERHUB_TOKEN`（Docker Hub 访问令牌，需要 Read & Write 权限）。
 

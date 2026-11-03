@@ -95,7 +95,7 @@ CREATE TABLE IF NOT EXISTS prompts (
     message_id INTEGER NOT NULL,      -- 提示消息
     kind       TEXT    NOT NULL,      -- 等什么：time / edit / reason / madd / mrep，见 handlers/review.py（msg 已去掉，旧记录会作废）
     sid        INTEGER NOT NULL,
-    arg        INTEGER NOT NULL DEFAULT 0,  -- 附加参数：mrep = 替换第几个媒体
+    arg        INTEGER NOT NULL DEFAULT 0,  -- 附加参数：mrep = 替换第几个媒体（带内容版本，见 media.media_ref）
     user_id    INTEGER NOT NULL,      -- 点按钮的人；只有他的回复算数
     cleanup    TEXT,                  -- 完成后一起删掉的其他消息（JSON 列表），例如“修改”时发出的当前内容
     created_at INTEGER NOT NULL,
@@ -138,6 +138,8 @@ DROPPED_COLUMNS = [
 JSON_COLUMNS = ("items", "original_items", "spam_flags", "edit_preview")  # 存成 JSON 文本的列
 
 OPEN_STATES = ("pending", "scheduled", "failed")  # 已提交、尚未发布或拒绝
+# 发布中途程序重启时记在 error 里的标记，显示时翻译成审核群的语言（见 render.control_text）
+PUBLISH_INTERRUPTED = "@interrupted"
 SUBMITTER_EDITABLE = ("draft", "pending")  # 投稿人自己能修改的状态：审核开始（定时、发布、拒绝）之前
 
 SPOILERABLE = {"photo", "video", "animation"}
@@ -504,8 +506,7 @@ class DB:
     async def reset_stuck_publishing(self) -> None:
         """进程在发布中途退出时，把 publishing 标成 failed 让管理员决定是否重试。"""
         await self._exec(
-            "UPDATE submissions SET status='failed', error='发布过程中程序重启，请确认频道后决定是否重试' "
-            "WHERE status='publishing'"
+            "UPDATE submissions SET status='failed', error=? WHERE status='publishing'", (PUBLISH_INTERRUPTED,)
         )
 
     # ---------- stats ----------

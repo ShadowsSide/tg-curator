@@ -11,6 +11,7 @@ from ..core import Core, explicit_reply
 from ..db import SUBMITTER_EDITABLE
 from ..i18n import t
 from ..keyboards import UserCB, UserMediaCB, user_media_kb
+from ..media import parse_media_ref
 from ..render import dump_link_preview, extract_item, message_item
 
 # 用户自己发的内容（能投稿的和不支持的都在内）。其余是置顶、自动删除计时等服务消息，种类多且还在增加，所以列这边。
@@ -140,8 +141,9 @@ def build_router() -> Router:
             await cq.answer(err.text(lang) if err else t(lang, "merged_toast"), show_alert=bool(err))
             return
         if a == "mrm":
-            err = await core.remove_own_media(sid, uid, v, editor)  # 成功时按钮由 core 恢复
-            await cq.answer(err.text(lang) if err else t(lang, "toast_media_removed", n=v), show_alert=bool(err))
+            index, version = parse_media_ref(v)
+            err = await core.remove_own_media(sid, uid, index, editor, version)  # 成功时按钮由 core 恢复
+            await cq.answer(err.text(lang) if err else t(lang, "toast_media_removed", n=index), show_alert=bool(err))
             if not err:
                 return
         sub = await core.get_submission(sid)

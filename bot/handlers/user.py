@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from aiogram import F, Router
-from aiogram.enums import ChatType
+from aiogram.enums import ChatType, ContentType
 from aiogram.exceptions import TelegramBadRequest
 from aiogram.filters import Command, CommandStart
 from aiogram.types import CallbackQuery, Message
@@ -12,6 +12,16 @@ from ..db import SUBMITTER_EDITABLE
 from ..i18n import t
 from ..keyboards import UserCB, UserMediaCB, user_media_kb
 from ..render import dump_link_preview, extract_item, message_item
+
+# 用户自己发的内容（能投稿的和不支持的都在内）。其余是置顶、自动删除计时等服务消息，种类多且还在增加，所以列这边。
+# UNKNOWN 是 aiogram 还不认识的新类型，当作内容，至少回一句“不支持”
+USER_CONTENT = frozenset({
+    ContentType.TEXT, ContentType.PHOTO, ContentType.VIDEO, ContentType.ANIMATION, ContentType.DOCUMENT,
+    ContentType.AUDIO, ContentType.VOICE, ContentType.VIDEO_NOTE, ContentType.STICKER, ContentType.LIVE_PHOTO,
+    ContentType.PAID_MEDIA, ContentType.STORY, ContentType.CHECKLIST, ContentType.CONTACT, ContentType.DICE,
+    ContentType.GAME, ContentType.POLL, ContentType.VENUE, ContentType.LOCATION, ContentType.UNKNOWN,
+})
+
 
 def build_router() -> Router:
     router = Router(name="user")
@@ -62,19 +72,27 @@ def build_router() -> Router:
     @router.message(Command("msg"))
     async def msg_cmd(m: Message, core: Core) -> None:
         """投稿人给审核员发消息：必须回复审核员的消息或自己的投稿。"""
-        lang = core.lang_of(m.from_user)
-        body, entities = ent.strip_command(m.text or m.caption or "", ent.dump(m.entities or m.caption_entities))
-        reply = explicit_reply(m)
-        found = await core.find_user_message(m.from_user.id, reply.message_id) if reply else None
+        if m.media_group_id:  # 说明里写 /msg 的相册：收齐后整组转达，其余几项不能当成新投稿
+            core.albums.add(m, lambda messages: _relay_to_review(m, messages, core))
+            return
+        await _relay_to_review(m, [m], core)
+
+    async def _relay_to_review(cmd: Message, messages: list[Message], core: Core) -> None:
+        """cmd：带 /msg 的那条；messages：要转达的全部（单条就是它自己，相册是所有项）。"""
+        lang = core.lang_of(cmd.from_user)
+        body, entities = ent.strip_command(cmd.text or cmd.caption or "", ent.dump(cmd.entities or cmd.caption_entities))
+        reply = explicit_reply(cmd)
+        found = await core.find_user_message(cmd.from_user.id, reply.message_id) if reply else None
         if not found:
-            await m.reply(t(lang, "msg_usage_user"))
+            await cmd.reply(t(lang, "msg_usage_user"))
             return
-        item = message_item(m, body, entities)
-        if item is None:
-            await m.reply(t(lang, "msg_empty"))
+        items = [message_item(x, body, entities) if x.message_id == cmd.message_id
+                 else message_item(x, x.caption or "", ent.dump(x.caption_entities)) for x in messages]
+        if any(it is None for it in items):
+            await cmd.reply(t(lang, "msg_empty"))
             return
-        err = await core.relay_to_review(found[0], m.from_user, item, m.message_id)
-        await m.reply(err.text(lang) if err else t(lang, "msg_sent_to_review"))
+        err = await core.relay_to_review(found[0], cmd.from_user, items, [x.message_id for x in messages])
+        await cmd.reply(err.text(lang) if err else t(lang, "msg_sent_to_review"))
 
     @router.edited_message()
     async def native_edit(m: Message, core: Core) -> None:
@@ -97,6 +115,8 @@ def build_router() -> Router:
 
     @router.message()
     async def single(m: Message, core: Core) -> None:
+        if m.content_type not in USER_CONTENT:
+            return  # 置顶、自动删除计时等服务消息不是用户发的内容，不回复“不支持”
         if m.text and m.text.startswith("/"):
             await m.answer(t(core.lang_of(m.from_user), "unknown_cmd"))
             return

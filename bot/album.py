@@ -28,10 +28,14 @@ class AlbumCollector:
         return f"{message.chat.id}:{message.media_group_id}"
 
     def add(self, message: Message, on_album: Callable[[list[Message]], Awaitable[None]] | None = None) -> None:
-        """加入相册的一项。on_album：这个相册收齐后交给谁（第一项决定），不填就是默认的处理。"""
+        """加入相册的一项。on_album：这个相册收齐后交给谁；不填就是默认的处理。
+        指定了的优先，不管先后：相册里带 /msg 的那项不一定最先到，先到的几项按默认处理登记过也要改过来。"""
         key = self._key(message)
         self._buffers.setdefault(key, []).append(message)
-        self._handlers.setdefault(key, on_album or self.on_album)
+        if on_album:
+            self._handlers[key] = on_album
+        else:
+            self._handlers.setdefault(key, self.on_album)
         if timer := self._timers.get(key):
             timer.cancel()
         self._timers[key] = asyncio.create_task(self._flush_later(key))

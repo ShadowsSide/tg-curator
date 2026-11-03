@@ -391,13 +391,16 @@ class DB:
             "SELECT 1 FROM conversations WHERE direction='to_review' AND review_msg_id=?", (message_id,)
         ) is not None
 
-    async def log_message(self, sid: int, direction: str, sender_id: int, sender_name: str, item: dict,
-                          user_msg_id: int | None, review_msg_id: int | None) -> None:
-        await self.conn.execute(
+    async def log_message(self, sid: int, direction: str, sender_id: int, sender_name: str,
+                          parts: list[tuple[dict, int | None, int | None]]) -> None:
+        """记下一次 /msg 转达（msg_count 加 1）。parts：(内容, 投稿人私聊里的消息, 审核群里的消息)，
+        相册每一项各一行，回复其中任何一张都能找到这条投稿。"""
+        ts = now_ts()
+        await self.conn.executemany(
             """INSERT INTO conversations(sid, direction, sender_id, sender_name, item, created_at,
                                          user_msg_id, review_msg_id) VALUES(?, ?, ?, ?, ?, ?, ?, ?)""",
-            (sid, direction, sender_id, sender_name, json.dumps(item, ensure_ascii=False), now_ts(),
-             user_msg_id, review_msg_id),
+            [(sid, direction, sender_id, sender_name, json.dumps(item, ensure_ascii=False), ts, user_msg_id,
+              review_msg_id) for item, user_msg_id, review_msg_id in parts],
         )
         await self.conn.execute("UPDATE submissions SET msg_count = msg_count + 1 WHERE id=?", (sid,))
         await self.conn.commit()
@@ -508,11 +511,12 @@ class DB:
     # ---------- stats ----------
 
     async def review_counts(self, since: int) -> tuple[int, int, int]:
+        """通过、拒绝、待处理。发布失败的稿件 decision 仍是 approved，但还没发出去、等审核员重试，算待处理。"""
         row = await self._one(
             """SELECT
-                 COALESCE(SUM(decision='approved' AND reviewed_at>=?), 0),
+                 COALESCE(SUM(decision='approved' AND status!='failed' AND reviewed_at>=?), 0),
                  COALESCE(SUM(decision='rejected' AND reviewed_at>=?), 0),
-                 COALESCE(SUM(status='pending'), 0)
+                 COALESCE(SUM(status IN ('pending', 'failed')), 0)
                FROM submissions""",
             (since, since),
         )
@@ -522,7 +526,7 @@ class DB:
         return await self._all(
             """SELECT s.user_id, u.username, u.full_name, u.banned,
                       COUNT(*)                                                     AS total,
-                      SUM(s.decision='approved')                                   AS approved,
+                      SUM(s.decision='approved' AND s.status!='failed')            AS approved,
                       SUM(s.decision='rejected')                                   AS rejected,
                       SUM(s.anonymous)                                             AS anonymous,
                       COUNT(DISTINCT date(s.submitted_at + ?, 'unixepoch'))        AS active_days,

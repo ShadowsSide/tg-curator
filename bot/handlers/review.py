@@ -248,13 +248,17 @@ def build_router(settings: Settings) -> Router:
     @router.message(F.media_group_id)
     async def album_rest(m: Message, core: Core) -> None:
         """相册里没带回复的其余项（如果有）：并进正在收集的那个相册；
-        相册前面的部分已经处理过（这几项晚到了）：同一个人发的就接着处理。"""
+        相册前面的部分已经处理过（这几项晚到了）：同一个人发的就接着处理；
+        都不是就先收着：带 /msg 的那项可能还在后面，到了会改成整组转达，没有的话当作普通回复处理。"""
+        if (m.caption or "").startswith("/"):
+            raise SkipHandler  # 说明里写了命令（如 /msg）的那项交给命令处理
         if core.albums.join(m):
             return
         ans = _answered(m.media_group_id)
-        if not ans or not _is_owner(m, ans.prompt):
-            raise SkipHandler
-        core.albums.add(m, lambda messages: _answer_late_media(ans, messages, core))
+        if ans and _is_owner(m, ans.prompt):
+            core.albums.add(m, lambda messages: _answer_late_media(ans, messages, core))
+        else:
+            core.albums.add(m, lambda messages: _hint_relay_reply(messages[0], core))
 
     async def _finish(prompt: Prompt, m: Message, core: Core, err: Notice | None, done: str) -> None:
         """回复提示的结果：成功就删掉提示；出错时能改了再试的保留提示，其他的作废。"""
@@ -405,17 +409,25 @@ def build_router(settings: Settings) -> Router:
     @router.message(Command("msg"))
     async def msg_cmd(m: Message, core: Core) -> None:
         """审核员给投稿人发消息：回复投稿发送 /msg 内容。"""
-        body, entities = ent.strip_command(m.text or m.caption or "", ent.dump(m.entities or m.caption_entities))
-        sid = await _replied_sid(m, core)
+        if m.media_group_id:  # 说明里写 /msg 的相册：收齐后整组转达
+            core.albums.add(m, lambda messages: _relay_to_user(m, messages, core))
+            return
+        await _relay_to_user(m, [m], core)
+
+    async def _relay_to_user(cmd: Message, messages: list[Message], core: Core) -> None:
+        """cmd：带 /msg 的那条；messages：要转达的全部（单条就是它自己，相册是所有项）。"""
+        body, entities = ent.strip_command(cmd.text or cmd.caption or "", ent.dump(cmd.entities or cmd.caption_entities))
+        sid = await _replied_sid(cmd, core)
         if sid is None:
-            await m.reply(t(core.lang, "reply_to_submission" if explicit_reply(m) else "msg_usage_admin"))
+            await cmd.reply(t(core.lang, "reply_to_submission" if explicit_reply(cmd) else "msg_usage_admin"))
             return
-        item = message_item(m, body, entities)
-        if item is None:
-            await m.reply(t(core.lang, "msg_empty"))
+        items = [message_item(x, body, entities) if x.message_id == cmd.message_id
+                 else message_item(x, x.caption or "", ent.dump(x.caption_entities)) for x in messages]
+        if any(it is None for it in items):
+            await cmd.reply(t(core.lang, "msg_empty"))
             return
-        err = await core.relay_to_user(sid, m.from_user, item)
-        await m.reply(err.text(core.lang) if err else t(core.lang, "msg_sent_to_user"))
+        err = await core.relay_to_user(sid, cmd.from_user, items)
+        await cmd.reply(err.text(core.lang) if err else t(core.lang, "msg_sent_to_user"))
 
     @router.message(Command("ban"))
     async def ban_cmd(m: Message, command: CommandObject, core: Core) -> None:
@@ -461,7 +473,10 @@ def build_router(settings: Settings) -> Router:
 
     @router.message(F.reply_to_message)
     async def plain_reply(m: Message, core: Core) -> None:
-        """直接回复了投稿人转来的消息但没写 /msg：提醒一下，免得以为对方收到了。"""
+        await _hint_relay_reply(m, core)
+
+    async def _hint_relay_reply(m: Message, core: Core) -> None:
+        """直接回复了投稿人转来的消息但没写 /msg：提醒一下，免得以为对方收到了（相册只提醒一次）。"""
         reply = explicit_reply(m)
         if reply and await core.is_review_relay_message(reply.message_id):
             await m.reply(t(core.lang, "msg_hint_admin"))

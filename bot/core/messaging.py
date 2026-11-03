@@ -9,7 +9,7 @@ from ..db import Submission
 from ..entities import u16len
 from ..errors import Notice, notice
 from ..i18n import t
-from ..render import send_items
+from ..render import caption_index, send_items
 from ..timeutil import now_ts
 from .base import CoreBase
 
@@ -28,14 +28,17 @@ class MessagingMixin(CoreBase):
         return None
 
     @staticmethod
-    def _labeled(item: dict, label: str) -> dict:
-        """在内容前面加上加粗的“💬 审核员：/ 投稿人：”，原有格式整体后移，保持不变。"""
+    def _labeled(items: list[dict], label: str) -> list[dict]:
+        """在内容前面加上加粗的“💬 审核员：/ 投稿人：”，原有格式整体后移，保持不变。
+        相册加在说明文字那一项前面，和发送时承载说明的是同一项。"""
+        i = caption_index(items)
         label_entities = [{"type": "bold", "offset": 0, "length": u16len(label)}]
-        text, entities = ent.join(label, label_entities, item.get("text", ""), item.get("entities", []), sep="\n")
-        return {**item, "text": text, "entities": entities}
+        text, entities = ent.join(label, label_entities, items[i].get("text", ""), items[i].get("entities", []),
+                                  sep="\n")
+        return [*items[:i], {**items[i], "text": text, "entities": entities}, *items[i + 1:]]
 
-    async def relay_to_user(self, sid: int, reviewer: TgUser, item: dict) -> Notice | None:
-        """审核员 → 投稿人：以“审核员”的身份发到投稿人那条投稿下面。"""
+    async def relay_to_user(self, sid: int, reviewer: TgUser, items: list[dict]) -> Notice | None:
+        """审核员 → 投稿人：以“审核员”的身份发到投稿人那条投稿下面。items：一条，或相册的每一项。"""
         sub = await self.db.get(sid)
         if not sub:
             return notice("sub_not_found")
@@ -45,18 +48,18 @@ class MessagingMixin(CoreBase):
         lang = await self.user_lang(sub.user_id)
         try:
             sent = await send_items(
-                self.bot, sub.user_id, [self._labeled(item, t(lang, "msg_from_reviewer"))], sig=("", []),
-                spoiler=bool(item.get("spoiler")), reply_to=sub.user_msg_id,
+                self.bot, sub.user_id, self._labeled(items, t(lang, "msg_from_reviewer")), sig=("", []),
+                spoiler=any(it.get("spoiler") for it in items), reply_to=sub.user_msg_id,
             )
         except TelegramAPIError as e:
             return notice("msg_undelivered", error=str(e))
-        await self.db.log_message(sid, "to_user", reviewer.id, reviewer.full_name, item,
-                                  user_msg_id=sent[0].message_id, review_msg_id=None)
+        await self.db.log_message(sid, "to_user", reviewer.id, reviewer.full_name,
+                                  [(it, m.message_id, None) for it, m in zip(items, sent)])
         await self.refresh_control(sid)
         return None
 
-    async def relay_to_review(self, sid: int, user: TgUser, item: dict, user_msg_id: int) -> Notice | None:
-        """投稿人 → 审核员：发到审核群，回复在这条投稿的控制消息下面。"""
+    async def relay_to_review(self, sid: int, user: TgUser, items: list[dict], user_msg_ids: list[int]) -> Notice | None:
+        """投稿人 → 审核员：发到审核群，回复在这条投稿的控制消息下面。items：一条，或相册的每一项。"""
         sub = await self.db.get(sid)
         if not sub or sub.user_id != user.id:
             return notice("u_edit_not_found")
@@ -68,14 +71,14 @@ class MessagingMixin(CoreBase):
             return err
         try:
             sent = await send_items(
-                self.bot, self.s.review_chat_id, [self._labeled(item, t(self.lang, "msg_from_submitter"))],
-                sig=("", []), spoiler=bool(item.get("spoiler")), reply_to=sub.review_msg_id,
+                self.bot, self.s.review_chat_id, self._labeled(items, t(self.lang, "msg_from_submitter")),
+                sig=("", []), spoiler=any(it.get("spoiler") for it in items), reply_to=sub.review_msg_id,
             )
         except TelegramAPIError as e:
             return notice("msg_failed", error=str(e))
         # 审核员回复这条转来的消息发 /msg，就能定位到这条投稿
         await self.db.link_review_messages(sid, [m.message_id for m in sent])
-        await self.db.log_message(sid, "to_review", user.id, user.full_name, item,
-                                  user_msg_id=user_msg_id, review_msg_id=sent[0].message_id)
+        await self.db.log_message(sid, "to_review", user.id, user.full_name,
+                                  [(it, u, r.message_id) for it, u, r in zip(items, user_msg_ids, sent)])
         await self.refresh_control(sid)
         return None

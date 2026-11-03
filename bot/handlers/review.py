@@ -427,7 +427,7 @@ def build_router(settings: Settings) -> Router:
             return
 
         if not body.strip():
-            err = await core.show_text(sid, m.chat.id, reply_to=m.message_id)
+            err, _ = await core.show_text(sid, m.chat.id, reply_to=m.message_id)
             await m.reply(err.text(core.lang) if err else t(core.lang, "admin_echo_hint"))
             return
 

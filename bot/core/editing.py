@@ -181,14 +181,15 @@ class EditingMixin(CoreBase):
             except TelegramAPIError as e:  # 超过 48 小时、已被投稿人删掉
                 log.info("删除投稿人 #%s 的旧预览失败：%s", sid, e)
 
-    async def show_text(self, sid: int, chat_id: int, reply_to: int) -> Notice | None:
-        """把稿件当前的文字（带格式）发出来，方便复制后修改再 /edit。"""
+    async def show_text(self, sid: int, chat_id: int, reply_to: int) -> tuple[Notice | None, int | None]:
+        """把稿件当前的文字（带格式）发出来，方便复制后修改再 /edit。返回 (错误, 发出的消息)。"""
         sub = await self.db.get(sid)
         if not sub:
-            return notice("sub_not_found", sid=sid)
-        if not await self._send_current_text(sub, chat_id, reply_to):
-            return notice("no_text_to_show", sid=sid)
-        return None
+            return notice("sub_not_found", sid=sid), None
+        sent = await self._send_current_text(sub, chat_id, reply_to)
+        if not sent:
+            return notice("no_text_to_show", sid=sid), None
+        return None, sent.message_id
 
     async def _send_current_text(self, sub: Submission, chat_id: int, reply_to: int) -> Message | None:
         """发出稿件当前的正文或说明文字（带格式）；没有文字时什么也不发，返回 None。"""

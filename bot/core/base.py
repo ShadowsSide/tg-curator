@@ -146,6 +146,19 @@ class CoreBase:
             except TelegramAPIError as e:
                 log.info("删除投稿 #%s 上一次改稿的消息失败：%s", sid, e)
 
+    async def replace_user_ack(self, sid: int, message_ids: list[int]) -> None:
+        """投稿人私聊里改稿 / 查看留下的命令和回复，每条投稿只留最近一次：记下这次的，删掉上一次的。
+        投稿内容本身（原消息、加进去的图片）和沟通消息不在这里，不会删。删不掉（超过 48 小时等）就留着。"""
+        sub = await self.db.get(sid)
+        if not sub:
+            return
+        await self.db.update(sid, user_ack=message_ids)
+        if sub.user_ack:
+            try:
+                await self.bot.delete_messages(sub.user_id, sub.user_ack)
+            except TelegramAPIError as e:
+                log.info("删除投稿人 #%s 上一次改稿的消息失败：%s", sid, e)
+
     async def add_edit_ack(self, sid: int, message_ids: list[int]) -> None:
         """这次改稿又多了几条消息（相册后到的部分和对应的回复）：一起记下，下次改稿时删掉。"""
         sub = await self.db.get(sid)

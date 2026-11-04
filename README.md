@@ -62,7 +62,10 @@ Curator 基于 Python 3.12、[aiogram 3](https://github.com/aiogram/aiogram) 和
 1. 在 [@BotFather](https://t.me/BotFather) 创建机器人，拿到 token。隐私模式保持默认开启即可
 2. 把机器人设为**频道**管理员，并给它“发布消息”权限
 3. 建一个**审核群**，把机器人拉进去，普通成员即可。默认只有审核群的管理员和群主能审核（见 `REVIEWERS`）
-4. 获取频道 ID 和审核群 ID（都是 `-100` 开头的数字），可以借助 [@RawDataBot](https://t.me/RawDataBot)，或者在群里发一条消息后访问 `https://api.telegram.org/bot<token>/getUpdates` 查看。频道也可以直接填 `@用户名`
+4. 获取频道 ID 和审核群 ID（都是 `-100` 开头的数字）：用 [Telegram Web](https://web.telegram.org/a/) 打开频道或群，地址栏 `#` 后面的数字就是 ID；也可以把频道或群里的一条消息转发给 [@RawDataBot](https://t.me/RawDataBot) 查看。频道也可以直接填 `@用户名`
+
+> [!NOTE]
+> 不建议用 `https://api.telegram.org/bot<token>/getUpdates` 查 ID：机器人运行时消息已经被它取走，只会返回空的 `"result":[]`；隐私模式下群里的普通消息机器人也收不到。
 
 > [!IMPORTANT]
 > 审核群必须是**超级群**。ID 不是 `-100` 开头说明是普通群：在群设置里把“对新成员显示聊天记录”改为可见，群就会升级为超级群，再重新获取 ID。
@@ -227,7 +230,7 @@ Telegram 不允许把 GIF 放进相册，每个 GIF 都会单独成为一条投�
 <summary><b>已知限制</b></summary>
 
 **审核**
-- 二次确认不能关闭；拒绝默认还要先选理由，设 `REJECT_TEMPLATES=` 可以跳过
+- 发布、拒绝稿件（以及封禁、解除封禁）时必须二次确认，防止误触；拒绝时默认先选理由，设 `REJECT_TEMPLATES=` 可以跳过（不附理由）
 - 确认面板打开期间控制按钮消息被刷新（投稿人改稿、有新的 `/msg`）时，按钮会变回原样，需要重新点，不会误执行
 - 调整 `REJECT_TEMPLATES` 的顺序并重启后，之前打开的理由面板会按新顺序取理由，可能选错
 - 用 `/unban` 解封后，旧消息上的 🔓 / 🗑 按钮不会自动消失，点了才会收起

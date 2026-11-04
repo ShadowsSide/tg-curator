@@ -60,7 +60,10 @@ Curator is built with Python 3.12, [aiogram 3](https://github.com/aiogram/aiogra
 1. Create a bot with [@BotFather](https://t.me/BotFather) and get its token. Leave privacy mode on (the default)
 2. Make the bot an admin of your **channel** with the "Post messages" permission
 3. Create a **review group** and add the bot as a regular member. By default only the group's admins and owner can review (see `REVIEWERS`)
-4. Get the channel ID and the review group ID (both are numbers starting with `-100`), for example with [@RawDataBot](https://t.me/RawDataBot), or by sending a message in the group and opening `https://api.telegram.org/bot<token>/getUpdates`. The channel can also be given as `@username`
+4. Get the channel ID and the review group ID (both are numbers starting with `-100`): open the channel or group in [Telegram Web](https://web.telegram.org/a/), and the number after `#` in the address bar is the ID. You can also forward a message from the channel or group to [@RawDataBot](https://t.me/RawDataBot). The channel can also be given as `@username`
+
+> [!NOTE]
+> `https://api.telegram.org/bot<token>/getUpdates` isn't a good way to find IDs: while the bot is running it has already fetched the messages, so you only get an empty `"result":[]`, and with privacy mode on the bot doesn't receive ordinary group messages anyway.
 
 > [!IMPORTANT]
 > The review group must be a **supergroup**. If its ID doesn't start with `-100`, it's a basic group: in the group settings, make "Chat history for new members" visible, and the group is upgraded to a supergroup. Then get the ID again.
@@ -225,7 +228,7 @@ Telegram doesn't allow GIFs in albums, so each GIF becomes its own submission.
 <summary><b>Known limitations</b></summary>
 
 **Reviewing**
-- Second-tap confirmation can't be turned off; rejecting also asks for a reason by default (set `REJECT_TEMPLATES=` to skip it)
+- Publishing and rejecting (as well as banning and unbanning) always need a second tap, to avoid accidental taps; rejecting asks for a reason first by default (set `REJECT_TEMPLATES=` to skip it and reject without a reason)
 - If the control panel message refreshes while a confirm panel is open (the submitter edits, a new `/msg` arrives), the buttons reset and you tap again; nothing runs by mistake
 - After reordering `REJECT_TEMPLATES` and restarting, reason panels opened earlier pick reasons by the new order and may pick the wrong one
 - After `/unban`, old 🔓 / 🗑 buttons don't disappear by themselves; they go away when tapped

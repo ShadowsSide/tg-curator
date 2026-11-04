@@ -1,128 +1,108 @@
+<!-- prettier-ignore -->
+<div align="center">
+
 # Curator
 
-[![docker](https://github.com/ShadowsSide/tg-curator/actions/workflows/docker.yml/badge.svg)](https://github.com/ShadowsSide/tg-curator/actions/workflows/docker.yml)
-[![license](https://img.shields.io/github/license/ShadowsSide/tg-curator)](LICENSE)
-![python](https://img.shields.io/badge/python-3.12-blue)
-![platform](https://img.shields.io/badge/platform-linux%2Famd64%20%7C%20linux%2Farm64-lightgrey)
+[![docker](https://img.shields.io/github/actions/workflow/status/ShadowsSide/tg-curator/docker.yml?style=flat-square&label=build)](https://github.com/ShadowsSide/tg-curator/actions/workflows/docker.yml)
+![python](https://img.shields.io/badge/Python-3.12-3776ab?style=flat-square&logo=python&logoColor=white)
+[![aiogram](https://img.shields.io/badge/aiogram-3-2ca5e0?style=flat-square&logo=telegram&logoColor=white)](https://github.com/aiogram/aiogram)
+![platform](https://img.shields.io/badge/platform-amd64%20%7C%20arm64-lightgrey?style=flat-square)
+[![license](https://img.shields.io/github/license/ShadowsSide/tg-curator?style=flat-square)](LICENSE)
+
+A Telegram channel submission bot: users send posts in a private chat, admins review them in a review group, and approved posts are published to the channel.
 
 [简体中文](README.md) | **English**
 
-[Features](#features) · [How it works](#how-it-works) · [Quick start](#quick-start) · [Configuration](#configuration) · [Usage](#usage) · [Known limitations and risks](#known-limitations-and-risks) · [FAQ](#faq) · [Development](#development)
+[How it works](#how-it-works) · [Features](#features) · [Quick start](#quick-start) · [Configuration](#configuration) · [Usage](#usage) · [FAQ](#faq) · [Development](#development)
 
-**Curator** is a Telegram channel submission bot: users send posts to the bot in a private chat, admins review them in a review group, and approved posts are published to the channel.
+</div>
 
-Built with Python 3.12 + [aiogram 3](https://github.com/aiogram/aiogram) + SQLite, deployed with a single Docker Compose command. It uses long polling, so **you don't need a public IP or HTTPS**.
+Curator is built with Python 3.12, [aiogram 3](https://github.com/aiogram/aiogram) and SQLite, and deploys with a single Docker Compose command. It uses long polling, so **you don't need a public IP or HTTPS**; a VPS, an ARM server or a Raspberry Pi all work.
 
-> The bot speaks **English and Chinese**. Submitters see the language of their Telegram app (Chinese for Chinese clients, English otherwise); the review group, channel signatures and the review summary use `LANGUAGE`. For an English setup, start from `.env.en.example`, which sets `LANGUAGE=en`.
-
-## Features
-
-**Submitting**
-- Text, photos, videos, GIFs, files, audio and voice messages. Albums of several photos or videos are merged into one submission
-- Submitters choose to post **signed** (with their name) or **anonymously**. Either way, admins can always see who sent it. Their previous choice is shown first
-- Channel posts end with *via* the submitter's name or *via* Anonymous (“via” in italics; the name links to the submitter in the review-group preview, but not in the channel)
-- **Formatting is kept exactly as sent**: links, bold, quotes, spoiler text, code, date/time and emoji all come through to the channel unchanged
-- Submitters can **edit their post** until the review starts, either with Telegram's built-in "Edit" or by **replying** to it with `/edit`; they can also **add or remove photos** (reply to their submission with a photo to add it). After each change they get a full preview of the submission
-- **Once a reviewer has edited a submission, the submitter can't change it anymore** (neither text nor photos) and has to use `/msg`, so their edits can't silently overwrite the reviewer's; they're told the first time a reviewer edits it
-- **Spam checks** (optional): keyword blacklist, a link limit (whitelisted domains don't count) and a cooldown for new submitters. By default a hit only puts a ⚠️ Possible spam note on the control panel message for reviewers to judge; it can also block the submission (edits after submitting are checked too). Submitters can use `/msg` and edits at most 5 times a minute, so they can't flood the review group
-
-**Reviewer ↔ submitter messaging**
-- Both sides use `/msg message`: reviewers reply to the submission's preview or control panel message, submitters reply to the reviewer's message or their own submission, and the bot relays it. A plain reply without `/msg` only gets a hint and isn't relayed. Submitters always see the sender as “Reviewer”; neither side sees the other's account
-- Formatting is kept, and a single photo or file can be attached; the conversation is stored and the control panel message shows the message count
-- Possible any time during review, and for 3 days after it's published or rejected (`MSG_WINDOW_DAYS`); banned users can't send
-
-**Reviewing**
-- Each submission gets a preview in the review group (exactly what the channel will show), followed by a control panel message with colored buttons
-- Publish now · Schedule · Reject · Ban submitter
-- Publishing options: 🙈 **spoiler** (blur the media) and 🔕 **silent** (subscribers get a notification without sound). The spoiler starts on if the submitter blurred their own media, and follows them if they turn it on or off in a later edit
-- Pick a common reject reason with one tap (`REJECT_TEMPLATES`)
-- **✏️ Edit**, **✏️ Custom reason / time**: tap the button, then just reply to the bot's prompt, no commands to remember; send `/cancel` to give up
-- **🖼 Media**: while pending, add, replace or remove photos and videos (up to 10); text submissions can get photos too
-- Commands work as well: `/edit` to change a post, `/no reason` to reject, `/ban reason` to ban. Banning also rejects every open submission from that user
-- Safe against accidental taps: Publish now, Reject, Ban and Unban need a second tap to confirm
-- `/user` shows a contributor with a button to ban or unban them directly
-- Safe against double actions: if two admins press "Publish" at the same time, the post is still published only once
-- Publishes what the reviewer saw: if the post is edited after "Publish" is pressed, confirming doesn't publish it; the buttons refresh so you can check the new preview first. When two people edit at once, the edit based on old content is not saved
-- **Only answers in private chats and the review group**: it never replies in other groups, and leaves any other group or channel it's added to. The publishing channel and its linked discussion group are whitelisted and never left
-
-**Scheduling and stats**
-- Schedule with quick buttons or a custom time (`20:30`, `10-20 09:00`, `+2h`, `+1d`, …). Schedules are stored in the database and survive restarts; if a scheduled post fails to go out, reviewers are told under its control panel message
-- A review summary is posted to the review group at a set interval and refreshed after each review action:
-  ```
-  Accepted 3 Rejected 1 Pending 4
-  Approval rate: 75.00% Review rate: 50.00%
-  #review_stats [updated 16:03:10]
-  ```
-- Contributor activity ranking and per-user stats; submitters can see their own stats with `/me`
-
-**English and Chinese**
-- Submitters see the language of their Telegram app (Chinese clients get Chinese, everyone else English); the review group, channel signatures and the review summary use the `LANGUAGE` setting
-- The command menu is shown in the client's language too
-
-**Deployment**
-- Multi-arch images for `linux/amd64` and `linux/arm64`: works on regular VPSes, ARM servers and Raspberry Pi
-- Proxy support (`http://`, `socks5://`) and support for a self-hosted Bot API server
+> [!TIP]
+> You only need three values to start: the bot token, the channel ID and the review group ID. Jump to [Quick start](#quick-start) and you'll be running in a few minutes. For an English setup, start from `.env.en.example`, which sets `LANGUAGE=en`.
 
 ## How it works
 
 ```
-                               User sends content
+                           User sends content in a private chat
                                         ▼
-                           Chooses signed / anonymous
+                             Choose signed / anonymous
                                         ▼
-                     Review group: preview + control panel message
+                    Review group: preview + control panel message
                                         │
- Before deciding: 🙈 Spoiler · 🔕 Silent · ✏️ Edit · 🖼 Media; /msg the submitter
+      Before deciding: 🙈 Spoiler · 🔕 Silent · ✏️ Edit · 🖼 Media; /msg the submitter
                                         │
             ┌───────────────────────────┼───────────────────────────┐
-     ✅ Publish now                ⏰ Schedule             ❌ Reject / 🚫 Ban
+      ✅ Publish now              ⏰ Schedule                ❌ Reject / 🚫 Ban
             ▼                           ▼                           ▼
-  Channel + notify user          Publish on time        Notify user (with reason)
+  Channel + notify submitter   Published on time + notify   Notify submitter (with reason)
 ```
+
+## Features
+
+- **Accepts almost anything**: text, photos, videos, GIFs, files, audio and voice; albums become one submission, even when Telegram delivers them in batches
+- **Formatting kept intact**: links, bold, quotes, spoiler text, code, dates and custom emoji look the same in the channel
+- **Signed or anonymous**: the channel signature is *via* name or *via* Anonymous; admins always see the real submitter
+- **Edits before review**: submitters can use Telegram's "Edit", reply with `/edit`, or add and remove photos, and get a full preview after each change. Once a reviewer has edited a submission, the submitter can't change it anymore, so a reviewer's changes are never silently overwritten
+- **Everything in the review group**: each submission gets a preview and a control panel message to publish now or later, reject (with ready-made reasons), ban, edit text and media, and toggle spoiler and silent mode
+- **Anonymous two-way messaging**: both sides use `/msg` and the bot relays it; submitters only ever see “Reviewer”, and neither side sees the other's account
+- **Safe against mistakes**: publishing, rejecting and banning need a second tap; two admins tapping Publish at once publish only once; what gets published is always the version a reviewer saw
+- **Spam checks (optional)**: keyword blacklist, link limit and a cooldown for new users, which flag or block a submission; submitters' `/msg` and edits are rate-limited
+- **Scheduling and stats**: scheduled posts live in the database and survive restarts; the review group gets a periodic summary that refreshes after each review, plus activity rankings and per-user stats
+- **English and Chinese**: submitters see the language of their Telegram app; the review group and channel use `LANGUAGE`
+- **Easy to run**: amd64 / arm64 images, proxy and self-hosted Bot API server support; a configuration mistake logs one clear line instead of a restart loop
 
 ## Quick start
 
 ### 1. Set up Telegram
 
-1. Create a bot with [@BotFather](https://t.me/BotFather) and copy its token. Leave privacy mode on (the default)
-2. Make the bot an admin of your **channel** with permission to post messages
-3. Create a **review group** and add the bot as a regular member. By default only the group's **admins and owner** can review (`REVIEWERS`); other members get a “no permission” notice
-4. Find the channel ID and review group ID (both are numbers starting with `-100`). The review group must be a supergroup: if its ID doesn't start with `-100`, it's a basic group. Make chat history visible to new members in the group settings to upgrade it, then get the ID again. You can use a bot such as [@RawDataBot](https://t.me/RawDataBot), or send a message in the group and open `https://api.telegram.org/bot<token>/getUpdates`. For the channel you can also use its `@username`
+1. Create a bot with [@BotFather](https://t.me/BotFather) and get its token. Leave privacy mode on (the default)
+2. Make the bot an admin of your **channel** with the "Post messages" permission
+3. Create a **review group** and add the bot as a regular member. By default only the group's admins and owner can review (see `REVIEWERS`)
+4. Get the channel ID and the review group ID (both are numbers starting with `-100`): open the channel or group in [Telegram Web](https://web.telegram.org/a/), and the number after `#` in the address bar is the ID. You can also forward a message from the channel or group to [@RawDataBot](https://t.me/RawDataBot). The channel can also be given as `@username`
+
+> [!NOTE]
+> `https://api.telegram.org/bot<token>/getUpdates` isn't a good way to find IDs: while the bot is running it has already fetched the messages, so you only get an empty `"result":[]`, and with privacy mode on the bot doesn't receive ordinary group messages anyway.
+
+> [!IMPORTANT]
+> The review group must be a **supergroup**. If its ID doesn't start with `-100`, it's a basic group: in the group settings, make "Chat history for new members" visible, and the group is upgraded to a supergroup. Then get the ID again.
 
 ### 2. Deploy
 
-The prebuilt image (`ghcr.io/shadowsside/tg-curator`, amd64 / arm64) is used by default, so the server only needs two files:
+The server only needs two files; the prebuilt image `ghcr.io/shadowsside/tg-curator` is used by default:
 
 ```bash
 mkdir tg-curator && cd tg-curator
 curl -fsSLO https://raw.githubusercontent.com/ShadowsSide/tg-curator/main/docker-compose.yml
-curl -fsSL https://raw.githubusercontent.com/ShadowsSide/tg-curator/main/.env.en.example -o .env   # fill in BOT_TOKEN, CHANNEL_ID and REVIEW_CHAT_ID (LANGUAGE=en is already set)
-nano .env   # edit the configuration
+curl -fsSL https://raw.githubusercontent.com/ShadowsSide/tg-curator/main/.env.en.example -o .env
+nano .env                  # fill in BOT_TOKEN, CHANNEL_ID, REVIEW_CHAT_ID
 docker compose up -d
 docker compose logs -f
 ```
 
-> [!NOTE]
-> The configuration is checked at startup. If a required value is missing or malformed, Telegram rejects the token, the channel or review group can't be found, the two IDs are swapped, or the bot isn't a channel admin with the “Post messages” right, the log shows one “Configuration error: …” line and the container is marked `unhealthy`. The bot then stays idle instead of restarting over and over; fix `.env` and run `docker compose up -d`. Network errors are not configuration errors: the container restarts and tries again.
+The configuration is checked at startup. If a required value is missing, the token is wrong, the channel or review group can't be found, the two IDs are swapped, or the bot can't post to the channel, the log shows one "Configuration error: …" line and the container is marked `unhealthy`. The bot doesn't run and doesn't restart in a loop; fix `.env`, then run `docker compose up -d` again. Network problems aren't configuration errors: the container restarts and retries.
 
-Image tags: `latest` is the newest build of the main branch, `dev` tracks the DEV branch (unmerged features, may be unstable), `vX.Y.Z` are releases, and `sha-xxxxxxx` points to a specific build, which is handy for rolling back. To use another tag or image, set `IMAGE` in `.env`.
+| Image tag | Contents |
+|---|---|
+| `latest` | Latest version of the main branch |
+| `dev` | The DEV branch: unmerged features, may be unstable |
+| `vX.Y.Z` | A release |
+| `sha-xxxxxxx` | One specific build, handy for rolling back |
 
-To build from source instead, clone the whole repository and run `docker compose -f docker-compose.yml -f docker-compose.build.yml up -d --build`.
+Set `IMAGE` in `.env` to use another tag or image. To build from source, clone the repository and run `docker compose -f docker-compose.yml -f docker-compose.build.yml up -d --build`.
 
 ### 3. Updating and backups
 
 > [!WARNING]
-> **Back up the database before updating**: upgrades migrate the schema automatically, and some versions drop columns that are no longer used, which can't be undone.
+> **Back up the database before updating.** Upgrades migrate the schema automatically, and some versions drop columns that are no longer used; those can't be recovered.
 
 ```bash
-docker compose cp bot:/app/data/bot.db ./backup-$(date +%F).db   # 1. back up the database
-docker compose pull && docker compose up -d                      # 2. update to the latest image
+docker compose cp bot:/app/data/bot.db ./backup-$(date +%F).db   # back up the database
+docker compose pull && docker compose up -d                      # update to the latest image
 ```
 
-The database lives in the `bot-data` Docker volume.
-
-> [!NOTE]
-> When stopped or updated, the bot finishes any publishing or handling in progress (up to 45 seconds) before exiting. That's what `stop_grace_period: 60s` in `docker-compose.yml` is for; don't remove it, or Docker kills the bot after its default 10 seconds. When a new version changes `docker-compose.yml`, download it again before updating.
+The database lives in the Docker volume `bot-data`. When stopping or updating, the bot finishes publishing in progress (up to 45 seconds) before exiting, so keep `stop_grace_period: 60s` in `docker-compose.yml`. When a new version changes `docker-compose.yml`, download it again before updating.
 
 ## Configuration
 
@@ -130,13 +110,11 @@ Everything is configured in `.env`. See [`.env.en.example`](.env.en.example) for
 
 ### Required
 
-The bot won't start without these.
-
-| Variable | Default | Description |
-|---|---|---|
-| `BOT_TOKEN` | — | The bot token |
-| `CHANNEL_ID` | — | Channel to publish to: `@username` or `-100…` |
-| `REVIEW_CHAT_ID` | — | Review group ID (must be a supergroup, starts with `-100`) |
+| Variable | Description |
+|---|---|
+| `BOT_TOKEN` | The bot token |
+| `CHANNEL_ID` | Channel to publish to: `@username` or `-100…` |
+| `REVIEW_CHAT_ID` | Review group ID (must be a supergroup, starts with `-100`) |
 
 ### Common
 
@@ -151,7 +129,7 @@ Options most deployments adjust as needed.
 | `REJECT_TEMPLATES` | 4 default reasons, depends on `LANGUAGE` | Reasons offered after tapping Reject, separated by `\|`, e.g. `Duplicate\|Ads`; set it to empty to skip the reason panel |
 | `SCHEDULE_PRESETS` | `09:00,12:00,18:00,21:00` | Quick time buttons in the schedule panel |
 | `DEFAULT_SILENT` | `false` | Whether new submissions are published silently by default |
-| `MAX_PENDING_PER_USER` | `5` | Maximum open submissions per user at a time |
+| `MAX_PENDING_PER_USER` | `5` | Maximum open submissions per user at a time; adding photos to your own submission by replying isn't limited |
 | `REMINDER_INTERVAL_MINUTES` | `60` | Interval of the review summary, aligned to the clock; `0` turns it off |
 | `REMINDER_QUIET_HOURS` | — | Quiet hours with no summaries, e.g. `0-8` |
 | `PROXY` | — | Proxy, e.g. `socks5://host:port` |
@@ -182,119 +160,99 @@ Spam checks, messaging window, stats scope and so on; the defaults are usually f
 
 ### Submitters (private chat with the bot)
 
+Send your content to the bot, then choose signed or anonymous (your previous choice is shown first). Until the review starts (scheduled, published or rejected), you can still change it:
+
 | Action | Description |
 |---|---|
-| Send any content | Starts a submission, then choose signed or anonymous. Your previous choice is marked “(last time)” and shown first; you still tap it |
-| Edit the original message with Telegram's "Edit" | Changes the submission until the review starts (scheduled, published, rejected): text, formatting, or even the image |
-| Reply to your submission with a photo / video | The choice panel gets an extra **➕ Add to that submission** button that adds the new photos to it; or submit them as a new submission as usual. Only drafts and pending submissions can take more. You can reply to the original message or to the bot's "Submitted" message |
-| Send several photos / videos at once (an album) | Becomes one submission. Telegram sometimes delivers an album in batches (say 1 photo, then 9 more a little later); parts arriving **within 10 minutes** join the same submission and the count in the prompt is updated. Parts that arrive after you submitted are added too, and reviewers get a new preview |
-| 🗑 Remove a photo / video | Shown on the bot's message while a draft or pending submission has 2 or more photos/videos; tap it and pick the one to remove. Nothing can be changed once the review has started (scheduled, published, rejected). Deleting the photo from the chat isn't synced: Telegram doesn't tell bots about deletions in private chats |
-| `/edit new content` | Only works as a **reply** to your submission (or the bot's message about it); without a reply nothing is changed |
-| `/edit` (as a reply) | Sends a full preview of the submission as it stands (photos, text and signature, as it will be published); works after a reviewer edit or once the review has started. While you can still edit, it also sends the formatted text so you can copy and change it |
-| Preview after an edit | After each successful edit the bot sends a full preview of the submission, keeping only the newest one (previews older than 48 hours can't be deleted). Replying to it with `/edit` or `/msg` works too |
-| After a reviewer edit | You can't change the submission anymore (`/edit`, “Edit”, adding or removing photos are all refused); use `/msg` to talk to the reviewers. The bot tells you the first time a reviewer edits it |
-| `/msg message` | Message the reviewers: **reply** to the reviewer's message or your submission |
+| Edit the original message with Telegram's "Edit" | Changes the text or formatting, or even swaps the photo |
+| Reply to your submission with `/edit new content` | Replaces the text. It must be a **reply** to the submission or the bot's message about it; otherwise nothing is changed |
+| Reply to your submission with just `/edit` | Sends a full preview of the submission as it will be published; while you can still edit, also the formatted text to copy and change. Works after the review starts and after a reviewer edit too |
+| Reply to your submission with a photo / video | The choice panel gets an extra **➕ Add to that submission** button. This works even at the open-submission limit (`MAX_PENDING_PER_USER`), but then the photos can't be submitted as a new submission |
+| 🗑 Remove a photo / video | Shown on the bot's message when there are 2 or more photos/videos. Deleting a photo from the chat isn't synced: Telegram doesn't tell bots about deletions in private chats |
+| Reply to a reviewer's message or your submission with `/msg message` | Messages the reviewers; formatting is kept, and a photo or file can be attached |
 | `/me` | Your submission stats |
 
-### Admins (review group)
+After each successful edit the bot sends the latest full preview. Older previews, and your edit commands and the bot's replies, are kept only for the latest edit; your original submission messages are never deleted. The first time a reviewer edits your submission the bot tells you; from then on you can't change it and can only use `/msg`.
 
-Buttons on the control panel message: **✅ Publish now**, **⏰ Schedule**, **❌ Reject**, **🚫 Ban submitter**, **✏️ Edit**, **🖼 Media**, plus the **🙈 Spoiler** and **🔕 Silent** toggles. Once a submitter is banned, their control panel messages show **🔓 Unban** and **🗑 Delete their posts**: after you confirm, it deletes the previews, control panel messages and relayed messages of all their submissions (published ones too) from the review group. The submissions and stats stay in the database. Telegram doesn't let bots delete messages older than 48 hours (not even as an admin); the reply says how many there are, and an admin has to delete them by hand.
+### Reviewers (review group)
 
-#### Reply prompts
+Each submission gets a preview in the review group (exactly as it will look in the channel), followed by a control panel message:
 
-**✏️ Edit**, **✏️ Custom reason** on the reason panel and **✏️ Custom time** on the schedule panel post a “please reply to this message…” prompt. Just reply to it, no commands to remember:
-- Only the reply of whoever tapped the button counts (anonymous admins excepted); send `/cancel` to give up (as a reply to a prompt it drops that one; on its own it drops all your open prompts)
-- **Edit** first posts the current content with formatting so you can copy and change it; the prompt and that copy are deleted once you're done
-- **Custom reason** rejects as soon as you send the reason, with no extra confirmation
-- Prompts are stored in the database, so they still work after a restart; prompts left unanswered for 24 hours are deleted
+| Button | What it does |
+|---|---|
+| ✅ Publish now · ⏰ Schedule | Scheduling offers quick times and custom ones (`20:30`, `10-20 09:00`, `+2h`, `+1d`, …) |
+| ❌ Reject · 🚫 Ban submitter | Pick a ready-made reason (`REJECT_TEMPLATES`) or write one; the reason is sent to the submitter. Banning rejects all their open submissions |
+| ✏️ Edit | The bot posts the current content with formatting to copy; reply to its prompt to make the change |
+| 🖼 Media | While pending: add (an album reply works too), replace or remove photos and videos, up to 10; text submissions can get photos too |
+| 🙈 Spoiler · 🔕 Silent | Publishing toggles; Spoiler is on by default when the submitter used a spoiler |
+| 🔓 Unban · 🗑 Delete their posts | Shown once the submitter is banned; deletes the review group messages of all their submissions, database records are kept |
 
-#### Changing photos and videos
+Publish now, Reject, Ban and Unban act on the second tap. Prompts waiting for a reply only accept the person who tapped the button; send `/cancel` to give up. Every edit posts a new preview; the review group keeps only the original preview, the latest edited preview, and the messages and “Edited” confirmation of the latest edit (failed ones stay so you can see why).
 
-**🖼 Media** (only while pending) opens the media panel: **➕ Add photo / video** (an album reply works too; if the last items of the album arrive late, they're added as well with a separate reply), **🔁 Replace N** and **🗑 Remove N** (asks to confirm; the last one can't be removed). Photos and videos only, at most 10 per submission; submissions with a file, GIF or audio can't use it. A text submission can get photos too: its text becomes their caption (see “Known limitations and risks” below).
-
-Every edit posts a new preview. The review group keeps only the original preview and the latest edited one; older edited previews are deleted (Telegram doesn't let bots delete messages older than 48 hours, so those stay).
-
-#### Confirmation and reject reasons
-
-To avoid accidental taps, **Publish now, Reject, Ban and Unban** first switch to “Confirm / Back” buttons and only act on the second tap. Scheduling, retrying and the `/no` and `/ban` commands need no confirmation.
-
-**❌ Reject** first asks for a reason (`REJECT_TEMPLATES`; defaults: Duplicate, Off-topic, Low quality, Advertising; or “No reason”). The confirm button shows the chosen reason, and the reason is sent to the submitter. For a reason of your own, tap **✏️ Custom reason** or use `/no reason`.
-
-#### Commands
-
-The commands below do the same as the buttons, for those who prefer commands. Use them by **replying** to a submission's preview or control panel message. The bot never shows submission numbers, and no command needs one:
+If you prefer commands, send them as a **reply** to a submission's preview or control panel message; no submission numbers needed:
 
 | Command | Description |
 |---|---|
-| `/edit new content` | Changes the text or caption, keeping its formatting, and posts a new preview. The original is kept. Once a reviewer has edited a submission (the 🖼 Media panel counts too), the submitter can't change it anymore and is told the first time |
-| `/edit` | Shows the current content with formatting |
-| `/msg message` | Message the submitter as “Reviewer”; also works as a reply to a relayed submitter message |
-| `/no [reason]` | Rejects the submission; the reason is sent to the submitter |
-| `/ban [reason]` | Bans the submitter and rejects all their open submissions |
-| `/unban <user ID>` | Lifts a ban (same as 🔓 Unban on the control panel message) |
-| `/stats` | Posts the latest review summary |
-| `/queue` | Lists scheduled posts |
-| `/active [days]` | Contributor activity ranking (default: 30 days) |
-| `/user <user ID>` | Shows one contributor's stats, with a 🚫 Ban / 🔓 Unban button below (asks to confirm); works for users with no submissions too, to ban in advance. If they're banned and still have posts in the review group, there's also a 🗑 delete button |
-| `/cancel` | Drops prompts waiting for your reply: as a reply to a prompt it drops that one; on its own it drops all of yours |
-
-`/ban` and `/unban` also accept a user ID (`/ban <user ID> reason`) for users with nothing under review, or to ban someone in advance. Each scheduled post in `/queue` has a “view” link that jumps to its control panel message.
-
-## Known limitations and risks
-
-**Review actions**
-- **More taps**: Publish now, Reject, Ban and Unban always need a second tap, and Reject first asks for a reason by default (Reject → reason → Confirm, three taps). Set `REJECT_TEMPLATES=` to skip the reason; the confirmation itself can't be turned off
-- **The confirm panel can be reset**: if the control panel message refreshes while you're about to confirm (the submitter edits, someone sends `/msg`, …), the buttons go back to normal and you need to tap again. Nothing runs by accident
-- **Changing `REJECT_TEMPLATES` can shift old panels**: buttons store the reason's position. After reordering the reasons and restarting, a panel opened before the restart picks the reason by the new order; an out-of-range position means “No reason”. Finish any rejection in progress before changing it
-- **Reasons can't contain `|`**: it's the separator
-- **Old 🔓 / 🗑 buttons don't disappear by themselves**: a ban only refreshes the control panel messages it rejects. After `/unban <user ID>`, the 🔓 / 🗑 on those messages stay until someone taps them; tapping one then says the user isn't banned and removes them (the submitter isn't notified again). This avoids refreshing all of that user's control panel messages at once and hitting rate limits
-- **The review group hits rate limits sooner**: the confirm and reason panels each edit the control panel message once more, so with heavy review traffic Telegram's limits come sooner. The bot waits and retries automatically, but actions get slower
-
-**Changing photos and videos**
-- **Adding photos to a text submission**: the text limit drops from 4096 to 1024 characters (longer text can't take photos), the link preview goes away, it can't turn back into plain text, and the post looks different in the channel (text under the photos)
-- **Replaced or removed photos can't be brought back**: the original is stored (`original_items`), but the bot has no way to restore it
-- **Reviewers aren't notified when a submitter changes photos**: a new preview appears and the control panel message shows “edited (submitter)”
-- **Submitters keep the old button after the review starts**: tapping it explains that nothing can be changed any more and removes the button
-
-**Spam checks**
-- **Chinese keywords can over-match**: Chinese has no word boundaries, so keywords match as substrings (e.g. “微信” also matches “微信公众号推荐”). That's why the default only flags (`SPAM_ACTION=flag`); watch the flags for a while before switching to `block`
-- **Blocking doesn't tell the submitter which word matched**: so it can't be dodged on purpose, but the submitter may not know what to change
-- **Only URLs and hyperlinks count as links**: `@usernames`, emails and phone numbers don't
-- **Reviewer edits aren't blocked**: with `SPAM_ACTION=block`, a submitter adding a keyword by editing after submitting is blocked; edits by reviewers only update the flags
-- **The rate limit is fixed**: a submitter's `/msg` and edits after submitting are limited to 5 a minute in total, and this can't be configured. It's kept in memory and resets on restart. Edits to drafts and reviewer actions are not limited
-- **The cooldown only applies to submitters with nothing published yet**: one published post lifts it; it counts from the last submission, rejected ones included
-- **Bad values keep the bot from running**: with a non-number in `MAX_LINKS` or `NEW_USER_COOLDOWN_MINUTES`, or a `SPAM_ACTION` other than `flag` / `block`, the log shows one “Configuration error: …” line and the container is marked `unhealthy` until `.env` is fixed
-
-**Other**
-- **An album being collected during a crash is lost**: the items of an album arrive separately, and the bot waits `ALBUM_DELAY` seconds in memory to collect them. On a normal stop (`docker stop`, updates) it handles the items that already arrived first, and the ones arriving after the restart join the same submission; but if it crashes, loses power or is killed within those seconds, the items that already arrived are lost and the submitter needs to send them again
-- **The late part of an album isn't always merged**: items arriving later than `ALBUM_DELAY` join the submission made from the same album for up to 10 minutes. If that submission is already being reviewed, was cancelled, or would go over 10 items, the late part becomes a separate submission and the prompt says why. When it joins a pending submission, the review group gets an updated preview and the control panel message shows “edited (submitter)”. When a reviewer replies to “Add” with an album, its late part is added too (within 10 minutes, same reviewer only); a reply to “Replace” uses only the first item that arrived, and the bot says the late ones weren't used. On the reviewer side this is kept in memory only, so items arriving after a restart are lost
+| `/edit new content` · `/edit` | Change the text (formatting kept, original saved) · show the current content |
+| `/msg message` | Message the submitter as “Reviewer” |
+| `/no [reason]` | Reject |
+| `/ban [reason]` · `/unban <user ID>` | Ban · unban; `/ban <user ID> reason` supports banning in advance (nothing pending / never submitted) |
+| `/user <user ID>` | Show a contributor, with Ban / Unban buttons below |
+| `/stats` · `/queue` · `/active [days]` | Review summary · scheduled posts · activity ranking (default 30 days) |
+| `/cancel` | Drop prompts waiting for your reply |
 
 ## FAQ
 
-**Custom (premium) emoji turn into regular emoji in the channel. Why?**
-Telegram only lets bots with a username bought on Fragment send custom emoji to channels. When the channel refuses them, the bot automatically resends the post with the matching regular emoji. All other formatting is unaffected.
-
-**The log says `Conflict: terminated by other getUpdates request`.**
-Two processes are using the same token.
+**The log says `Conflict: terminated by other getUpdates request`?**
+The same token is being used by two processes at once.
 
 > [!IMPORTANT]
 > Run only one instance per token, and use a separate bot for testing.
 
-**A post failed to publish. What now?**
-The control panel message shows the reason and a 🔁 Retry button; a failed scheduled post also gets a reply under its control panel message. A common cause is that the bot lost the "Post messages" right in the channel. Length, including the signature, is already checked when submitting and editing (1024 characters for media captions, 4096 for text), so posts rarely fail for being too long.
-
-**"Delete their posts" says some couldn't be deleted?**
-Telegram doesn't let bots delete messages older than 48 hours; the reply says how many there are, an admin has to delete them by hand, and pressing again won't retry them. Messages that couldn't be deleted for other reasons (a network error, say) are logged and retried when you press again. Run `docker compose logs bot | grep 删除审核群消息失败` to see the submission, the message IDs and Telegram's reason.
+**What if publishing fails?**
+The control panel message shows the reason and a 🔁 Retry button; failed scheduled posts also get a separate alert. The usual cause is that the bot lost the "Post messages" permission in the channel.
 
 **What happens when Telegram rate-limits the bot?**
-The bot waits as long as Telegram asks and retries automatically. If the wait would be too long (over 30 seconds), a post being published is automatically rescheduled for later instead of being marked failed. Several changes to the review summary within a few seconds are merged into one update.
+The bot waits and retries automatically. If Telegram asks for more than 30 seconds, a post being published is rescheduled for a bit later instead of being marked as failed.
 
-**A user sent several GIFs and got several submissions. Why?**
+**Custom emoji turn into regular emoji in the channel?**
+Telegram only lets bots with a Fragment username post custom emoji to channels. When the channel refuses them, the bot resends with the matching regular emoji.
+
+**Why can't some messages be deleted?**
+Telegram doesn't let bots delete messages older than 48 hours, not even as an admin. Those messages stay; an admin can delete them by hand if needed.
+
+**A user sent several GIFs. Why did they become separate submissions?**
 Telegram doesn't allow GIFs in albums, so each GIF becomes its own submission.
+
+<details>
+<summary><b>Known limitations</b></summary>
+
+**Reviewing**
+- Publishing and rejecting (as well as banning and unbanning) always need a second tap, to avoid accidental taps; rejecting asks for a reason first by default (set `REJECT_TEMPLATES=` to skip it and reject without a reason)
+- If the control panel message refreshes while a confirm panel is open (the submitter edits, a new `/msg` arrives), the buttons reset and you tap again; nothing runs by mistake
+- After reordering `REJECT_TEMPLATES` and restarting, reason panels opened earlier pick reasons by the new order and may pick the wrong one
+- After `/unban`, old 🔓 / 🗑 buttons don't disappear by themselves; they go away when tapped
+
+**Photos and videos**
+- Once a text submission gets photos, its caption limit drops from 4096 to 1024 characters, the link preview goes away, and it can't become text-only again
+- The original is saved, but there's no feature to restore it
+
+**Spam checks**
+- Keywords match as substrings, which can catch innocent text (especially in Chinese, which has no word boundaries), so the default only flags (`SPAM_ACTION=flag`)
+- Blocked submitters aren't told which word matched; `@usernames`, emails and phone numbers don't count as links
+- Submitters' `/msg` and post-submission edits are limited to 5 per minute in total; not configurable, and reset on restart
+- Rejected submissions also count toward the new-user cooldown's "last submitted"
+
+**Albums**
+- The bot waits `ALBUM_DELAY` seconds to collect an album; a crash or power loss in those seconds loses the parts that already arrived
+- If the submission a late part would join is already under review, cancelled, or would exceed 10 items, the late part becomes a separate submission and the reason is shown
+- A reviewer's album reply to Replace only uses the first item; late parts on the reviewer side are kept in memory only and are lost on restart
+
+</details>
 
 ## Development
 
-Requires Python 3.12 (the version the Docker image and CI use).
+Requires Python 3.12 (the same as the image and CI):
 
 ```bash
 python3 -m venv .venv && .venv/bin/pip install -r requirements.txt -r requirements-dev.txt
@@ -303,19 +261,17 @@ set -a; source .env; set +a
 DB_PATH=./data/bot.db .venv/bin/python -m bot
 ```
 
-The tests need no token and no network access. `tests/test_*.py` are unit tests; `tests/live_*.py` are end-to-end tests that run the real bot process against a mock Bot API server. Each file is a standalone script you can run on its own, and its opening docstring says what it covers. To run them all (about 4 minutes):
+Tests need no token and no network. `tests/test_*.py` are unit tests; `tests/live_*.py` are end-to-end tests that start a mock Bot API server and run the real bot process. Each file is a standalone script with a description at the top. Run all tests (about 10 minutes) and the static check:
 
 ```bash
 for f in tests/test_*.py tests/live_*.py; do .venv/bin/python "$f" || echo "FAILED: $f"; done
-```
-
-GitHub Actions (`.github/workflows/test.yml`) first checks the code with pyflakes (undefined names, unused imports and variables, …), then runs all the tests on every pull request, and on every push to `main`, `DEV` or a tag (called from `docker.yml`, which only builds the image if they pass). To check locally:
-
-```bash
 .venv/bin/python -m pyflakes bot tests
 ```
 
-### Project layout
+GitHub Actions runs the same checks on every PR, on pushes to `main` / `DEV` and on tags, and only builds images when they pass.
+
+<details>
+<summary><b>Project layout</b></summary>
 
 ```
 bot/
@@ -323,23 +279,23 @@ bot/
   config.py       environment variables
   db.py           SQLite schema, migrations and queries
   core/           business logic, combined into one Core; handlers only go through it
-    base.py         setup, language, notifications, control panel messages, lookups for handlers
-    submissions.py  receiving, drafts, sending for review
-    editing.py      editing (/edit and Telegram's built-in edit)
+    base.py         setup, languages, notifications, control panel messages, queries for handlers
+    submissions.py  receiving, drafts, submitting for review
+    editing.py      editing submissions (/edit, Telegram's Edit)
     review.py       publish, schedule, reject, ban, spoiler / silent toggles
-    messaging.py    /msg messaging
-    prompts.py      reply prompts (Edit, custom reason / time, adding / replacing media)
-    stats.py        review summary, activity, scheduled queue
-    scheduler.py    background jobs: scheduled publishing, draft cleanup, summary reminders
-  render.py       sending content (single / album, signature, spoiler, silent) and message texts
+    messaging.py    /msg relaying
+    prompts.py      prompts waiting for a reply (edit, custom reason / time, add / replace media)
+    stats.py        review summary, activity, schedule queue
+    scheduler.py    background jobs: scheduled publishing, draft cleanup, reminders
+  render.py       sending content (single / album, signature, spoiler, silent) and texts
   entities.py     message formatting (UTF-16 offsets, appending the signature)
   i18n.py         English and Chinese UI texts
-  errors.py       notice codes returned by the business logic (translated when shown)
-  guard.py        only handle private chats and the review group; leave other groups
+  errors.py       notice codes returned by the core (translated when shown)
+  guard.py        only handles private chats and the review group, leaves other chats
   permissions.py  reviewer permissions (REVIEWERS)
   spam.py         spam checks: keywords, link limit
   media.py        rules for changing photos and videos: add, replace, remove
-  ratelimit.py    automatic waiting and retrying when rate-limited
+  ratelimit.py    waits and retries when rate-limited
   throttle.py     rate limit for submitters' /msg and edits
   keyboards.py    colored inline buttons
   album.py        album collection
@@ -347,15 +303,15 @@ bot/
   handlers/
     user.py       private chat: submitting, editing, /me
     review.py     review group: buttons and commands
-    errors.py     unhandled errors: log and tell the person
+    errors.py     unhandled exceptions: log and tell the user
 tests/            unit and end-to-end tests
 scripts/          multi-arch image build script
 ```
 
-### Publishing images (for your own fork)
+</details>
 
-On every push to `main`, `DEV` or a `v*` tag, GitHub Actions runs all the tests first and, if they pass, builds amd64 + arm64 images (`DEV` is tagged `dev` and never touches `latest`) and publishes them to `ghcr.io/<owner>/tg-curator`. To run your own image, set `IMAGE=ghcr.io/<owner>/tg-curator:latest` in `.env`; otherwise this repository's image is pulled.
+### Publishing your own image (for a fork)
 
-To publish to Docker Hub as well, add the variable `DOCKERHUB_USERNAME` and the secret `DOCKERHUB_TOKEN` (a Docker Hub access token with Read & Write permission) under **Settings → Secrets and variables → Actions** in your repository.
+Pushes to `main` or `DEV` and `v*` tags make Actions build amd64 + arm64 images and publish them to `ghcr.io/<owner>/tg-curator`. Set `IMAGE=ghcr.io/<owner>/tg-curator:latest` in `.env` to deploy it.
 
-You can also build and push locally: `scripts/build-multiarch.sh <image:tag>`.
+To publish to Docker Hub as well, add the variable `DOCKERHUB_USERNAME` and the secret `DOCKERHUB_TOKEN` (with Read & Write access) under the repository's **Settings → Secrets and variables → Actions**. You can also build and push locally with `scripts/build-multiarch.sh <image:tag>`.

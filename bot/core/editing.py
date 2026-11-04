@@ -92,6 +92,11 @@ class EditingMixin(CoreBase):
 
     async def _save_edit(self, sub: Submission, items: list[dict], editor: str,
                          allowed: tuple[str, ...], *, by_submitter: bool) -> Notice | None:
+        # 审核员改过之后投稿人再改，会悄悄盖掉审核员的修改（/edit、原生编辑都是整段替换），只能 /msg 沟通
+        if by_submitter and sub.reviewer_edited:
+            return notice("locked_by_reviewer")
+        # 审核员第一次改稿（草稿还没进审核群，不算）：锁住投稿人的修改，并告诉他一次
+        locking = not by_submitter and sub.status != "draft" and not sub.reviewer_edited
         err = await self._length_error(sub, items, signed=sub.status != "draft")
         if err:
             return err
@@ -123,7 +128,7 @@ class EditingMixin(CoreBase):
             sub.id, allowed, version=sub.version, items=items, original_items=sub.original_items or sub.items,
             edited_by=editor, edited_at=now_ts(),
             spam_flags=hits or None,
-            **follow,
+            **follow, **({"reviewer_edited": 1} if locking else {}),
         )
         if not ok:
             await self._delete_old_preview(ids)  # 这份预览的内容没有保存，不能留在审核群里
@@ -137,10 +142,15 @@ class EditingMixin(CoreBase):
             await self.db.update(sub.id, edit_preview=ids)
             await self._delete_old_preview(sub.edit_preview)
             await self.refresh_control(sub.id)
+        if by_submitter:  # 投稿人自己的聊天里只有他当初发的那几条，看不出改完的样子
+            await self.send_user_preview(sub.id)
+        if locking:  # 版本锁保证同一版本只有一次保存成功，所以只会通知一次
+            await self.notify(sub, "notify_reviewer_edited")
+            await self.refresh_user_kb(sub.id)  # 收起“删除图片”
         return None
 
     async def _delete_old_preview(self, ids: list[int] | None) -> None:
-        """改稿后删掉上一份修改后的预览，审核群里只留最初的预览（控制消息回复的就是它）和最新一份。
+        """改稿后删掉上一份修改后的预览，审核群里只留最初的预览（控制按钮消息回复的就是它）和最新一份。
         删不掉（超过 48 小时、已被手动删掉）就留着，它仍然能用来回复定位投稿。"""
         if not ids:
             return
@@ -151,14 +161,35 @@ class EditingMixin(CoreBase):
             return
         await self.db.unlink_review_messages(ids)
 
-    async def show_text(self, sid: int, chat_id: int, reply_to: int) -> Notice | None:
-        """把稿件当前的文字（带格式）发出来，方便复制后修改再 /edit。"""
+    async def send_user_preview(self, sid: int, reply_to: int | None = None) -> None:
+        """在投稿人私聊里发出投稿当前的完整内容（发布时的样子；草稿还没选署名，不带落款），删掉上一份。
+        回复这份预览发 /edit、/msg、图片也能找到这条投稿（见 db.find_by_user_message）。"""
         sub = await self.db.get(sid)
         if not sub:
-            return notice("sub_not_found", sid=sid)
-        if not await self._send_current_text(sub, chat_id, reply_to):
-            return notice("no_text_to_show", sid=sid)
-        return None
+            return
+        sig = await self._signature(sub, link=False) if sub.status != "draft" else ("", [])
+        try:
+            sent = await send_items(self.bot, sub.user_id, sub.items, sig=sig, spoiler=sub.spoiler,
+                                    reply_to=reply_to or sub.user_msg_id)
+        except TelegramAPIError as e:  # 投稿人拉黑了机器人等：只是看不到预览，不影响改稿
+            log.info("给投稿人发 #%s 的预览失败：%s", sid, e)
+            return
+        await self.db.update(sid, user_preview=[m.message_id for m in sent])
+        if sub.user_preview:
+            try:
+                await self.bot.delete_messages(sub.user_id, sub.user_preview)
+            except TelegramAPIError as e:  # 超过 48 小时、已被投稿人删掉
+                log.info("删除投稿人 #%s 的旧预览失败：%s", sid, e)
+
+    async def show_text(self, sid: int, chat_id: int, reply_to: int) -> tuple[Notice | None, int | None]:
+        """把稿件当前的文字（带格式）发出来，方便复制后修改再 /edit。返回 (错误, 发出的消息)。"""
+        sub = await self.db.get(sid)
+        if not sub:
+            return notice("sub_not_found", sid=sid), None
+        sent = await self._send_current_text(sub, chat_id, reply_to)
+        if not sent:
+            return notice("no_text_to_show", sid=sid), None
+        return None, sent.message_id
 
     async def _send_current_text(self, sub: Submission, chat_id: int, reply_to: int) -> Message | None:
         """发出稿件当前的正文或说明文字（带格式）；没有文字时什么也不发，返回 None。"""

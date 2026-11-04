@@ -61,14 +61,23 @@ def build_router() -> Router:
         if not sub or sub.user_id != uid:
             await m.reply(t(lang, "u_edit_not_found"))
             return
-        if not body.strip():
-            err = await core.show_text(sid, m.chat.id, reply_to=m.message_id)
-            await m.reply(err.text(lang) if err else t(lang, "u_edit_echo_hint"))
+        # 改稿 / 查看成功后，命令和回复只留最近一次的（见 core.replace_user_ack）；失败的留着，要看原因
+        if not body.strip():  # 只发 /edit：看投稿现在的样子（审核员改过、锁定后也能看）；还能改时再发文字方便复制
+            await core.send_user_preview(sid, reply_to=m.message_id)
+            if sub.reviewer_edited or sub.status not in SUBMITTER_EDITABLE:
+                hint = await m.reply(t(lang, "u_preview_locked") if sub.reviewer_edited else t(lang, "u_preview_view_only"))
+                await core.replace_user_ack(sid, [m.message_id, hint.message_id])
+                return
+            err, echo = await core.show_text(sid, m.chat.id, reply_to=m.message_id)
+            hint = await m.reply(err.text(lang) if err else t(lang, "u_edit_echo_hint"))
+            await core.replace_user_ack(sid, [m.message_id, *([echo] if echo else []), hint.message_id])
             return
 
         err = await core.edit(sid, _editor(core, m), body, entities, dump_link_preview(m.link_preview_options),
                               allowed=SUBMITTER_EDITABLE, by_submitter=True)
-        await m.reply(err.text(lang) if err else _edited_text(lang, sid, sub.status))
+        done = await m.reply(err.text(lang) if err else _edited_text(lang, sid, sub.status))
+        if not err:
+            await core.replace_user_ack(sid, [m.message_id, done.message_id])
 
     @router.message(Command("msg"))
     async def msg_cmd(m: Message, core: Core) -> None:
@@ -108,7 +117,9 @@ def build_router() -> Router:
         sub = await core.get_submission(sid)
         lang = core.lang_of(m.from_user)
         err = await core.replace_item(sid, index, new_item, _editor(core, m), SUBMITTER_EDITABLE)
-        await m.reply(err.text(lang) if err else _edited_text(lang, sid, sub.status))
+        done = await m.reply(err.text(lang) if err else _edited_text(lang, sid, sub.status))
+        if not err:  # 改的是投稿原消息本身，不删；只记“已更新”的回复
+            await core.replace_user_ack(sid, [done.message_id])
 
     @router.message(F.media_group_id)
     async def album_part(m: Message, core: Core) -> None:
@@ -192,5 +203,5 @@ def _edited_text(lang: str, sid: int, status: str) -> str:
 
 
 def _editor(core: Core, m: Message) -> str:
-    """控制消息上“已修改（谁）”的显示，用审核群的语言。"""
+    """控制按钮消息上“已修改（谁）”的显示，用审核群的语言。"""
     return t(core.lang, "submitter_label", name=m.from_user.full_name)

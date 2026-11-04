@@ -35,7 +35,7 @@ USER_ID = re.compile(r"[1-9][0-9]{0,15}")
 MAX_ACTIVE_DAYS = 3650
 
 
-# 按钮 → 提示的种类；FOLD 里的按钮来自面板（理由面板、媒体面板），发提示时把控制消息恢复原样
+# 按钮 → 提示的种类；FOLD 里的按钮来自面板（理由面板、媒体面板），发提示时把控制按钮消息恢复原样
 PROMPT_KIND = {"custom": "time", "edit": "edit", "creason": "reason", "madd": "madd", "mrep": "mrep"}
 FOLD = ("creason", "madd", "mrep")
 
@@ -95,7 +95,7 @@ async def _banned_submitter(core: Core, sid: int) -> bool:
 
 
 async def _replied_sid(m: Message, core: Core) -> int | None:
-    """命令针对的投稿：回复的那条投稿消息（预览、控制消息、转来的留言）。"""
+    """命令针对的投稿：回复的那条投稿消息（预览、控制按钮消息、转来的留言）。"""
     reply = explicit_reply(m)
     return await core.sid_for_review_message(reply.message_id) if reply else None
 
@@ -125,7 +125,7 @@ def build_router(settings: Settings) -> Router:
             await cq.answer(t(lang, "toast_pick_reason"))
             return
         if step == "confirm" and action in ("unban", "purge") and not await _banned_submitter(core, sid):
-            # 早就解封了（比如用了 /unban），控制消息上的按钮是旧的：不出确认面板，直接收起
+            # 早就解封了（比如用了 /unban），控制按钮消息上的按钮是旧的：不出确认面板，直接收起
             await core.refresh_control(sid)
             await cq.answer(t(lang, "toast_not_banned"), show_alert=True)
             return
@@ -142,7 +142,7 @@ def build_router(settings: Settings) -> Router:
             await cq.answer(t(lang, "toast_publishing"))
             err = await core.publish(sid, reviewer=who, version=v)
             if err:
-                await cq.message.reply(err.text(lang))  # 回复在这条投稿的控制消息下面
+                await cq.message.reply(err.text(lang))  # 回复在这条投稿的控制按钮消息下面
         elif action == "retry":
             await cq.answer(t(lang, "toast_retrying"))
             err = await core.publish(sid, reviewer=who, from_states=("failed",), version=v)
@@ -197,7 +197,7 @@ def build_router(settings: Settings) -> Router:
         elif action == "purge":
             sub = await core.get_submission(sid)
             res = await core.purge_review_messages(sub.user_id) if sub else notice("sub_not_found", sid=sid)
-            await core.refresh_control(sid)  # 删成功时这条控制消息已经没了（不会再刷新）；没删掉就收起确认面板
+            await core.refresh_control(sid)  # 删成功时这条控制按钮消息已经没了（不会再刷新）；没删掉就收起确认面板
             await cq.answer(res.text(lang), show_alert=True)
         else:
             await cq.answer()
@@ -277,20 +277,26 @@ def build_router(settings: Settings) -> Router:
         else:
             core.albums.add(m, lambda messages: _hint_relay_reply(messages[0], core))
 
-    async def _finish(prompt: Prompt, m: Message, core: Core, err: Notice | None, done: str) -> None:
-        """回复提示的结果：成功就删掉提示；出错时能改了再试的保留提示，其他的作废。"""
+    async def _finish(prompt: Prompt, m: Message, core: Core, err: Notice | None, done: str,
+                      replies: list[Message] | None = None) -> None:
+        """回复提示的结果：成功就删掉提示；出错时能改了再试的保留提示，其他的作废。
+        replies：审核员回复提示发的全部消息（相册是每一项），默认就是 m。"""
         if err:
             await m.reply(err.text(core.lang))
             if err.key not in RETRYABLE:
                 await core.finish_prompt(prompt)
             return
         await core.finish_prompt(prompt)
-        await m.reply(done)
+        ack = await m.reply(done)
+        # 改稿成功：审核员回复的内容（文字，或添加 / 替换用的图片）和确认只留最近一次的，下次改稿时删掉。
+        # 相册后到的部分回复在它自己下面（见 _answer_late_media），删掉前面这几张不影响
+        if prompt.kind in ("edit", "madd", "mrep"):
+            await core.replace_edit_ack(prompt.sid, [x.message_id for x in replies or [m]] + [ack.message_id])
 
     async def _answer_media(prompt: Prompt, messages: list[Message], core: Core) -> Notice | None:
         """回复了“添加 / 替换”的提示：发来的图片视频（可以是相册）加进投稿或换掉第 arg 个。"""
         err = await _apply_media(prompt, messages, "add" if prompt.kind == "madd" else "replace", core)
-        await _finish(prompt, messages[0], core, err, t(core.lang, "admin_edited"))
+        await _finish(prompt, messages[0], core, err, t(core.lang, "admin_edited"), replies=messages)
         return err
 
     async def _answer_album(prompt: Prompt, album: str, messages: list[Message], core: Core) -> None:
@@ -309,11 +315,15 @@ def build_router(settings: Settings) -> Router:
         prompt, first, n = ans.prompt, messages[0], len(messages)
         async with ans.lock:
             if prompt.kind == "mrep":
-                await first.reply(t(core.lang, "media_late_unused", n=n))
-                return
-            err = ans.error or await _apply_media(prompt, messages, "add", core)
-            await first.reply(t(core.lang, "media_late_failed", n=n, reason=err.text(core.lang)) if err
-                              else t(core.lang, "media_late_added", n=n))
+                note = await first.reply(t(core.lang, "media_late_unused", n=n))
+            else:
+                err = ans.error or await _apply_media(prompt, messages, "add", core)
+                if err:  # 没加进去：留着，审核员要看原因
+                    await first.reply(t(core.lang, "media_late_failed", n=n, reason=err.text(core.lang)))
+                    return
+                note = await first.reply(t(core.lang, "media_late_added", n=n))
+            # 和前面那批一起，算这次改稿留下的消息，下次改稿时删掉
+            await core.add_edit_ack(prompt.sid, [x.message_id for x in messages] + [note.message_id])
 
     async def _apply_media(prompt: Prompt, messages: list[Message], op: str, core: Core) -> Notice | None:
         items = [extract_item(x) for x in messages]
@@ -417,12 +427,16 @@ def build_router(settings: Settings) -> Router:
             return
 
         if not body.strip():
-            err = await core.show_text(sid, m.chat.id, reply_to=m.message_id)
+            err, _ = await core.show_text(sid, m.chat.id, reply_to=m.message_id)
             await m.reply(err.text(core.lang) if err else t(core.lang, "admin_echo_hint"))
             return
 
         err = await core.edit(sid, m.from_user.full_name, body, entities, dump_link_preview(m.link_preview_options))
-        await m.reply(err.text(core.lang) if err else t(core.lang, "admin_edited"))
+        if err:  # 失败的留着：审核员要看原因、改了再发
+            await m.reply(err.text(core.lang))
+            return
+        ack = await m.reply(t(core.lang, "admin_edited"))
+        await core.replace_edit_ack(sid, [m.message_id, ack.message_id])  # 只留最近一次的修改消息和确认
 
     @router.message(Command("msg"))
     async def msg_cmd(m: Message, core: Core) -> None:
@@ -485,7 +499,7 @@ def build_router(settings: Settings) -> Router:
         if not await core.unban_user(uid):
             await m.reply(t(core.lang, "not_banned", uid=uid))
             return
-        if sid is not None:  # 收起回复的那条控制消息上的“解除封禁”；别的控制消息上的旧按钮点了再收起
+        if sid is not None:  # 收起回复的那条控制按钮消息上的“解除封禁”；别的控制按钮消息上的旧按钮点了再收起
             await core.refresh_control(sid)
         await m.reply(t(core.lang, "unbanned_reply", uid=uid))
 

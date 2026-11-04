@@ -80,7 +80,7 @@ async def scenario():
     told = await wait_for(lambda e: is_send(e, "sendMessage", USER, "未通过"), since=n)
     ctrl = await wait_for(lambda e: e["method"] == "editMessageText"
                           and str(e["params"].get("message_id")) == str(c2["result"]["message_id"]), since=n)
-    check("Confirm → rejected; reason sent to submitter and shown on the control message",
+    check("Confirm → rejected; reason sent to submitter and shown on the control panel message",
           told and "重复投稿" in told["params"]["text"] and ctrl and "重复投稿" in ctrl["params"]["text"],
           told and told["params"]["text"])
 

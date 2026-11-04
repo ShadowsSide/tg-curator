@@ -1,5 +1,5 @@
 """剧透遮罩跟随投稿人的修改：
-- 投稿人用 Telegram 自带的“编辑”给图片开 / 关剧透，控制消息上的剧透设置跟着变
+- 投稿人用 Telegram 自带的“编辑”给图片开 / 关剧透，控制按钮消息上的剧透设置跟着变
 - 只改说明文字（剧透没变）不覆盖审核员手动切换的结果
 - 回复自己的投稿发一张带剧透的图并“加到这条投稿”，剧透也跟着打开
 
@@ -40,7 +40,7 @@ def edit_photo(message_id, fid, spoiler, caption=""):
 
 
 def ctrl_text(message_id, since):
-    """since 之后这条控制消息被刷新后的文字。"""
+    """since 之后这条控制按钮消息被刷新后的文字。"""
     return wait_for(lambda e: e["method"] == "editMessageText" and str(e["params"].get("message_id")) == str(message_id)
                     and str(e["params"].get("chat_id")) == str(REVIEW), since=since)
 

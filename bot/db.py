@@ -61,13 +61,17 @@ CREATE TABLE IF NOT EXISTS submissions (
     edit_preview   TEXT,
     merge_to       INTEGER,
     media_group_id TEXT,
-    version        INTEGER NOT NULL DEFAULT 0
+    version        INTEGER NOT NULL DEFAULT 0,
+    reviewer_edited INTEGER NOT NULL DEFAULT 0,  -- 审核员改过稿：之后投稿人不能再改，只能 /msg
+    user_preview   TEXT,               -- 投稿人私聊里最新一份完整预览的消息（JSON 列表），发新的时删掉旧的
+    edit_ack       TEXT,               -- 审核群里最近一次改稿的修改消息和“已修改”确认（JSON 列表），下次改稿时删掉
+    user_ack       TEXT                -- 投稿人私聊里最近一次改稿 / 查看的命令和回复（JSON 列表），下次时删掉
 );
 
 CREATE INDEX IF NOT EXISTS idx_sub_status ON submissions(status, scheduled_at);
 CREATE INDEX IF NOT EXISTS idx_sub_user   ON submissions(user_id, submitted_at);
 
--- 审核群里属于某条投稿的所有消息（预览 + 控制消息），用于 /no、/ban 回复定位投稿
+-- 审核群里属于某条投稿的所有消息（预览 + 控制按钮消息），用于 /no、/ban 回复定位投稿
 CREATE TABLE IF NOT EXISTS review_messages (
     message_id INTEGER PRIMARY KEY,
     sid        INTEGER NOT NULL
@@ -126,6 +130,11 @@ MIGRATIONS = [
     ("submissions", "media_group_id", "ALTER TABLE submissions ADD COLUMN media_group_id TEXT"),
     ("submissions", "version", "ALTER TABLE submissions ADD COLUMN version INTEGER NOT NULL DEFAULT 0"),
     ("prompts", "arg", "ALTER TABLE prompts ADD COLUMN arg INTEGER NOT NULL DEFAULT 0"),
+    ("submissions", "reviewer_edited",
+     "ALTER TABLE submissions ADD COLUMN reviewer_edited INTEGER NOT NULL DEFAULT 0"),
+    ("submissions", "user_preview", "ALTER TABLE submissions ADD COLUMN user_preview TEXT"),
+    ("submissions", "edit_ack", "ALTER TABLE submissions ADD COLUMN edit_ack TEXT"),
+    ("submissions", "user_ack", "ALTER TABLE submissions ADD COLUMN user_ack TEXT"),
 ]
 
 # 已移除功能留下的列：旧库里有就删掉 (表, 列)
@@ -135,7 +144,7 @@ DROPPED_COLUMNS = [
     ("submissions", "topic_status"),
 ]
 
-JSON_COLUMNS = ("items", "original_items", "spam_flags", "edit_preview")  # 存成 JSON 文本的列
+JSON_COLUMNS = ("items", "original_items", "spam_flags", "edit_preview", "user_preview", "edit_ack", "user_ack")  # 存成 JSON 文本的列
 
 OPEN_STATES = ("pending", "scheduled", "failed")  # 已提交、尚未发布或拒绝
 # 发布中途程序重启时记在 error 里的标记，显示时翻译成审核群的语言（见 render.control_text）
@@ -190,6 +199,10 @@ class Submission:
     merge_to: int | None = None  # 草稿：投稿人回复旧投稿发的图片，可以“加到”这条投稿里
     media_group_id: str | None = None  # 由相册生成的投稿：Telegram 的相册编号，相册后到的部分靠它找回这条投稿
     version: int = 0  # 内容每改一次加 1：发布按钮带着它，确认时内容变过就不发；改稿时防止互相覆盖
+    reviewer_edited: bool = False  # 审核员改过稿（文字或媒体）：之后投稿人不能再改，只能用 /msg 沟通
+    user_preview: list[int] | None = None  # 投稿人私聊里最新一份完整预览（改稿后、只发 /edit 时发出）
+    edit_ack: list[int] | None = None  # 审核群里最近一次改稿留下的修改消息和“已修改”确认，下次改稿时删掉
+    user_ack: list[int] | None = None  # 投稿人私聊里最近一次改稿 / 查看的命令和回复，下次改稿或查看时删掉
 
     @property
     def spoilerable(self) -> bool:
@@ -202,9 +215,13 @@ class Submission:
         data["original_items"] = json.loads(data["original_items"]) if data["original_items"] else None
         data["spam_flags"] = json.loads(data["spam_flags"]) if data.get("spam_flags") else None
         data["edit_preview"] = json.loads(data["edit_preview"]) if data.get("edit_preview") else None
+        data["user_preview"] = json.loads(data["user_preview"]) if data.get("user_preview") else None
+        data["edit_ack"] = json.loads(data["edit_ack"]) if data.get("edit_ack") else None
+        data["user_ack"] = json.loads(data["user_ack"]) if data.get("user_ack") else None
         data["anonymous"] = bool(data["anonymous"])
         data["spoiler"] = bool(data["spoiler"])
         data["silent"] = bool(data["silent"])
+        data["reviewer_edited"] = bool(data.get("reviewer_edited"))
         return cls(**data)
 
 
@@ -358,7 +375,8 @@ class DB:
         """用户私聊里的某条消息属于哪条投稿：
         - 是投稿内容本身 → (投稿编号, 第几项)。同一条消息可能在两条投稿里（图片“加到”了旧投稿，
           新建的草稿随即作废），优先取没作废的那条
-        - 是机器人的“请选择投稿方式 / 已提交”提示 → (投稿编号, None)"""
+        - 原稿里有、后来被删掉或换掉的内容，机器人的“请选择投稿方式 / 已提交”提示，或发给投稿人的完整预览
+          → (投稿编号, None)"""
         row = await self._one(
             """SELECT s.id, CAST(j.key AS INTEGER) FROM submissions s, json_each(s.items) j
                WHERE s.user_id=? AND json_extract(j.value, '$.msg_id')=?
@@ -367,8 +385,24 @@ class DB:
         )
         if row:
             return row[0], row[1]
+        # 原稿里有、现在已经不在投稿里的（被删掉、被换掉的图）：消息还留在投稿人的聊天里，回复它也要找得到投稿
+        row = await self._one(
+            """SELECT s.id FROM submissions s, json_each(s.original_items) j
+               WHERE s.user_id=? AND json_extract(j.value, '$.msg_id')=?
+               ORDER BY s.status='cancelled', s.id DESC LIMIT 1""",
+            (user_id, message_id),
+        )
+        if row:
+            return row[0], None
         row = await self._one(
             "SELECT id FROM submissions WHERE user_id=? AND user_msg_id=? ORDER BY id DESC LIMIT 1",
+            (user_id, message_id),
+        )
+        if row:
+            return row[0], None
+        row = await self._one(
+            """SELECT s.id FROM submissions s, json_each(s.user_preview) j
+               WHERE s.user_id=? AND j.value=? ORDER BY s.id DESC LIMIT 1""",
             (user_id, message_id),
         )
         if row:
@@ -444,7 +478,7 @@ class DB:
 
     async def review_traces(self, chat_id: int, user_id: int) -> dict[int, list[int]]:
         """这个用户的投稿在审核群里还留着的消息：{投稿编号: [消息编号]}。
-        包括预览、控制消息、改稿后的预览、转达的 /msg（都在 review_messages 里）和等待回复的提示（连同它要一起删的消息）。"""
+        包括预览、控制按钮消息、改稿后的预览、转达的 /msg（都在 review_messages 里）和等待回复的提示（连同它要一起删的消息）。"""
         traces: dict[int, set[int]] = {}
         rows = await self._all(
             """SELECT rm.sid, rm.message_id FROM review_messages rm JOIN submissions s ON s.id = rm.sid WHERE s.user_id=?
@@ -462,7 +496,7 @@ class DB:
         return {sid: sorted(ids) for sid, ids in sorted(traces.items())}
 
     async def forget_review_messages(self, chat_id: int, sids: list[int]) -> None:
-        """这些投稿在审核群里的消息已经删掉了：清掉对应记录（投稿本身保留，控制消息编号置空，之后不再刷新）。"""
+        """这些投稿在审核群里的消息已经删掉了：清掉对应记录（投稿本身保留，控制按钮消息编号置空，之后不再刷新）。"""
         marks = ", ".join("?" * len(sids))
         await self.conn.execute(f"DELETE FROM review_messages WHERE sid IN ({marks})", sids)
         await self.conn.execute(f"DELETE FROM prompts WHERE chat_id=? AND sid IN ({marks})", (chat_id, *sids))
@@ -478,9 +512,10 @@ class DB:
         )
         return row[0] if row else None
 
-    async def count_open_by_user(self, user_id: int) -> int:
+    async def count_open_by_user(self, user_id: int, statuses: tuple[str, ...] = ("draft", "pending")) -> int:
         row = await self._one(
-            "SELECT COUNT(*) FROM submissions WHERE user_id=? AND status IN ('draft', 'pending')", (user_id,)
+            f"SELECT COUNT(*) FROM submissions WHERE user_id=? AND status IN ({','.join('?' * len(statuses))})",
+            (user_id, *statuses),
         )
         return row[0]
 

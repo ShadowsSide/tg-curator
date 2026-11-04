@@ -71,7 +71,10 @@ class SubmissionsMixin(CoreBase):
                 late = await self._join_album(target, first, items, lang)
                 if late is None:
                     return
-        if await self.db.count_open_by_user(user.id) >= self.s.max_pending_per_user:
+        # 回复自己的投稿发来的图片视频多半是要加进那条投稿，不占新名额，到了上限也照常给“加到这条投稿”；
+        # 要是改点“署名 / 匿名”当新投稿，提交时再按上限拦（见 submit）
+        merge_to = await self._merge_target(first, items)
+        if not merge_to and await self.db.count_open_by_user(user.id) >= self.s.max_pending_per_user:
             await first.reply(t(lang, "too_many"))
             return
 
@@ -79,7 +82,6 @@ class SubmissionsMixin(CoreBase):
         spoiler = any(i.get("spoiler") for i in items)
         sid = await self.db.create_draft(user.id, items, silent=self.s.default_silent, spoiler=spoiler,
                                          media_group_id=first.media_group_id)
-        merge_to = await self._merge_target(first, items)
         if merge_to:
             await self.db.update(sid, merge_to=merge_to)
         sub = await self.db.get(sid)
@@ -169,6 +171,9 @@ class SubmissionsMixin(CoreBase):
         err = await self._cooldown(user_id)
         if err:
             return err
+        # 草稿建的时候已经按上限查过，这里只拦没查过的：回复旧投稿发图生成的草稿（见 _receive）
+        if sub.merge_to and await self.db.count_open_by_user(user_id, ("pending",)) >= self.s.max_pending_per_user:
+            return notice("too_many")
         hits = spam.check(sub.items, self.s.spam_rules)
         err = self._spam_blocked(hits)  # 草稿保留，改了内容可以重新提交
         if err:
@@ -222,7 +227,7 @@ class SubmissionsMixin(CoreBase):
                 reply_parameters=_reply_to(preview[0].message_id),
                 link_preview_options=NO_PREVIEW,
             )
-        except Exception:  # 没有控制消息的预览没法操作，重新提交时还会再发一份
+        except Exception:  # 没有控制按钮消息的预览没法操作，重新提交时还会再发一份
             await self._delete_old_preview([m.message_id for m in preview])
             raise
         await self.db.update(sid, review_msg_id=ctrl.message_id)

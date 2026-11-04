@@ -63,11 +63,11 @@ async def scenario():
     n = len(log); gm("好的", reply_to=third)
     check("reviewer replying to any relayed photo is recognised",
           await wait_for(lambda e: is_send(e, "sendMessage", REVIEW, "/msg"), since=n))
-    check("control message counts one conversation, not three",
+    check("control panel message counts one conversation, not three",
           await wait_for(lambda e: e["method"] == "editMessageText" and "沟通 1 条" in e["params"].get("text", ""),
                          since=0)
           and not [e for e in log if "沟通 3 条" in str(e["params"].get("text", ""))])
-    # 审核员回复控制消息发相册，/msg 写在第二张：整组转给投稿人，标签在第二张
+    # 审核员回复控制按钮消息发相册，/msg 写在第二张：整组转给投稿人，标签在第二张
     n = len(log)
     admin_photo("B1", "g2", ctrl["result"]["message_id"])
     admin_photo("B2", "g2", ctrl["result"]["message_id"], caption="/msg 这是参考图")

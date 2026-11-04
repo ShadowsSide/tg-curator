@@ -1,7 +1,7 @@
 """封禁后删除 TA 在审核群的稿件（🗑）：
-- 控制消息：封禁后出现 🗑，要二次确认；确认后删除 TA 全部投稿（含已发布）在审核群的预览和控制消息，别人的不动
+- 控制按钮消息：封禁后出现 🗑，要二次确认；确认后删除 TA 全部投稿（含已发布）在审核群的预览和控制按钮消息，别人的不动
 - /user 卡片：被封禁且还有稿件时显示 🗑（带条数），删完后按钮消失；删除失败提示可重试，重试成功
-- 旧按钮：解封后点控制消息或卡片上的 🗑，只提示“没有被封禁”，不删除
+- 旧按钮：解封后点控制按钮消息或卡片上的 🗑，只提示“没有被封禁”，不删除
 
 用法（项目根目录下）：python tests/live_purge_test.py
 复用 live_test.py 的模拟 Bot API 服务器。约 15 秒。
@@ -29,7 +29,7 @@ def toast(since, contains):
 
 
 def review_ids(marker):
-    """审核群里含 marker 的消息（预览）的编号；控制消息不含稿件内容，另外取。"""
+    """审核群里含 marker 的消息（预览）的编号；控制按钮消息不含稿件内容，另外取。"""
     return {e["result"]["message_id"] for e in log
             if not e.get("error") and is_send(e, "sendMessage", REVIEW, marker) and e.get("result")}
 
@@ -60,14 +60,14 @@ async def scenario():
     c2 = await submit("删稿二 待审核", 2)
     c3 = await submit("别人的稿件", 3, who=BOB)
     ctrl2, ctrl3 = c2["result"]["message_id"], c3["result"]["message_id"]
-    alice_ids = review_ids("删稿一") | review_ids("删稿二") | {c1["result"]["message_id"], ctrl2}  # 预览 + 控制消息
+    alice_ids = review_ids("删稿一") | review_ids("删稿二") | {c1["result"]["message_id"], ctrl2}  # 预览 + 控制按钮消息
     bob_ids = review_ids("别人的稿件") | {ctrl3}
-    check("setup: previews + control messages recorded", len(alice_ids) == 4 and len(bob_ids) == 2, (alice_ids, bob_ids))
+    check("setup: previews + control panel messages recorded", len(alice_ids) == 4 and len(bob_ids) == 2, (alice_ids, bob_ids))
 
-    # 1. 控制消息上封禁 → 出现 🔓 和 🗑
+    # 1. 控制按钮消息上封禁 → 出现 🔓 和 🗑
     n = len(log); lt.cb("r:ban_ok:2:0", REVIEW, ADMIN, message_id=ctrl2)
     banned = await edited(ctrl2, n)
-    check("ban → control message shows 🔓 + 🗑", banned and buttons(banned).get(PURGE_BTN) == "r:purge:2:0",
+    check("ban → control panel message shows 🔓 + 🗑", banned and buttons(banned).get(PURGE_BTN) == "r:purge:2:0",
           banned and buttons(banned))
 
     # 2. 点 🗑 先确认；返回不删
@@ -88,7 +88,7 @@ async def scenario():
     check("/user after deleting → no 🗑 left (only 🔓)", c and buttons(c) == {"🔓 解除封禁": f"au:unban:{USER}"},
           c and buttons(c))
 
-    # 4. 旧按钮：Bob 封禁后解封，再点控制消息上的 🗑 → 只提示没有被封禁
+    # 4. 旧按钮：Bob 封禁后解封，再点控制按钮消息上的 🗑 → 只提示没有被封禁
     n = len(log); lt.cb("r:ban_ok:3:0", REVIEW, ADMIN, message_id=ctrl3)
     await edited(ctrl3, n)
     n = len(log); gm(f"/unban {BOB}")
@@ -96,7 +96,7 @@ async def scenario():
     n = len(log); lt.cb("r:purge:3:0", REVIEW, ADMIN, message_id=ctrl3)
     t = await toast(n, "没有被封禁")
     collapsed = await edited(ctrl3, n)
-    check("stale 🗑 on control message after unban → “not banned”, button removed, nothing deleted",
+    check("stale 🗑 on control panel message after unban → “not banned”, button removed, nothing deleted",
           t and t["params"].get("show_alert") and collapsed and PURGE_BTN not in buttons(collapsed) and not deletes(n),
           collapsed and buttons(collapsed))
 

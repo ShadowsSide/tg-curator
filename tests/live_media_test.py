@@ -85,7 +85,7 @@ def index_of(data):
 async def panel_button(sid, ctrl_id, label):
     """打开审核员的媒体面板，取某个按钮的数据（不带 “r:” 前缀，可以直接交给 ask）。"""
     n = len(log); lt.cb(f"r:media:{sid}:0", REVIEW, ADMIN, message_id=ctrl_id)
-    # 等的是这次打开的面板：之前的操作可能还有一次控制消息刷新没发完
+    # 等的是这次打开的面板：之前的操作可能还有一次控制按钮消息刷新没发完
     panel = await wait_for(lambda e: e["method"] == "editMessageReplyMarkup" and label in buttons(e), since=n)
     data = buttons(panel).get(label) if panel else None
     return data and data.removeprefix("r:")
@@ -103,7 +103,7 @@ async def scenario():
     # ===== 审核员 =====
     c1 = await submit("媒体测试 文字", 1)
     ctrl1 = c1["result"]["message_id"]
-    check("pending control message has 🖼 Media", buttons(c1).get("🖼 媒体") == "r:media:1:0", buttons(c1))
+    check("pending control panel message has 🖼 Media", buttons(c1).get("🖼 媒体") == "r:media:1:0", buttons(c1))
 
     # 1. 纯文字投稿的面板：只有“添加”和“返回”
     n = len(log); lt.cb("r:media:1:0", REVIEW, ADMIN, message_id=ctrl1)

@@ -89,7 +89,7 @@ def user_card_kb(uid: int, banned: bool, lang: str, purgeable: int = 0) -> Inlin
 
 
 def user_confirm_kb(uid: int, action: str, lang: str) -> InlineKeyboardMarkup:
-    """/user 卡片的二次确认面板，和控制消息上的确认面板用同样的文字和颜色。"""
+    """/user 卡片的二次确认面板，和控制按钮消息上的确认面板用同样的文字和颜色。"""
     return InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text=t(lang, f"btn_confirm_{action}"), style=CONFIRMABLE[action],
                               callback_data=AdminUserCB(a=action + CONFIRMED, uid=uid).pack())],
@@ -124,7 +124,7 @@ def user_kb(sub: Submission, lang: str, last_anon: bool | None = None) -> Inline
     """投稿人私聊里那条提示消息上的按钮。
     草稿：署名 / 匿名 / 取消；回复旧投稿发的图片还多一个“加到这条投稿”（sub.merge_to）。
       last_anon：上次选的是匿名（True）还是署名（False），那个按钮标上“（上次）”并排在前面；None = 第一次投稿。
-    草稿和待审核：有 2 个以上图片视频时多一个“删除图片”。其他状态没有按钮。"""
+    草稿和待审核：有 2 个以上图片视频时多一个“删除图片”（审核员改过稿就没有了）。其他状态没有按钮。"""
     sid = sub.id
     rows: list[list[InlineKeyboardButton]] = []
     if sub.status == "draft":
@@ -136,7 +136,7 @@ def user_kb(sub: Submission, lang: str, last_anon: bool | None = None) -> Inline
         if last_anon is not None:
             choices[0] = (t(lang, "btn_last", label=choices[0][0]), choices[0][1])
         rows.append([_ub(text, a, sid, style=BLUE) for text, a in choices])
-    if sub.status in ("draft", "pending") and media_count(sub.items) > 1:
+    if sub.status in ("draft", "pending") and media_count(sub.items) > 1 and not sub.reviewer_edited:
         rows.append([_umb(t(lang, "btn_user_media"), "mdel", sid)])
     if sub.status == "draft":
         rows.append([_ub(t(lang, "btn_cancel"), "cancel", sid)])
@@ -153,7 +153,7 @@ def user_media_kb(sub: Submission, lang: str) -> InlineKeyboardMarkup:
 
 
 def control_kb(sub: Submission, lang: str, banned: bool = False) -> InlineKeyboardMarkup | None:
-    """控制消息的按钮。banned：投稿人已被封禁，最后一行显示“解除封禁”和“删除 TA 的稿件”。"""
+    """控制按钮消息的按钮。banned：投稿人已被封禁，最后一行显示“解除封禁”和“删除 TA 的稿件”。"""
     sid = sub.id
     rows: list[list[InlineKeyboardButton]] = []
     if sub.status in OPEN_STATES:

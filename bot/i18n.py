@@ -120,10 +120,12 @@ T: dict[str, dict[str, str]] = {
             "👋 欢迎投稿！\n\n"
             "直接把要投稿的内容发给我即可：文字、图片、视频、GIF、文件，或一次发多张图（相册）。\n"
             "发送后选择 <b>署名</b> 或 <b>匿名</b>，审核通过后会发布到频道，结果会通知你。\n\n"
-            "<b>修改投稿</b>（审核开始之前都可以改；定时、发布、拒绝后就不能改了）：\n"
+            "<b>修改投稿</b>（审核开始之前都可以改；定时、发布、拒绝后，或者审核员改过之后，就不能改了）：\n"
             "· 直接用 Telegram 的“编辑”修改你发出的那条消息，机器人会自动同步（换图也可以）\n"
-            "· 或者<b>回复</b>你的投稿，发送 <code>/edit 新内容</code>；回复时只发 /edit 会把当前内容发给你，方便复制修改\n"
-            "· 要加图：<b>回复</b>你的投稿发图片或视频，选“加到这条投稿”；要删图：点投稿下面的“删除图片 / 视频”\n\n"
+            "· 或者<b>回复</b>你的投稿，发送 <code>/edit 新内容</code>；只发 /edit 会发来投稿现在的样子（任何时候都能看）\n"
+            "· 要加图：<b>回复</b>你的投稿发图片或视频，选“加到这条投稿”；要删图：点投稿下面的“删除图片 / 视频”"
+            "（直接删除聊天里的图片不会同步，Telegram 不会通知机器人）\n"
+            "· 每次改完，机器人都会发来投稿现在的完整预览\n\n"
             "<b>和审核员沟通</b>：<b>回复</b>审核员的消息或你的投稿，发送 <code>/msg 内容</code>\n\n"
             "/me 查看我的投稿统计"
         ),
@@ -132,12 +134,15 @@ T: dict[str, dict[str, str]] = {
             "Text, photos, videos, GIFs, files, or several photos at once (an album) all work.\n"
             "After sending, choose <b>signed</b> or <b>anonymous</b>. Once approved, it's published to the channel "
             "and you'll be notified.\n\n"
-            "<b>Editing</b> (possible until the review starts; not once it's scheduled, published or rejected):\n"
+            "<b>Editing</b> (possible until the review starts; not once it's scheduled, published or rejected, "
+            "or once a reviewer has edited it):\n"
             "· Use Telegram's “Edit” on the message you sent; the bot syncs it automatically (you can even swap the image)\n"
-            "· Or <b>reply</b> to your submission with <code>/edit new content</code>; replying with just /edit sends "
-            "you the current content so you can copy and change it\n"
+            "· Or <b>reply</b> to your submission with <code>/edit new content</code>; just /edit shows how your "
+            "submission looks now (works any time)\n"
             "· To add photos, <b>reply</b> to your submission with them and choose “Add to that submission”; "
-            "to remove one, tap “Remove a photo / video” under your submission\n\n"
+            "to remove one, tap “Remove a photo / video” under your submission (deleting the photo from the chat "
+            "isn't synced: Telegram doesn't tell the bot)\n"
+            "· After each change the bot sends you a full preview of your submission\n\n"
             "<b>Talking to the reviewers</b>: <b>reply</b> to the reviewer's message or your submission with "
             "<code>/msg message</code>\n\n"
             "/me shows your submission stats"
@@ -243,12 +248,34 @@ T: dict[str, dict[str, str]] = {
         "zh": '没有找到这条投稿。',
         "en": "Couldn't find that submission.",
     },
+    "u_preview_view_only": {
+        "zh": "↑ 这是投稿现在的内容。审核已经开始，不能再改了；有问题请用 <code>/msg</code> 告诉审核员。",
+        "en": "↑ This is your submission as it stands. The review has started, so it can't be changed; "
+              "use <code>/msg</code> to talk to the reviewers.",
+    },
+    "u_preview_locked": {
+        "zh": "↑ 这是投稿现在的内容（含审核员的修改）。审核员改过之后你不能再改了；有问题请用 <code>/msg</code> 告诉审核员。",
+        "en": "↑ This is your submission as it stands, including the reviewer's edits. You can't change it anymore; "
+              "use <code>/msg</code> to talk to the reviewers.",
+    },
     "u_edit_echo_hint": {
         "zh": "↑ 这是当前内容。复制、修改后，回复你的投稿发送 <code>/edit 新内容</code>。",
         "en": "↑ This is the current content. Copy and change it, then reply to your submission with "
               "<code>/edit new content</code>.",
     },
     "submitter_label": {"zh": "投稿人 {name}", "en": "submitter {name}"},
+    "locked_by_reviewer": {
+        "zh": "审核员已经修改过这条投稿，你不能再改了。如需调整，请回复审核员的消息或你的投稿，"
+              "发送 <code>/msg 内容</code> 告诉审核员。",
+        "en": "A reviewer has already edited this submission, so you can't change it anymore. To ask for changes, "
+              "reply to the reviewer's message or your submission with <code>/msg your message</code>.",
+    },
+    "notify_reviewer_edited": {
+        "zh": "✏️ 审核员修改了你的投稿，之后不能再改，请用 <code>/msg</code> 与审核员沟通。"
+              "回复你的投稿发送 <code>/edit</code> 可以查看当前内容。",
+        "en": "✏️ A reviewer edited your submission, so you can't change it anymore; use <code>/msg</code> to talk "
+              "to the reviewers. Reply to your submission with <code>/edit</code> to see the current version.",
+    },
 
     # ---------- 通知投稿人 ----------
     "view_post": {"zh": "查看帖子", "en": "View post"},
@@ -374,7 +401,7 @@ T: dict[str, dict[str, str]] = {
         "en": 'This submission has no text. Send /edit followed by a caption to add one',
     },
 
-    # ---------- 审核：控制消息 ----------
+    # ---------- 审核：控制按钮消息 ----------
     "ctrl_title": {
         "zh": '📮 <b>新投稿</b>',
         "en": '📮 <b>New submission</b>',
@@ -547,25 +574,25 @@ T: dict[str, dict[str, str]] = {
 
     # ---------- 审核：命令 ----------
     "review_help": {
-        "zh": '🛠 <b>审核群命令</b>\n/stats 发送最新审核统计\n/queue 定时发布队列\n/active [天数] 投稿人活跃度排行（默认 30 天）\n/user &lt;用户ID&gt; 查看某位投稿人\n\n<b>处理投稿</b>（控制消息上的 ✏️ 修改 按钮和 /edit 作用相同；命令要回复投稿的预览或控制消息使用）\n/edit 新内容 —— 替换正文或说明文字，格式原样保留\n/edit —— 不带内容：把当前文字（含格式）发出来，方便复制后修改\n/msg 内容 —— 发消息给投稿人（以“审核员”身份），投稿人也用 /msg 回复\n/no [理由] —— 拒绝，理由会发给投稿人\n/ban [理由] —— 封禁投稿人，并自动拒绝其所有未处理来稿\n/cancel —— 放弃正在等你回复的操作（点了 修改、自定义理由 等按钮后）\n\n<b>按用户处理</b>\n/ban &lt;用户ID&gt; [理由] · /unban &lt;用户ID&gt;',
-        "en": "🛠 <b>Review group commands</b>\n/stats post the latest review summary\n/queue scheduled posts\n/active [days] contributor ranking (default 30 days)\n/user &lt;user ID&gt; show one contributor\n\n<b>Handling a submission</b> (the ✏️ Edit button does the same as /edit; reply to the submission's preview or control message to use a command)\n/edit new content — replace the text or caption, keeping formatting\n/edit — on its own: show the current text with formatting so you can copy it\n/msg message — message the submitter (shown as “Reviewer”); they answer with /msg too\n/no [reason] — reject; the reason is sent to the submitter\n/ban [reason] — ban the submitter and reject all their open submissions\n/cancel — drop what's waiting for your reply (after tapping Edit, Custom reason and so on)\n\n<b>By user</b>\n/ban &lt;user ID&gt; [reason] · /unban &lt;user ID&gt;",
+        "zh": '🛠 <b>审核群命令</b>\n/stats 发送最新审核统计\n/queue 定时发布队列\n/active [天数] 投稿人活跃度排行（默认 30 天）\n/user &lt;用户ID&gt; 查看某位投稿人\n\n<b>处理投稿</b>（控制按钮消息上的 ✏️ 修改 按钮和 /edit 作用相同；命令要回复投稿的预览或控制按钮消息使用）\n/edit 新内容 —— 替换正文或说明文字，格式原样保留\n/edit —— 不带内容：把当前文字（含格式）发出来，方便复制后修改\n/msg 内容 —— 发消息给投稿人（以“审核员”身份），投稿人也用 /msg 回复\n/no [理由] —— 拒绝，理由会发给投稿人\n/ban [理由] —— 封禁投稿人，并自动拒绝其所有未处理来稿\n/cancel —— 放弃正在等你回复的操作（点了 修改、自定义理由 等按钮后）\n\n<b>按用户处理</b>\n/ban &lt;用户ID&gt; [理由] · /unban &lt;用户ID&gt;',
+        "en": "🛠 <b>Review group commands</b>\n/stats post the latest review summary\n/queue scheduled posts\n/active [days] contributor ranking (default 30 days)\n/user &lt;user ID&gt; show one contributor\n\n<b>Handling a submission</b> (the ✏️ Edit button does the same as /edit; reply to the submission's preview or control panel message to use a command)\n/edit new content — replace the text or caption, keeping formatting\n/edit — on its own: show the current text with formatting so you can copy it\n/msg message — message the submitter (shown as “Reviewer”); they answer with /msg too\n/no [reason] — reject; the reason is sent to the submitter\n/ban [reason] — ban the submitter and reject all their open submissions\n/cancel — drop what's waiting for your reply (after tapping Edit, Custom reason and so on)\n\n<b>By user</b>\n/ban &lt;user ID&gt; [reason] · /unban &lt;user ID&gt;",
     },
     "no_permission": {"zh": "⛔ 你没有审核权限", "en": "⛔ You don't have reviewer permission"},
     "reply_to_submission": {
-        "zh": "请回复投稿的预览或控制消息。",
-        "en": "Please reply to a submission's preview or control message.",
+        "zh": "请回复投稿的预览或控制按钮消息。",
+        "en": "Please reply to a submission's preview or control panel message.",
     },
     "usage_user": {
-        "zh": "用法：/user &lt;用户ID&gt;（控制消息里投稿人名字后面的数字）",
-        "en": "Usage: /user &lt;user ID&gt; (the number after the submitter's name in the control message)",
+        "zh": "用法：/user &lt;用户ID&gt;（控制按钮消息里投稿人名字后面的数字）",
+        "en": "Usage: /user &lt;user ID&gt; (the number after the submitter's name in the control panel message)",
     },
     "usage_no": {
-        "zh": '用法：回复投稿的预览或控制消息，发送 /no [理由]',
-        "en": "Usage: reply to a submission's preview or control message with /no [reason]",
+        "zh": '用法：回复投稿的预览或控制按钮消息，发送 /no [理由]',
+        "en": "Usage: reply to a submission's preview or control panel message with /no [reason]",
     },
     "usage_edit": {
-        "zh": '用法：回复投稿的预览或控制消息，发送 /edit 新内容',
-        "en": "Usage: reply to a submission's preview or control message with /edit new content",
+        "zh": '用法：回复投稿的预览或控制按钮消息，发送 /edit 新内容',
+        "en": "Usage: reply to a submission's preview or control panel message with /edit new content",
     },
     "usage_ban": {
         "zh": '用法：回复投稿发送 /ban [理由]，或 /ban &lt;用户ID&gt; [理由]',
@@ -614,8 +641,8 @@ T: dict[str, dict[str, str]] = {
     "msg_sent_to_user": {"zh": "✅ 已发送给投稿人", "en": "✅ Sent to the submitter"},
     "msg_sent_to_review": {"zh": "✅ 已发送给审核员", "en": "✅ Sent to the reviewers"},
     "msg_usage_admin": {
-        "zh": "用法：回复投稿的预览或控制消息，发送 <code>/msg 内容</code>",
-        "en": "Usage: reply to a submission's preview or control message with "
+        "zh": "用法：回复投稿的预览或控制按钮消息，发送 <code>/msg 内容</code>",
+        "en": "Usage: reply to a submission's preview or control panel message with "
               "<code>/msg message</code>",
     },
     "msg_usage_user": {

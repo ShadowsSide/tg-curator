@@ -60,7 +60,7 @@ async def main():
         n = len(log); lt.cb("u:sign:2", USER, USER)
         await flooded("sendMessage", REVIEW, n)
         _, code = await restart.stop(proc, task)
-        check("SIGTERM during submit → reaches the review group with its control message, clean exit",
+        check("SIGTERM during submit → reaches the review group with its control panel message, clean exit",
               [e for e in log[n:] if is_send(e, "sendMessage", REVIEW, CTRL)] and status(2) == "pending" and code == 0,
               (status(2), code, lines[-5:]))
         bad = lt.unexpected_errors(lines)

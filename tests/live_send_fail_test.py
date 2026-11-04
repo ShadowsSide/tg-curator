@@ -43,17 +43,17 @@ async def scenario():
     ctrl = await wait_for(lambda e: is_send(e, "sendMessage", REVIEW, CTRL), since=n)
     check("pressing again submits it", ctrl)
 
-    # 2. 预览发出去了但控制消息失败：预览收回，不留下没法操作的消息
+    # 2. 预览发出去了但控制按钮消息失败：预览收回，不留下没法操作的消息
     photo = [{"file_id": "p", "file_unique_id": "u", "width": 1, "height": 1}]
-    await draft(caption="控制消息失败测试", photo=photo)
+    await draft(caption="控制按钮消息失败测试", photo=photo)
     lt.MOCK["fail"][f"sendMessage:{REVIEW}"] = [KICKED]
     n, answer = await press_submit(2)
     preview = await wait_for(lambda e: is_send(e, "sendPhoto", REVIEW), since=n)
     removed = await wait_for(lambda e: e["method"] == "deleteMessages"
                              and preview["result"]["message_id"] in e["params"].get("message_ids", []), since=n)
-    check("control message fails → preview removed, still a draft", told_draft(answer) and removed)
+    check("control panel message fails → preview removed, still a draft", told_draft(answer) and removed)
 
-    # 3. 发布时控制消息更新失败：照常发到频道，不卡在“发布中”
+    # 3. 发布时控制按钮消息更新失败：照常发到频道，不卡在“发布中”
     lt.MOCK["fail"][f"editMessageText:{REVIEW}"] = [KICKED]
     n = len(log); lt.cb(await lt.pub_ok(1), REVIEW, ADMIN)
     check("control update fails during publish → still published",

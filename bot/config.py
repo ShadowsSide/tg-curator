@@ -90,7 +90,7 @@ class Settings:
     reviewers: str  # 谁可以审核：admins（默认）/ all / 用户 ID，可组合，见 permissions.py
     reject_templates: tuple[str, ...]  # 点“拒绝”后可选的理由；为空则不显示理由面板
     spam_rules: SpamRules  # 关键词黑名单、链接上限，见 spam.py
-    spam_action: str  # 命中时：flag = 照常提交但在控制消息上标记；block = 拦下不让提交
+    spam_action: str  # 命中时：flag = 照常提交但在控制按钮消息上标记；block = 拦下不让提交
     new_user_cooldown_min: int  # 还没有稿件发布过的投稿人，两次投稿之间至少间隔几分钟；0 = 不限
 
     def reject_template(self, index: int) -> str | None:

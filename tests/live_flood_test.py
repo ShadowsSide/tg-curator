@@ -42,11 +42,11 @@ async def scenario():
     check("long 429 on publish → postponed and shown as scheduled, admin told why, not failed",
           msg and ctrl_sched and not failed, msg and msg["params"]["text"])
 
-    # 3. 审核群里的操作（编辑控制消息）被限流 → 同样自动重试
+    # 3. 审核群里的操作（编辑控制按钮消息）被限流 → 同样自动重试
     lt.MOCK["flood"][f"editMessageText:{REVIEW}"] = [1]
     n = len(log); lt.cb("r:silent:3:0", REVIEW, ADMIN)
     e = await wait_for(lambda e: is_send(e, "editMessageText", REVIEW, "静音发送：🔕 开"), timeout=10, since=n)
-    check("429 on editing the control message → retried and applied", e and floods(n, "editMessageText", REVIEW))
+    check("429 on editing the control panel message → retried and applied", e and floods(n, "editMessageText", REVIEW))
 
     # 4. 统计消息：短时间内多次审核只编辑一次，并且显示最终数字
     n = len(log); lt.gm("/stats")

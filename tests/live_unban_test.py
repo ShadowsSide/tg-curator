@@ -1,6 +1,6 @@
 """封禁 / 解封按钮：
-- 控制消息：封禁后显示 🔓 解除封禁，要二次确认；解封后通知投稿人、收起按钮。
-  用 /unban 解封后，别的控制消息上留下的旧按钮点了只提示“没有被封禁”并收起，不出确认面板。
+- 控制按钮消息：封禁后显示 🔓 解除封禁，要二次确认；解封后通知投稿人、收起按钮。
+  用 /unban 解封后，别的控制按钮消息上留下的旧按钮点了只提示“没有被封禁”并收起，不出确认面板。
 - /user 卡片：按当前状态显示 🚫 封禁 或 🔓 解除封禁，都要确认，执行后卡片原地刷新；
   状态已经被别人改了就只刷新卡片；没投过稿的人也能预先封禁；非审核员点不了。
 
@@ -17,7 +17,7 @@ from live_test import ADMIN, REVIEW, USER, buttons, check, gm, is_send, log, sub
 
 
 def ctrl_edit(message_id, since):
-    """since 之后这条控制消息被刷新（换文字和按钮，或只换按钮）。"""
+    """since 之后这条控制按钮消息被刷新（换文字和按钮，或只换按钮）。"""
     return wait_for(lambda e: e["method"] in ("editMessageText", "editMessageReplyMarkup")
                     and str(e["params"].get("message_id")) == str(message_id), since=since)
 
@@ -33,10 +33,10 @@ async def scenario():
     ctrl1 = c1["result"]["message_id"]
     check("not banned → no Unban button", not any(v.startswith("r:unban:") for v in buttons(c1).values()))
 
-    # 1. 用按钮封禁：被拒绝的那条控制消息上出现“解除封禁”
+    # 1. 用按钮封禁：被拒绝的那条控制按钮消息上出现“解除封禁”
     n = len(log); lt.cb("r:ban_ok:1:0", REVIEW, ADMIN, message_id=ctrl1)
     banned = await ctrl_edit(ctrl1, n)
-    check("after ban → control message shows 🔓 Unban", banned and buttons(banned) == {"🔓 解除封禁": "r:unban:1:0", "🗑 删除 TA 的稿件": "r:purge:1:0"},
+    check("after ban → control panel message shows 🔓 Unban", banned and buttons(banned) == {"🔓 解除封禁": "r:unban:1:0", "🗑 删除 TA 的稿件": "r:purge:1:0"},
           banned and buttons(banned))
 
     # 2. 点“解除封禁”先出确认面板，返回不解封
@@ -60,17 +60,17 @@ async def scenario():
     c2 = await submit("解封后可以再投稿", 2)
     check("unbanned submitter can submit again", c2)
 
-    # 4. /ban 回复已发布的投稿：那条控制消息也显示“解除封禁”
+    # 4. /ban 回复已发布的投稿：那条控制按钮消息也显示“解除封禁”
     n = len(log); lt.cb("r:pub_ok:2:0", REVIEW, ADMIN, message_id=c2["result"]["message_id"])
     await wait_for(lambda e: is_send(e, "sendMessage", lt.CHANNEL, "解封后可以再投稿"), since=n)
     ctrl2 = c2["result"]["message_id"]
     n = len(log); gm("/ban 广告", reply_to=ctrl2)
     await wait_for(lambda e: is_send(e, "sendMessage", REVIEW, "已封禁"), since=n)
     shown = await ctrl_edit(ctrl2, n)
-    check("/ban replying to a published submission → its control message shows 🔓 Unban",
+    check("/ban replying to a published submission → its control panel message shows 🔓 Unban",
           shown and buttons(shown) == {"🔓 解除封禁": "r:unban:2:0", "🗑 删除 TA 的稿件": "r:purge:2:0"}, shown and buttons(shown))
 
-    # 5. /unban 用 ID 解封：控制消息上的按钮成了旧的；点它只提示“没有被封禁”并收起，不出确认面板、不再通知
+    # 5. /unban 用 ID 解封：控制按钮消息上的按钮成了旧的；点它只提示“没有被封禁”并收起，不出确认面板、不再通知
     n = len(log); gm(f"/unban {USER}")
     await wait_for(lambda e: is_send(e, "sendMessage", REVIEW, "已解除封禁"), since=n)
     n = len(log); lt.cb("r:unban:2:0", REVIEW, ADMIN, message_id=ctrl2)
@@ -81,13 +81,13 @@ async def scenario():
           t and t["params"].get("show_alert") and gone and not buttons(gone) and not told,
           gone and buttons(gone))
 
-    # 6. /unban 回复控制消息解封：那条控制消息上的按钮立即收起
+    # 6. /unban 回复控制按钮消息解封：那条控制按钮消息上的按钮立即收起
     n = len(log); gm("/ban", reply_to=ctrl2)
     await ctrl_edit(ctrl2, n)
     n = len(log); gm("/unban", reply_to=ctrl2)
     await wait_for(lambda e: is_send(e, "sendMessage", REVIEW, "已解除封禁"), since=n)
     gone = await ctrl_edit(ctrl2, n)
-    check("/unban replying to the control message → its Unban button removed at once", gone and not buttons(gone),
+    check("/unban replying to the control panel message → its Unban button removed at once", gone and not buttons(gone),
           gone and buttons(gone))
 
     # 7. /user 卡片：没被封禁 → 🚫 封禁
@@ -108,7 +108,7 @@ async def scenario():
     check("card Back → card again, still 🚫 Ban", back and buttons(back) == {"🚫 封禁": f"au:ban:{USER}"},
           back and buttons(back))
 
-    # 9. 确认封禁：卡片显示已封禁和 🔓；通知投稿人；未处理的来稿被拒，控制消息出现 🔓
+    # 9. 确认封禁：卡片显示已封禁和 🔓；通知投稿人；未处理的来稿被拒，控制按钮消息出现 🔓
     n = len(log); lt.cb(f"au:ban_ok:{USER}", REVIEW, ADMIN, message_id=card_id)
     t = await toast(n, "已封禁")
     told = await wait_for(lambda e: is_send(e, "sendMessage", USER, "禁止投稿"), since=n)

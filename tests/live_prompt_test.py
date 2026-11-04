@@ -61,16 +61,16 @@ async def scenario():
     ctrl1 = c1["result"]["message_id"]
     first_preview = c1["params"]["reply_parameters"]["message_id"]
 
-    # 1. 控制消息上有 ✏️ 修改，没有 💬 联系投稿人（只用 /msg）
+    # 1. 控制按钮消息上有 ✏️ 修改，没有 💬 联系投稿人（只用 /msg）
     b = buttons(c1)
-    check("control message has Edit but no Message submitter button",
+    check("control panel message has Edit but no Message submitter button",
           b.get("✏️ 修改") == "r:edit:1:0" and not any(v.startswith("r:msg:") for v in b.values()), b)
 
     # 2. 点“修改”：先发当前内容，再发强制回复的提示；别的审核员回复提示不算数
     n0 = len(log); lt.cb("r:edit:1:0", REVIEW, ADMIN, message_id=ctrl1)
     prompt = await wait_for(lambda e: is_prompt(e, "修改后的正文"), since=n0)
     echo = next((e for e in log[n0:] if is_send(e, "sendMessage", REVIEW, "提示测试 原文")), None)
-    check("Edit → current text echoed, then a ForceReply prompt under the control message",
+    check("Edit → current text echoed, then a ForceReply prompt under the control panel message",
           prompt and echo and prompt["params"]["reply_parameters"]["message_id"] == ctrl1)
     n = len(log); reply_from(OTHER_ADMIN, "别人改的", prompt["result"]["message_id"])
     check("another reviewer's reply to the prompt is ignored",

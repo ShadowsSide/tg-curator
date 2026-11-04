@@ -37,20 +37,28 @@ class EditingMixin(CoreBase):
             target["link_preview"] = link_preview
         return await self._save_edit(sub, items, editor, allowed, by_submitter=by_submitter)
 
-    async def replace_item(self, sid: int, index: int, new_item: dict, editor: str,
+    async def replace_item(self, sid: int, msg_id: int, new_item: dict, editor: str,
                            allowed: tuple[str, ...]) -> Notice | None:
-        """投稿人用 Telegram 自带的“编辑”修改了原消息：整项替换（文字、格式、甚至换图都会同步）。"""
+        """投稿人用 Telegram 自带的“编辑”修改了原消息 msg_id：整项替换（文字、格式、甚至换图都会同步）。
+        按 msg_id 在这一刻的内容里找第几项：之前查到的序号可能已经因为删图而变了。"""
         sub = await self.db.get(sid)
         err = self._check_editable(sub, sid, allowed)
         if err:
             return err
         items = [dict(it) for it in sub.items]
+        index = next((i for i, it in enumerate(items) if msg_id in (it.get("msg_id"), it.get("text_msg_id"))), None)
+        if index is None:  # 这条消息刚被删出投稿
+            return notice("edit_race")
         old = items[index]
-        if old["type"] in media.MEDIA_TYPES and new_item["type"] == "text":
+        if old.get("text_msg_id") == msg_id:
             # 纯文字投稿加过图：原来那条文字消息现在是第一个媒体的说明，编辑它就是改说明
+            if new_item["type"] != "text":
+                return notice("type_change")
             items[index] = {**old, "text": new_item["text"], "entities": new_item["entities"]}
         elif (old["type"] == "text") != (new_item["type"] == "text"):
             return notice("type_change")
+        elif "text_msg_id" in old:  # 换图：说明来自那条文字消息，图片消息本身没有说明，保留原来的
+            items[index] = {**new_item, **{k: old[k] for k in ("text", "entities", "above", "text_msg_id") if k in old}}
         else:
             items[index] = new_item
         return await self._save_edit(sub, items, editor, allowed, by_submitter=True)
@@ -103,7 +111,8 @@ class EditingMixin(CoreBase):
         # 改稿后可能加了广告链接，重新检查；SPAM_ACTION=block 时投稿人不能靠“先提交、后改稿”绕过拦截
         hits = spam.check(items, self.s.spam_rules)
         err = self._spam_blocked(hits) if by_submitter else None
-        if not err and by_submitter and sub.status != "draft":  # 草稿还没进审核群，改多少次都不发消息
+        throttled = by_submitter and sub.status != "draft"  # 草稿还没进审核群，改多少次都不发消息
+        if not err and throttled:
             err = self._too_often(sub.user_id)
         if err:
             return err
@@ -136,6 +145,8 @@ class EditingMixin(CoreBase):
             # 状态没变、内容版本变了：别人刚改过，这次是基于旧内容改的，保存会把那次修改盖掉
             changed = fresh and fresh.status == sub.status and fresh.version != sub.version
             return notice("edit_conflict" if changed else "edit_race")
+        if throttled:  # 保存成功才算一次
+            self.throttle.record(sub.user_id)
         sub = await self.db.get(sub.id)
         if ids:
             await self.db.link_review_messages(sub.id, ids)
@@ -174,10 +185,10 @@ class EditingMixin(CoreBase):
         except TelegramAPIError as e:  # 投稿人拉黑了机器人等：只是看不到预览，不影响改稿
             log.info("给投稿人发 #%s 的预览失败：%s", sid, e)
             return
-        await self.db.update(sid, user_preview=[m.message_id for m in sent])
-        if sub.user_preview:
+        old = await self._swap_ids(sid, "user_preview", [m.message_id for m in sent])  # 同时改稿时取到的才是真正上一份
+        if old:
             try:
-                await self.bot.delete_messages(sub.user_id, sub.user_preview)
+                await self.bot.delete_messages(sub.user_id, old)
             except TelegramAPIError as e:  # 超过 48 小时、已被投稿人删掉
                 log.info("删除投稿人 #%s 的旧预览失败：%s", sid, e)
 

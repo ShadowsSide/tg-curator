@@ -61,7 +61,7 @@ Curator 基于 Python 3.12、[aiogram 3](https://github.com/aiogram/aiogram) 和
 
 1. 在 [@BotFather](https://t.me/BotFather) 创建机器人，拿到 token。隐私模式保持默认开启即可
 2. 把机器人设为**频道**管理员，并给它“发布消息”权限
-3. 建一个**审核群**，把机器人拉进去，普通成员即可。默认只有审核群的管理员和群主能审核（见 `REVIEWERS`）
+3. 建一个**审核群**，把机器人拉进去并设为管理员，只给“删除消息”权限即可（用来清理审核员改稿留下的消息、删除被封禁用户的稿件；没有这个权限也能审核，启动时日志里会提醒）。默认只有审核群的管理员和群主能审核（见 `REVIEWERS`）
 4. 获取频道 ID 和审核群 ID（都是 `-100` 开头的数字）：用 [Telegram Web](https://web.telegram.org/a/) 打开频道或群，地址栏 `#` 后面的数字就是 ID；也可以把频道或群里的一条消息转发给 [@RawDataBot](https://t.me/RawDataBot) 查看。频道也可以直接填 `@用户名`
 
 > [!NOTE]

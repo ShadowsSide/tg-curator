@@ -1,6 +1,6 @@
 # 每个 PR 检查代码（pyflakes）并运行全部测试（单元测试 + 端到端测试）。
 # 推送到 main / DEV / 打标签时由 docker.yml 调用（workflow_call），测试通过才构建镜像。
-# 端到端测试用本地模拟的 Bot API 服务器运行真实的机器人进程，不需要 token、密钥或外网。约 4 分钟。
+# 端到端测试用本地模拟的 Bot API 服务器运行真实的机器人进程，不需要 token、密钥或外网。约 10 分钟。
 name: test
 
 on:
@@ -14,7 +14,7 @@ permissions:
 jobs:
   test:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 25  # 全部测试约 10 分钟，并且随功能增加；留足余量，免得超时被当成测试失败
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-python@v7

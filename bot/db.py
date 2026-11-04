@@ -375,13 +375,14 @@ class DB:
         """用户私聊里的某条消息属于哪条投稿：
         - 是投稿内容本身 → (投稿编号, 第几项)。同一条消息可能在两条投稿里（图片“加到”了旧投稿，
           新建的草稿随即作废），优先取没作废的那条
-        - 原稿里有、后来被删掉或换掉的内容，机器人的“请选择投稿方式 / 已提交”提示，或发给投稿人的完整预览
-          → (投稿编号, None)"""
+        - 原稿里有、后来被删掉或换掉的内容，机器人的“请选择投稿方式 / 已提交”提示，发给投稿人的完整预览，
+          或改稿 / 查看时机器人的回复 → (投稿编号, None)
+        纯文字投稿加了图时，原文字消息记在第一项的 text_msg_id，同样算这一项。"""
         row = await self._one(
             """SELECT s.id, CAST(j.key AS INTEGER) FROM submissions s, json_each(s.items) j
-               WHERE s.user_id=? AND json_extract(j.value, '$.msg_id')=?
+               WHERE s.user_id=? AND (json_extract(j.value, '$.msg_id')=? OR json_extract(j.value, '$.text_msg_id')=?)
                ORDER BY s.status='cancelled', s.id DESC LIMIT 1""",
-            (user_id, message_id),
+            (user_id, message_id, message_id),
         )
         if row:
             return row[0], row[1]
@@ -400,13 +401,15 @@ class DB:
         )
         if row:
             return row[0], None
-        row = await self._one(
-            """SELECT s.id FROM submissions s, json_each(s.user_preview) j
-               WHERE s.user_id=? AND j.value=? ORDER BY s.id DESC LIMIT 1""",
-            (user_id, message_id),
-        )
-        if row:
-            return row[0], None
+        # 发给投稿人的完整预览，和改稿 / 查看时机器人的回复（“投稿已更新”“已加到你之前的投稿里”等）
+        for column in ("user_preview", "user_ack"):
+            row = await self._one(
+                f"""SELECT s.id FROM submissions s, json_each(s.{column}) j
+                    WHERE s.user_id=? AND j.value=? ORDER BY s.id DESC LIMIT 1""",
+                (user_id, message_id),
+            )
+            if row:
+                return row[0], None
         sid = await self.sid_by_relay_message(user_id, message_id)
         return (sid, None) if sid else None
 
@@ -478,7 +481,8 @@ class DB:
 
     async def review_traces(self, chat_id: int, user_id: int) -> dict[int, list[int]]:
         """这个用户的投稿在审核群里还留着的消息：{投稿编号: [消息编号]}。
-        包括预览、控制按钮消息、改稿后的预览、转达的 /msg（都在 review_messages 里）和等待回复的提示（连同它要一起删的消息）。"""
+        包括预览、控制按钮消息、改稿后的预览、转达的 /msg（都在 review_messages 里）、等待回复的提示（连同它要一起删的消息）
+        和最近一次改稿留下的消息（edit_ack）。"""
         traces: dict[int, set[int]] = {}
         rows = await self._all(
             """SELECT rm.sid, rm.message_id FROM review_messages rm JOIN submissions s ON s.id = rm.sid WHERE s.user_id=?
@@ -493,6 +497,11 @@ class DB:
         )
         for sid, mid, cleanup in prompts:
             traces.setdefault(sid, set()).update([mid, *json.loads(cleanup or "[]")])
+        # 最近一次改稿留下的消息：审核员改过的文字、换上的图片也是这条投稿的内容
+        acks = await self._all("SELECT id, edit_ack FROM submissions WHERE user_id=? AND edit_ack IS NOT NULL", (user_id,))
+        for sid, ids in acks:
+            if ids := json.loads(ids):
+                traces.setdefault(sid, set()).update(ids)
         return {sid: sorted(ids) for sid, ids in sorted(traces.items())}
 
     async def forget_review_messages(self, chat_id: int, sids: list[int]) -> None:
@@ -501,7 +510,7 @@ class DB:
         await self.conn.execute(f"DELETE FROM review_messages WHERE sid IN ({marks})", sids)
         await self.conn.execute(f"DELETE FROM prompts WHERE chat_id=? AND sid IN ({marks})", (chat_id, *sids))
         await self.conn.execute(
-            f"UPDATE submissions SET review_msg_id=NULL, edit_preview=NULL WHERE id IN ({marks})", sids)
+            f"UPDATE submissions SET review_msg_id=NULL, edit_preview=NULL, edit_ack=NULL WHERE id IN ({marks})", sids)
         await self.conn.commit()
 
     async def sid_by_review_message(self, message_id: int) -> int | None:
@@ -532,10 +541,11 @@ class DB:
         return [Submission.from_row(r) for r in rows]
 
     async def expire_drafts(self, older_than: int) -> list[Submission]:
+        """作废过期的草稿，返回作废了的。一条语句完成：先查再改的话，中间刚好被提交的草稿也会被当成过期。"""
         rows = await self._all(
-            "SELECT * FROM submissions WHERE status='draft' AND created_at<?", (older_than,)
+            "UPDATE submissions SET status='cancelled' WHERE status='draft' AND created_at<? RETURNING *", (older_than,)
         )
-        await self._exec("UPDATE submissions SET status='cancelled' WHERE status='draft' AND created_at<?", (older_than,))
+        await self.conn.commit()
         return [Submission.from_row(r) for r in rows]
 
     async def reset_stuck_publishing(self) -> None:

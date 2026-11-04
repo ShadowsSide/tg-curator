@@ -5,6 +5,7 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import html
 import logging
 
@@ -50,7 +51,7 @@ class CoreBase:
         self.db = db
         self.s = settings
         self.lang = settings.language
-        self.albums = AlbumCollector(settings.album_delay, self.receive)
+        self.albums = AlbumCollector(settings.album_delay, self.receive, self._album_failed)
         self.channel_post_base: str | None = None
         self.channel_chat_id: int | None = None
         self.channel_linked_chat_id: int | None = None  # 发布频道的关联群组（评论区）
@@ -62,6 +63,8 @@ class CoreBase:
         self._stopping = asyncio.Event()
         self.throttle = Throttle()  # 投稿人的 /msg 和改稿：都会在审核群发消息，限制频率
         self._album_locks: dict[tuple[int, str], tuple[asyncio.Lock, int]] = {}  # (投稿人, 相册编号) → (锁, 使用中的数量)
+        # 记下的消息编号（edit_ack、user_ack、user_preview）：读出旧的、写进新的要一起完成，并发改稿时才不会丢记录
+        self._ids_lock = asyncio.Lock()
 
     # ---------- lifecycle ----------
 
@@ -86,6 +89,7 @@ class CoreBase:
             raise ConfigError("cfg_review_basic_group", value=self.s.review_chat_id)
         if review.type != ChatType.SUPERGROUP:
             raise ConfigError("cfg_review_type", value=self.s.review_chat_id)
+        await self._check_review_admin(review.id, me.id)
 
         self.channel_chat_id = chat.id
         self.channel_linked_chat_id = chat.linked_chat_id
@@ -94,6 +98,17 @@ class CoreBase:
         else:
             self.channel_post_base = f"https://t.me/c/{str(chat.id).removeprefix('-100')}/"
         await self.db.reset_stuck_publishing()
+
+    async def _check_review_admin(self, chat_id: int, bot_id: int) -> None:
+        """审核群里机器人要有“删除消息”权限，才删得掉审核员改稿留下的消息、被封禁用户的稿件。
+        没有也能审核，所以只提醒，不阻止启动。"""
+        try:
+            member = await self.bot.get_chat_member(chat_id, bot_id)
+        except (TelegramBadRequest, TelegramForbiddenError):
+            member = None
+        if not (member and member.status == ChatMemberStatus.ADMINISTRATOR and member.can_delete_messages):
+            log.warning("机器人不是审核群的管理员，或者没有“删除消息”权限：审核员改稿留下的消息、被封禁用户的稿件会删不掉。"
+                        "请在审核群把机器人设为管理员，只给“删除消息”权限即可")
 
     async def _config_chat(self, chat_id: int | str, missing: str) -> ChatFullInfo:
         try:
@@ -133,37 +148,46 @@ class CoreBase:
             task.cancel()
         await asyncio.gather(*self._tasks, return_exceptions=True)
 
+    async def _swap_ids(self, sid: int, column: str, ids: list[int], *, append: bool = False) -> list[int]:
+        """把投稿记下的一组消息编号（column）换成 ids（append：加在后面），返回原来的；投稿不存在返回空列表。"""
+        async with self._ids_lock:
+            sub = await self.db.get(sid)
+            if not sub:
+                return []
+            old = getattr(sub, column) or []
+            await self.db.update(sid, **{column: [*old, *ids] if append else ids})
+        return old
+
     async def replace_edit_ack(self, sid: int, message_ids: list[int]) -> None:
         """审核员改稿成功后留下的修改消息和“已修改”确认，每条投稿只留最近一次：记下这次的，删掉上一次的。
-        删不掉（超过 48 小时、机器人没有“删除消息”权限等）就留着。"""
-        sub = await self.db.get(sid)
-        if not sub:
+        删不掉（超过 48 小时等）就留着。"""
+        old = await self._swap_ids(sid, "edit_ack", message_ids)
+        if not old:
             return
-        await self.db.update(sid, edit_ack=message_ids)
-        if sub.edit_ack:
-            try:
-                await self.bot.delete_messages(self.s.review_chat_id, sub.edit_ack)
-            except TelegramAPIError as e:
-                log.info("删除投稿 #%s 上一次改稿的消息失败：%s", sid, e)
+        try:
+            await self.bot.delete_messages(self.s.review_chat_id, old)
+        except TelegramAPIError as e:
+            # 一条删不掉整批就失败：机器人不是管理员时删不了审核员的消息。逐条删，至少删掉机器人自己发的
+            log.info("删除投稿 #%s 上一次改稿的消息失败（%s），改为逐条删除", sid, e)
+            for mid in old:
+                with contextlib.suppress(TelegramAPIError):
+                    await self.bot.delete_message(self.s.review_chat_id, mid)
 
     async def replace_user_ack(self, sid: int, message_ids: list[int]) -> None:
         """投稿人私聊里改稿 / 查看留下的命令和回复，每条投稿只留最近一次：记下这次的，删掉上一次的。
         投稿内容本身（原消息、加进去的图片）和沟通消息不在这里，不会删。删不掉（超过 48 小时等）就留着。"""
-        sub = await self.db.get(sid)
-        if not sub:
+        old = await self._swap_ids(sid, "user_ack", message_ids)
+        if not old:
             return
-        await self.db.update(sid, user_ack=message_ids)
-        if sub.user_ack:
-            try:
-                await self.bot.delete_messages(sub.user_id, sub.user_ack)
-            except TelegramAPIError as e:
-                log.info("删除投稿人 #%s 上一次改稿的消息失败：%s", sid, e)
+        sub = await self.db.get(sid)
+        try:
+            await self.bot.delete_messages(sub.user_id, old)
+        except TelegramAPIError as e:
+            log.info("删除投稿人 #%s 上一次改稿的消息失败：%s", sid, e)
 
     async def add_edit_ack(self, sid: int, message_ids: list[int]) -> None:
         """这次改稿又多了几条消息（相册后到的部分和对应的回复）：一起记下，下次改稿时删掉。"""
-        sub = await self.db.get(sid)
-        if sub:
-            await self.db.update(sid, edit_ack=[*(sub.edit_ack or []), *message_ids])
+        await self._swap_ids(sid, "edit_ack", message_ids, append=True)
 
     # ---------- 语言 ----------
 
@@ -238,8 +262,9 @@ class CoreBase:
         return None
 
     def _too_often(self, user_id: int) -> Notice | None:
-        """投稿人这次操作会在审核群发一条消息：太频繁就拦下，告诉他还要等几秒。"""
-        wait = self.throttle.hit(user_id)
+        """投稿人这次操作会在审核群发一条消息：太频繁就拦下，告诉他还要等几秒。
+        只查不记：成功后调用方再 throttle.record，失败（发不出去、和别人的修改冲突）的不占次数。"""
+        wait = self.throttle.wait(user_id)
         return notice("too_often", s=wait) if wait else None
 
     def _spam_blocked(self, hits: list[dict]) -> Notice | None:
@@ -248,6 +273,14 @@ class CoreBase:
         if not hits or self.s.spam_action != "block":
             return None
         return notice("spam_blocked_" + hits[0]["k"], **({"max": hits[0]["max"]} if "max" in hits[0] else {}))
+
+    async def _album_failed(self, first: Message) -> None:
+        """相册处理出错（不经过 handlers/errors.py）：和单条消息一样告诉发送的人这次没有完成。"""
+        lang = self.lang_of(first.from_user) if first.chat.type == ChatType.PRIVATE else self.lang
+        try:
+            await first.reply(t(lang, "error_generic"))
+        except TelegramAPIError as e:
+            log.info("回复相册出错提示失败：%s", e)
 
     async def notify(self, sub: Submission, key: str, **kw) -> None:
         """用投稿人自己的语言通知他，回复在他的投稿提示消息下面。"""

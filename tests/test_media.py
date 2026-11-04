@@ -45,7 +45,7 @@ def test_add_to_text_submission_turns_text_into_caption():
     assert err is None and [it["type"] for it in items] == ["photo", "video"]
     first = items[0]
     assert first["text"] == "你好世界" and first["entities"] == BOLD  # 文字和格式原样
-    assert first["msg_id"] == 50  # 原文字消息的编号：投稿人“编辑”那条文字 = 改说明
+    assert first["msg_id"] == 100 and first["text_msg_id"] == 50  # 图片保留自己的编号；原文字消息另记，“编辑”它 = 改说明
     assert "link_preview" not in first  # 链接预览不再有
     assert items[1]["text"] == ""
 
@@ -169,10 +169,27 @@ def test_core_native_text_edit_after_conversion_updates_caption():
         # 投稿人用 Telegram 的“编辑”改了原来那条文字消息（msg_id 50）
         assert await db.find_by_user_message(42, 50) == (sid, 0)
         new = {"type": "text", "text": "改过的说明", "entities": [], "msg_id": 50}
-        assert await core.replace_item(sid, 0, new, "投稿人", ("draft",)) is None
+        assert await core.replace_item(sid, 50, new, "投稿人", ("draft",)) is None
         it = (await db.get(sid)).items[0]
         assert it["type"] == "photo" and it["file_id"] == "p" and it["text"] == "改过的说明"
+        # “编辑”那张图（msg_id 777）换图：找得到，说明来自文字消息，保留
+        assert await db.find_by_user_message(42, 777) == (sid, 0)
+        swapped = {"type": "photo", "file_id": "p2", "text": "", "entities": [], "msg_id": 777}
+        assert await core.replace_item(sid, 777, swapped, "投稿人", ("draft",)) is None
+        it = (await db.get(sid)).items[0]
+        assert it["file_id"] == "p2" and it["text"] == "改过的说明" and it["text_msg_id"] == 50
+        # 文字消息只能改说明，不能换成图
+        assert (await core.replace_item(sid, 50, swapped, "投稿人", ("draft",))).key == "type_change"
     _with_core([text_item()], check)
+
+
+def test_text_msg_id_follows_the_caption():
+    """纯文字投稿加了图：说明来自原文字消息（text_msg_id），替换、删除时跟着说明走。"""
+    items, _ = media.add([text_item()], [photo("a", msg_id=1), photo("b", msg_id=2)])
+    replaced, _ = media.replace(items, 1, [photo("x")])
+    assert replaced[0]["text_msg_id"] == 50 and replaced[0]["text"] == "你好世界"
+    removed, _ = media.remove(items, 1)
+    assert [it["file_id"] for it in removed] == ["b"] and removed[0]["text_msg_id"] == 50
 
 
 def test_core_merge_draft_into_earlier_submission():

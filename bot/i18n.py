@@ -60,6 +60,8 @@ T: dict[str, dict[str, str]] = {
     "cfg_choice": {"zh": "{name} 只能是 {allowed}，当前是 {value!r}", "en": "{name} must be one of {allowed}, got {value!r}"},
     "cfg_tz": {"zh": "TZ 不是有效的时区：{value!r}（例如 Asia/Shanghai、UTC）",
                "en": "TZ is not a valid time zone: {value!r} (e.g. Asia/Shanghai, UTC)"},
+    "cfg_schedule_presets": {"zh": "SCHEDULE_PRESETS 里的 {value!r} 不是有效的时间（格式 HH:MM，例如 09:00,21:30）",
+                             "en": "{value!r} in SCHEDULE_PRESETS is not a valid time (use HH:MM, e.g. 09:00,21:30)"},
     "cfg_quiet_hours": {"zh": "REMINDER_QUIET_HOURS 格式不对：{value!r}（例如 0-8）",
                         "en": "REMINDER_QUIET_HOURS is malformed: {value!r} (e.g. 0-8)"},
     "cfg_quiet_hours_same": {
@@ -257,6 +259,11 @@ T: dict[str, dict[str, str]] = {
         "zh": "↑ 这是投稿现在的内容（含审核员的修改）。审核员改过之后你不能再改了；有问题请用 <code>/msg</code> 告诉审核员。",
         "en": "↑ This is your submission as it stands, including the reviewer's edits. You can't change it anymore; "
               "use <code>/msg</code> to talk to the reviewers.",
+    },
+    "u_edit_media_unused": {
+        "zh": "\n\n🖼 一起发来的 {n} 个图片 / 视频没有使用：<code>/edit</code> 只改文字。要加图，请回复你的投稿直接发送图片。",
+        "en": "\n\n🖼 The {n} photo(s) / video(s) sent with it weren't used: <code>/edit</code> only changes the text. "
+              "To add photos, reply to your submission with the photos themselves.",
     },
     "u_edit_echo_hint": {
         "zh": "↑ 这是当前内容。复制、修改后，回复你的投稿发送 <code>/edit 新内容</code>。",

@@ -42,8 +42,16 @@ def build_router() -> Router:
 
     @router.message(Command("edit"))
     async def edit_cmd(m: Message, core: Core) -> None:
+        if m.media_group_id:  # 说明里写 /edit 的相册：收齐后整组交给 /edit，其余几项不能当成新投稿
+            core.albums.add(m, lambda messages: _edit(m, core, media=len(messages)))
+            return
+        await _edit(m, core, media=0 if m.text else 1)
+
+    async def _edit(m: Message, core: Core, media: int) -> None:
+        """/edit：改文字，或只发 /edit 查看。media：随命令一起发来的图片视频有几个（不会用上，回复里说明）。"""
         uid = m.from_user.id
         lang = core.lang_of(m.from_user)
+        unused = t(lang, "u_edit_media_unused", n=media) if media else ""
         body, entities = ent.strip_command(m.text or m.caption or "", ent.dump(m.entities or m.caption_entities))
 
         # 必须回复要修改的那条投稿（投稿内容本身，或机器人关于它的提示消息）才生效
@@ -65,17 +73,18 @@ def build_router() -> Router:
         if not body.strip():  # 只发 /edit：看投稿现在的样子（审核员改过、锁定后也能看）；还能改时再发文字方便复制
             await core.send_user_preview(sid, reply_to=m.message_id)
             if sub.reviewer_edited or sub.status not in SUBMITTER_EDITABLE:
-                hint = await m.reply(t(lang, "u_preview_locked") if sub.reviewer_edited else t(lang, "u_preview_view_only"))
+                hint = await m.reply((t(lang, "u_preview_locked") if sub.reviewer_edited
+                                      else t(lang, "u_preview_view_only")) + unused)
                 await core.replace_user_ack(sid, [m.message_id, hint.message_id])
                 return
             err, echo = await core.show_text(sid, m.chat.id, reply_to=m.message_id)
-            hint = await m.reply(err.text(lang) if err else t(lang, "u_edit_echo_hint"))
+            hint = await m.reply((err.text(lang) if err else t(lang, "u_edit_echo_hint")) + unused)
             await core.replace_user_ack(sid, [m.message_id, *([echo] if echo else []), hint.message_id])
             return
 
         err = await core.edit(sid, _editor(core, m), body, entities, dump_link_preview(m.link_preview_options),
                               allowed=SUBMITTER_EDITABLE, by_submitter=True)
-        done = await m.reply(err.text(lang) if err else _edited_text(lang, sid, sub.status))
+        done = await m.reply((err.text(lang) if err else _edited_text(lang, sid, sub.status)) + unused)
         if not err:
             await core.replace_user_ack(sid, [m.message_id, done.message_id])
 
@@ -110,20 +119,29 @@ def build_router() -> Router:
         found = await core.find_user_message(m.from_user.id, m.message_id)
         if not found or found[1] is None:
             return  # 不是投稿内容（比如普通聊天、命令），忽略
-        sid, index = found
+        sid = found[0]
         new_item = extract_item(m)
         if new_item is None:
             return
         sub = await core.get_submission(sid)
         lang = core.lang_of(m.from_user)
-        err = await core.replace_item(sid, index, new_item, _editor(core, m), SUBMITTER_EDITABLE)
+        err = await core.replace_item(sid, m.message_id, new_item, _editor(core, m), SUBMITTER_EDITABLE)
         done = await m.reply(err.text(lang) if err else _edited_text(lang, sid, sub.status))
         if not err:  # 改的是投稿原消息本身，不删；只记“已更新”的回复
             await core.replace_user_ack(sid, [done.message_id])
 
     @router.message(F.media_group_id)
     async def album_part(m: Message, core: Core) -> None:
+        # 用相册直接回复了审核员的消息但没写 /msg：和单条一样提醒用 /msg（整组只提醒一次），不当成新投稿。
+        # weak：相册里带 /msg 的那项（先到后到都一样）指定的“整组转达”优先，其余几项同样回复了审核员，不能把它改掉
+        reply = explicit_reply(m)
+        if reply and await core.sid_for_relay_message(m.from_user.id, reply.message_id):
+            core.albums.add(m, lambda messages: _hint_msg(messages[0], core), weak=True)
+            return
         core.albums.add(m)
+
+    async def _hint_msg(m: Message, core: Core) -> None:
+        await m.reply(t(core.lang_of(m.from_user), "msg_hint_user"))
 
     @router.message()
     async def single(m: Message, core: Core) -> None:

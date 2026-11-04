@@ -188,6 +188,8 @@ def build_router(settings: Settings) -> Router:
                 await cq.answer(t(lang, "sub_not_found", sid=sid), show_alert=True)
                 return
             rejected = await core.ban_user(sub.user_id, who)
+            if sid not in rejected:  # 确认期间被别人处理了（发布、拒绝）：收起确认面板，显示“解除封禁”
+                await core.refresh_control(sid)
             await cq.answer(t(lang, "toast_banned", n=len(rejected)))
         elif action == "unban":
             sub = await core.get_submission(sid)
@@ -275,7 +277,7 @@ def build_router(settings: Settings) -> Router:
         if ans and _is_owner(m, ans.prompt):
             core.albums.add(m, lambda messages: _answer_late_media(ans, messages, core))
         else:
-            core.albums.add(m, lambda messages: _hint_relay_reply(messages[0], core))
+            core.albums.add(m, lambda messages: _hint_relay_reply(messages[0], core), weak=True)
 
     async def _finish(prompt: Prompt, m: Message, core: Core, err: Notice | None, done: str,
                       replies: list[Message] | None = None) -> None:

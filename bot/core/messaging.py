@@ -78,6 +78,7 @@ class MessagingMixin(CoreBase):
             )
         except TelegramAPIError as e:
             return notice("msg_failed", error=html.escape(str(e)))  # 错误原文可能带 < >，消息按 HTML 解析
+        self.throttle.record(user.id)  # 发出去了才算一次
         # 审核员回复这条转来的消息发 /msg，就能定位到这条投稿
         await self.db.link_review_messages(sid, [m.message_id for m in sent])
         await self.db.log_message(sid, "to_review", user.id, user.full_name,

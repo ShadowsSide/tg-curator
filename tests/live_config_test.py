@@ -4,6 +4,7 @@
 - 待机时收到 SIGTERM（docker stop）马上退出
 - 网络不通不算配置错误：直接退出（退出码非 0），交给 Docker 重启重试
 - 正常启动时删掉上次留下的错误文件
+- 机器人在审核群没有“删除消息”权限：照常启动，只在日志里提醒一次
 
 用法（项目根目录下）：python tests/live_config_test.py
 复用 live_test.py 的模拟 Bot API 服务器，每种情况启动一次机器人。约 1 分钟。
@@ -23,6 +24,7 @@ from aiohttp import web  # noqa: E402
 ERROR_FILE = os.path.join(tempfile.mkdtemp(), "config-error")
 NOT_ADMIN = {"status": "member", "user": {"id": lt.BOT_ID, "is_bot": True, "first_name": "TestBot"}}
 CANT_POST = {**lt.BOT_ADMIN, "can_post_messages": False}
+DELETE_WARNING = "没有“删除消息”权限"
 
 # (名称, 额外环境变量, 模拟服务器的失败注入, 机器人在频道里的身份, 日志里应该出现的错误说明)
 CASES = [
@@ -33,6 +35,7 @@ CASES = [
     ("bad number elsewhere", {"MAX_PENDING_PER_USER": "five"}, {}, None, "MAX_PENDING_PER_USER 必须是数字"),
     ("bad time zone", {"TZ": "Mars/Base"}, {}, None, "TZ 不是有效的时区"),
     ("bad REVIEWERS", {"REVIEWERS": "admins,bob"}, {}, None, "REVIEWERS 里有无法识别的值 'bob'"),
+    ("bad SCHEDULE_PRESETS", {"SCHEDULE_PRESETS": "09:00,25:00"}, {}, None, "SCHEDULE_PRESETS 里的 '25:00' 不是有效的时间"),
     ("Telegram rejects the token", {}, {"getMe:None": [(401, "Unauthorized")]}, None, "Telegram 不认这个 BOT_TOKEN"),
     ("channel not found", {}, {f"getChat:{CHANNEL}": ["Bad Request: chat not found"]}, None,
      f"找不到 CHANNEL_ID 对应的频道 {CHANNEL}"),
@@ -126,9 +129,20 @@ async def main():
         lt.MOCK["fail"], lt.MOCK["bot_member"] = {}, lt.BOT_ADMIN
         proc, lines, pump = await start(port, {})
         polling = await until(lambda: any("Start polling" in line for line in lines))
-        check("valid config → stale health file removed, bot polls",
-              polling and not os.path.exists(ERROR_FILE) and proc.returncode is None, lines[-5:])
+        check("valid config → stale health file removed, bot polls, no delete-permission warning",
+              polling and not os.path.exists(ERROR_FILE) and proc.returncode is None
+              and not any(DELETE_WARNING in line for line in lines), lines[-5:])
         took, code = await stop(proc, pump)
+
+        # 审核群里只是普通成员：照常运行（能审核），日志里提醒设为管理员、给“删除消息”权限
+        lt.MOCK["bot_review_member"] = {**NOT_ADMIN}
+        proc, lines, pump = await start(port, {})
+        polling = await until(lambda: any("Start polling" in line for line in lines))
+        warned = [line for line in lines if DELETE_WARNING in line]
+        check("bot is a plain member of the review group → starts anyway, one warning, not an error",
+              polling and len(warned) == 1 and " WARNING " in warned[0] and not os.path.exists(ERROR_FILE), lines[-5:])
+        await stop(proc, pump)
+        lt.MOCK["bot_review_member"] = lt.BOT_REVIEW_ADMIN
     finally:
         await runner.cleanup()
     print(f"\n{sum(ok for _, ok in results)}/{len(results)} passed in {time.time() - lt.T0:.0f}s")

@@ -5,6 +5,7 @@
   链接预览不再有；说明文字最多 1024 字，超出时由 core 的保存步骤拒绝
 - 替换：换掉第 index 个媒体（从 1 开始），原来那一项的说明文字、“说明在上方”保持不变
 - 删除：删掉第 index 个媒体；不能删到一个都不剩。被删的那一项带着说明文字时，说明移到剩下的第一项
+说明文字来自另一条消息时（纯文字投稿加了图），那条文字消息的编号记在 text_msg_id，跟着说明走。
 新加入的媒体不带说明文字：说明文字只有一份（相册里只显示一个），保留原来的。
 返回 (新的 items, None)，或者 (None, 提示) 表示不能这样改。
 """
@@ -64,11 +65,12 @@ def add(items: Items, new: Items) -> tuple[Items | None, Notice | None]:
     if err:
         return None, err
     if is_text(items):
-        # 纯文字投稿加图：文字（含格式）变成第一个媒体的说明文字。保留原文字消息的 msg_id，
-        # 投稿人以后用 Telegram 的“编辑”改那条文字，就是改这段说明（见 core/editing.replace_item）
+        # 纯文字投稿加图：文字（含格式）变成第一个媒体的说明文字。图片保留自己的 msg_id，原文字消息的编号记在
+        # text_msg_id：投稿人以后“编辑”那条文字就是改这段说明，“编辑”那张图就是换图（见 core/editing.replace_item）
         text = items[0]
-        first = {**_bare(new[0]), "text": text.get("text", ""), "entities": text.get("entities", []),
-                 "msg_id": text.get("msg_id")}
+        first = {**_bare(new[0]), "text": text.get("text", ""), "entities": text.get("entities", [])}
+        if text.get("msg_id"):
+            first["text_msg_id"] = text["msg_id"]
         result = [first, *(_bare(it) for it in new[1:])]
     else:
         err = _check_existing(items)
@@ -89,7 +91,8 @@ def replace(items: Items, index: int, new: Items) -> tuple[Items | None, Notice 
     if len(new) != 1:
         return None, notice("media_replace_one")
     old = items[index - 1]
-    keep = {"text": old.get("text", ""), "entities": old.get("entities", []), "above": old.get("above", False)}
+    keep = {"text": old.get("text", ""), "entities": old.get("entities", []), "above": old.get("above", False),
+            **({"text_msg_id": old["text_msg_id"]} if "text_msg_id" in old else {})}
     result = list(items)
     result[index - 1] = {**new[0], **keep}
     return result, None
@@ -108,5 +111,6 @@ def remove(items: Items, index: int) -> tuple[Items | None, Notice | None]:
     if gone.get("text") and not any(it.get("text") for it in result):
         # 说明文字跟着被删的那一项走了：移到剩下的第一项，免得说明（和频道落款的位置）丢失
         result[0] = {**result[0], "text": gone["text"], "entities": gone.get("entities", []),
-                     "above": gone.get("above", False)}
+                     "above": gone.get("above", False),
+                     **({"text_msg_id": gone["text_msg_id"]} if "text_msg_id" in gone else {})}
     return result, None

@@ -59,7 +59,7 @@ Curator is built with Python 3.12, [aiogram 3](https://github.com/aiogram/aiogra
 
 1. Create a bot with [@BotFather](https://t.me/BotFather) and get its token. Leave privacy mode on (the default)
 2. Make the bot an admin of your **channel** with the "Post messages" permission
-3. Create a **review group** and add the bot as a regular member. By default only the group's admins and owner can review (see `REVIEWERS`)
+3. Create a **review group**, add the bot and make it an admin with only the "Delete messages" permission (used to clean up reviewers' edit messages and to delete a banned user's posts; reviewing works without it, and the log warns at startup). By default only the group's admins and owner can review (see `REVIEWERS`)
 4. Get the channel ID and the review group ID (both are numbers starting with `-100`): open the channel or group in [Telegram Web](https://web.telegram.org/a/), and the number after `#` in the address bar is the ID. You can also forward a message from the channel or group to [@RawDataBot](https://t.me/RawDataBot). The channel can also be given as `@username`
 
 > [!NOTE]

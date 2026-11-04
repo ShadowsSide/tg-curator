@@ -53,6 +53,9 @@ BOT_ADMIN = {"status": "administrator", "user": {"id": BOT_ID, "is_bot": True, "
                                    "can_invite_users", "can_post_stories", "can_edit_stories", "can_delete_stories",
                                    "can_send_welcome_messages")}}
 MOCK["bot_member"] = BOT_ADMIN  # 机器人在频道里的身份
+# 机器人在审核群里的身份：按 README 设为管理员，只给“删除消息”权限
+BOT_REVIEW_ADMIN = {**{k: v for k, v in BOT_ADMIN.items() if k != "can_post_messages"}, "can_delete_messages": True}
+MOCK["bot_review_member"] = BOT_REVIEW_ADMIN
 markups: dict = {}  # (chat_id, message_id) → 当前按钮：和 Telegram 一样，按钮没变时编辑会报 “message is not modified”
 
 
@@ -142,8 +145,8 @@ async def handle(request: web.Request):
     elif m == "getchatmember":
         uid_ = int(params["user_id"])
         member_user = {"id": uid_, "is_bot": False, "first_name": f"U{uid_}"}
-        if uid_ == BOT_ID:  # 机器人自己：频道管理员，能发消息（启动时会检查）
-            result = MOCK["bot_member"]
+        if uid_ == BOT_ID:  # 机器人自己：频道管理员，能发消息；审核群管理员，能删消息（启动时都会检查）
+            result = MOCK["bot_review_member"] if str(params.get("chat_id")) == str(REVIEW) else MOCK["bot_member"]
         elif uid_ in MOCK["admins"]:
             result = {"status": "creator", "user": member_user, "is_anonymous": False}
         else:

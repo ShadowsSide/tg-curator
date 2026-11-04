@@ -1,6 +1,6 @@
 """README 中英文同步测试：两份 README 结构一致，配置变量和命令都和代码对得上。用法：python tests/test_readme.py
 
-- 标题层级、表格行、代码块数量一致（英文版开头多一段语言说明，不算）
+- 标题层级、表格行、代码块数量一致
 - 配置表的分组和每组的变量、顺序一致，并且正好是 bot/config.py 读取的变量（加 compose 用的 IMAGE）
 - 配置表里 IMAGE 的默认值就是 docker-compose.yml 默认拉取的镜像，部署命令下载的文件都在仓库里
 - 审核群和私聊的命令表都列出了机器人注册的命令（/start、/help 除外）
@@ -61,13 +61,13 @@ def config_groups(lines, start, stop):
 
 
 def commands(lines, start, stop):
-    return {m.group(1) for line in section(lines, start, stop) if (m := re.match(r"\| `/([a-z]+)", line))}
+    """表格第一列里出现的命令（一行可以列几个，如 `/ban` · `/unban`）。"""
+    return {c for line in section(lines, start, stop) if line.startswith("|")
+            for c in re.findall(r"`/([a-z]+)", line.split("|")[1])}
 
 
 def test_same_shape():
-    en = shape(EN)
-    en.remove(">")  # 英文版开头的语言说明
-    assert shape(ZH) == en
+    assert shape(ZH) == shape(EN)
 
 
 def test_config_groups_match_and_cover_config_py():
@@ -82,8 +82,8 @@ def test_config_groups_match_and_cover_config_py():
 
 
 def test_command_tables_list_registered_commands():
-    for lines, priv, admin, end in [(ZH, "### 投稿人", "### 管理员", "## 已知限制"),
-                                    (EN, "### Submitters", "### Admins", "## Known limitations")]:
+    for lines, priv, admin, end in [(ZH, "### 投稿人", "### 审核员", "## 常见问题"),
+                                    (EN, "### Submitters", "### Reviewers", "## FAQ")]:
         priv = next(l for l in lines if l.startswith(priv))
         admin = next(l for l in lines if l.startswith(admin))
         end = next(l for l in lines if l.startswith(end))

@@ -13,7 +13,7 @@ A Telegram channel submission bot: users send posts in a private chat, admins re
 
 [简体中文](README.md) | **English**
 
-[Features](#features) · [Quick start](#quick-start) · [Configuration](#configuration) · [Usage](#usage) · [FAQ](#faq) · [Development](#development)
+[How it works](#how-it-works) · [Features](#features) · [Quick start](#quick-start) · [Configuration](#configuration) · [Usage](#usage) · [FAQ](#faq) · [Development](#development)
 
 </div>
 

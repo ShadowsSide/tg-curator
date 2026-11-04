@@ -60,6 +60,8 @@ T: dict[str, dict[str, str]] = {
     "cfg_choice": {"zh": "{name} 只能是 {allowed}，当前是 {value!r}", "en": "{name} must be one of {allowed}, got {value!r}"},
     "cfg_tz": {"zh": "TZ 不是有效的时区：{value!r}（例如 Asia/Shanghai、UTC）",
                "en": "TZ is not a valid time zone: {value!r} (e.g. Asia/Shanghai, UTC)"},
+    "cfg_schedule_presets": {"zh": "SCHEDULE_PRESETS 里的 {value!r} 不是有效的时间（格式 HH:MM，例如 09:00,21:30）",
+                             "en": "{value!r} in SCHEDULE_PRESETS is not a valid time (use HH:MM, e.g. 09:00,21:30)"},
     "cfg_quiet_hours": {"zh": "REMINDER_QUIET_HOURS 格式不对：{value!r}（例如 0-8）",
                         "en": "REMINDER_QUIET_HOURS is malformed: {value!r} (e.g. 0-8)"},
     "cfg_quiet_hours_same": {

@@ -181,6 +181,37 @@ def test_interrupted_publish_shown_in_review_language():
         asyncio.run(run(os.path.join(d, "r.db")))
 
 
+def test_expire_drafts_skips_one_submitted_meanwhile():
+    """过期草稿作废和投稿人提交同时发生：刚被提交的不算过期（不会把它的提示改成“草稿已过期”）。"""
+    async def run(path):
+        db = DB(path)
+        await db.connect()
+        try:
+            item = [{"type": "text", "text": "a", "entities": []}]
+            stale, submitting = [await db.create_draft(42, item) for _ in range(2)]
+            await db.update(stale, created_at=1)
+            await db.update(submitting, created_at=1)
+            # 投稿人恰好在查出过期草稿之后、作废之前点了提交
+            real_all, submitted = db._all, []
+
+            async def all_then_submit(sql, params=()):
+                rows = await real_all(sql, params)
+                if "status='draft'" in sql and not submitted:
+                    submitted.append(await db.transition(submitting, ("draft",), "pending"))
+                return rows
+            db._all = all_then_submit
+            got = {s.id for s in await db.expire_drafts(100)}
+            submitted = submitted[0]
+            # 两件事谁先都行，但结果要一致：提交成功的不在“过期”里，作废了的就没提交成功
+            assert (submitting in got) != submitted, (got, submitted)
+            assert stale in got and (await db.get(stale)).status == "cancelled"
+        finally:
+            await db.close()
+
+    with tempfile.TemporaryDirectory() as d:
+        asyncio.run(run(os.path.join(d, "e.db")))
+
+
 if __name__ == "__main__":
     tests = [v for k, v in dict(globals()).items() if k.startswith("test_")]
     for fn in tests:

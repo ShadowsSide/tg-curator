@@ -541,10 +541,11 @@ class DB:
         return [Submission.from_row(r) for r in rows]
 
     async def expire_drafts(self, older_than: int) -> list[Submission]:
+        """作废过期的草稿，返回作废了的。一条语句完成：先查再改的话，中间刚好被提交的草稿也会被当成过期。"""
         rows = await self._all(
-            "SELECT * FROM submissions WHERE status='draft' AND created_at<?", (older_than,)
+            "UPDATE submissions SET status='cancelled' WHERE status='draft' AND created_at<? RETURNING *", (older_than,)
         )
-        await self._exec("UPDATE submissions SET status='cancelled' WHERE status='draft' AND created_at<?", (older_than,))
+        await self.conn.commit()
         return [Submission.from_row(r) for r in rows]
 
     async def reset_stuck_publishing(self) -> None:

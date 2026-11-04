@@ -35,6 +35,7 @@ CASES = [
     ("bad number elsewhere", {"MAX_PENDING_PER_USER": "five"}, {}, None, "MAX_PENDING_PER_USER 必须是数字"),
     ("bad time zone", {"TZ": "Mars/Base"}, {}, None, "TZ 不是有效的时区"),
     ("bad REVIEWERS", {"REVIEWERS": "admins,bob"}, {}, None, "REVIEWERS 里有无法识别的值 'bob'"),
+    ("bad SCHEDULE_PRESETS", {"SCHEDULE_PRESETS": "09:00,25:00"}, {}, None, "SCHEDULE_PRESETS 里的 '25:00' 不是有效的时间"),
     ("Telegram rejects the token", {}, {"getMe:None": [(401, "Unauthorized")]}, None, "Telegram 不认这个 BOT_TOKEN"),
     ("channel not found", {}, {f"getChat:{CHANNEL}": ["Bad Request: chat not found"]}, None,
      f"找不到 CHANNEL_ID 对应的频道 {CHANNEL}"),

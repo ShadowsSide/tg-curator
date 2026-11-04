@@ -15,9 +15,12 @@ ALBUM_MERGE_WINDOW = 10 * 60
 class AlbumCollector:
     """相册（media group）的每一项是单独的 update，这里等最后一项到达后 delay 秒再一起处理。"""
 
-    def __init__(self, delay: float, on_album: Callable[[list[Message]], Awaitable[None]]):
+    def __init__(self, delay: float, on_album: Callable[[list[Message]], Awaitable[None]],
+                 on_error: Callable[[Message], Awaitable[None]] | None = None):
         self.delay = delay
         self.on_album = on_album  # 默认的处理：投稿人发来的相册当作投稿
+        # 处理出错时调用（参数是相册第一项）：相册不经过 aiogram 的错误处理，要自己告诉发送的人
+        self.on_error = on_error
         self._buffers: dict[str, list[Message]] = {}
         self._handlers: dict[str, Callable[[list[Message]], Awaitable[None]]] = {}
         self._timers: dict[str, asyncio.Task] = {}  # 还在等后面几项的相册
@@ -78,3 +81,8 @@ class AlbumCollector:
             await handler(messages)
         except Exception:
             log.exception("处理相册失败 %s", key)
+            if self.on_error:
+                try:
+                    await self.on_error(messages[0])
+                except Exception:
+                    log.exception("回复相册出错提示失败 %s", key)

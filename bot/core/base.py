@@ -51,7 +51,7 @@ class CoreBase:
         self.db = db
         self.s = settings
         self.lang = settings.language
-        self.albums = AlbumCollector(settings.album_delay, self.receive)
+        self.albums = AlbumCollector(settings.album_delay, self.receive, self._album_failed)
         self.channel_post_base: str | None = None
         self.channel_chat_id: int | None = None
         self.channel_linked_chat_id: int | None = None  # 发布频道的关联群组（评论区）
@@ -262,8 +262,9 @@ class CoreBase:
         return None
 
     def _too_often(self, user_id: int) -> Notice | None:
-        """投稿人这次操作会在审核群发一条消息：太频繁就拦下，告诉他还要等几秒。"""
-        wait = self.throttle.hit(user_id)
+        """投稿人这次操作会在审核群发一条消息：太频繁就拦下，告诉他还要等几秒。
+        只查不记：成功后调用方再 throttle.record，失败（发不出去、和别人的修改冲突）的不占次数。"""
+        wait = self.throttle.wait(user_id)
         return notice("too_often", s=wait) if wait else None
 
     def _spam_blocked(self, hits: list[dict]) -> Notice | None:
@@ -272,6 +273,14 @@ class CoreBase:
         if not hits or self.s.spam_action != "block":
             return None
         return notice("spam_blocked_" + hits[0]["k"], **({"max": hits[0]["max"]} if "max" in hits[0] else {}))
+
+    async def _album_failed(self, first: Message) -> None:
+        """相册处理出错（不经过 handlers/errors.py）：和单条消息一样告诉发送的人这次没有完成。"""
+        lang = self.lang_of(first.from_user) if first.chat.type == ChatType.PRIVATE else self.lang
+        try:
+            await first.reply(t(lang, "error_generic"))
+        except TelegramAPIError as e:
+            log.info("回复相册出错提示失败：%s", e)
 
     async def notify(self, sub: Submission, key: str, **kw) -> None:
         """用投稿人自己的语言通知他，回复在他的投稿提示消息下面。"""

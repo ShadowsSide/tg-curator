@@ -20,16 +20,19 @@ class Throttle:
         self.clock = clock
         self._recent: dict[int, deque[float]] = {}  # 用户 → 最近几次的时间
 
-    def hit(self, user_id: int) -> int:
-        """记一次。没超过限制返回 0（并记下这次）；超过了返回还要等几秒，这次不记。"""
+    def wait(self, user_id: int) -> int:
+        """现在能不能再操作：能返回 0，不能返回还要等几秒。只查不记：操作成功后再 record，失败的不算数。"""
         now = self.clock()
-        recent = self._recent.setdefault(user_id, deque())
+        recent = self._recent.get(user_id)
         while recent and recent[0] <= now - self.window:
             recent.popleft()
-        if len(recent) >= self.limit:
+        if recent and len(recent) >= self.limit:
             return max(1, math.ceil(recent[0] + self.window - now))
-        recent.append(now)
         return 0
+
+    def record(self, user_id: int) -> None:
+        """记下一次成功的操作。"""
+        self._recent.setdefault(user_id, deque()).append(self.clock())
 
     def prune(self) -> None:
         """删掉已经过了时间窗口的用户，免得字典一直变大（调度循环定期调用）。"""

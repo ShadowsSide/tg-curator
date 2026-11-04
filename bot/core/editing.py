@@ -111,7 +111,8 @@ class EditingMixin(CoreBase):
         # 改稿后可能加了广告链接，重新检查；SPAM_ACTION=block 时投稿人不能靠“先提交、后改稿”绕过拦截
         hits = spam.check(items, self.s.spam_rules)
         err = self._spam_blocked(hits) if by_submitter else None
-        if not err and by_submitter and sub.status != "draft":  # 草稿还没进审核群，改多少次都不发消息
+        throttled = by_submitter and sub.status != "draft"  # 草稿还没进审核群，改多少次都不发消息
+        if not err and throttled:
             err = self._too_often(sub.user_id)
         if err:
             return err
@@ -144,6 +145,8 @@ class EditingMixin(CoreBase):
             # 状态没变、内容版本变了：别人刚改过，这次是基于旧内容改的，保存会把那次修改盖掉
             changed = fresh and fresh.status == sub.status and fresh.version != sub.version
             return notice("edit_conflict" if changed else "edit_race")
+        if throttled:  # 保存成功才算一次
+            self.throttle.record(sub.user_id)
         sub = await self.db.get(sub.id)
         if ids:
             await self.db.link_review_messages(sub.id, ids)

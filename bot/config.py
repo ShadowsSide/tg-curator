@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import re
 from dataclasses import dataclass
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
@@ -51,6 +52,15 @@ def _chat_id(value: str) -> int | str:
 
 def _templates(value: str) -> tuple[str, ...]:
     return tuple(x.strip() for x in value.split("|") if x.strip())
+
+
+def _presets(value: str) -> tuple[str, ...]:
+    """定时面板的快捷时间点：HH:MM，逗号分隔。写错的话点“定时发布”时才出错，所以启动时检查。"""
+    presets = tuple(p.strip() for p in value.replace("，", ",").split(",") if p.strip())
+    for p in presets:
+        if not re.fullmatch(r"([01]?[0-9]|2[0-3]):[0-5][0-9]", p):
+            raise ConfigError("cfg_schedule_presets", value=p)
+    return presets
 
 
 def _quiet_hours(value: str) -> tuple[int, int] | None:
@@ -125,9 +135,7 @@ def load_settings() -> Settings:
         db_path=_env("DB_PATH", "/app/data/bot.db"),
         album_delay=_num("ALBUM_DELAY", "1.5", kind=float),
         max_pending_per_user=_num("MAX_PENDING_PER_USER", "5"),
-        schedule_presets=tuple(
-            p.strip() for p in _env("SCHEDULE_PRESETS", "09:00,12:00,18:00,21:00").split(",") if p.strip()
-        ),
+        schedule_presets=_presets(_env("SCHEDULE_PRESETS", "09:00,12:00,18:00,21:00")),
         reminder_interval_min=_num("REMINDER_INTERVAL_MINUTES", "60"),
         reminder_only_when_pending=_bool(_env("REMINDER_ONLY_WHEN_PENDING", "true")),
         quiet_hours=_quiet_hours(_env("REMINDER_QUIET_HOURS", "")),

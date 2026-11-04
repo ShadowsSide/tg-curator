@@ -70,16 +70,16 @@ def test_quiet_hours():
         assert got == "cfg_quiet_hours_same" and value in zh and value in en, (value, got)
 
 
-COUNTS = ("MAX_PENDING_PER_USER", "MSG_WINDOW_DAYS", "REMINDER_INTERVAL_MINUTES")
+COUNTS = ("MAX_PENDING_PER_USER", "MSG_WINDOW_DAYS", "REMINDER_INTERVAL_MINUTES", "MAX_LINKS", "NEW_USER_COOLDOWN_MINUTES")
 
 
 def test_counts_not_negative():
-    """负数启动时就报错；0 可以（投稿上限不限 / 审核结束后不能再沟通 / 不发提醒）。"""
+    """负数启动时就报错；0 可以（投稿上限、链接数、新用户冷却不限 / 审核结束后不能再沟通 / 不发提醒）。"""
     for name in COUNTS:
         got, zh, en = error(**{name: "-1"})
         assert got == "cfg_negative" and name in zh and "负数" in zh and "negative" in en, (name, got, zh, en)
     s = load(**{name: "0" for name in COUNTS})
-    assert (s.max_pending_per_user, s.msg_window_days, s.reminder_interval_min) == (0, 0, 0)
+    assert (s.max_pending_per_user, s.msg_window_days, s.reminder_interval_min, s.new_user_cooldown_min) == (0, 0, 0, 0)
 
 
 def test_max_pending_zero_is_unlimited():

@@ -157,7 +157,7 @@ def load_settings() -> Settings:
         msg_window_days=_count("MSG_WINDOW_DAYS", "3"),
         reviewers=_env("REVIEWERS", "admins"),
         reject_templates=_templates(reasons if reasons is not None else t(language, "default_reject_templates")),
-        spam_rules=SpamRules.parse(_env("SPAM_KEYWORDS"), _num("MAX_LINKS", "0"), _env("LINK_WHITELIST")),
+        spam_rules=SpamRules.parse(_env("SPAM_KEYWORDS"), _count("MAX_LINKS", "0"), _env("LINK_WHITELIST")),
         spam_action=_choice(_env("SPAM_ACTION", "flag"), ("flag", "block"), "SPAM_ACTION"),
-        new_user_cooldown_min=max(_num("NEW_USER_COOLDOWN_MINUTES", "0"), 0),
+        new_user_cooldown_min=_count("NEW_USER_COOLDOWN_MINUTES", "0"),
     )

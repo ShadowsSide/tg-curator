@@ -151,7 +151,7 @@ Options most deployments adjust as needed.
 | `REJECT_TEMPLATES` | 4 default reasons, depends on `LANGUAGE` | Reasons offered after tapping Reject, separated by `\|`, e.g. `Duplicate\|Ads`; set it to empty to skip the reason panel |
 | `SCHEDULE_PRESETS` | `09:00,12:00,18:00,21:00` | Quick time buttons in the schedule panel |
 | `DEFAULT_SILENT` | `false` | Whether new submissions are published silently by default |
-| `MAX_PENDING_PER_USER` | `5` | Maximum open submissions per user at a time |
+| `MAX_PENDING_PER_USER` | `5` | Maximum open submissions per user at a time; adding photos to your own submission by replying isn't limited |
 | `REMINDER_INTERVAL_MINUTES` | `60` | Interval of the review summary, aligned to the clock; `0` turns it off |
 | `REMINDER_QUIET_HOURS` | — | Quiet hours with no summaries, e.g. `0-8` |
 | `PROXY` | — | Proxy, e.g. `socks5://host:port` |
@@ -186,12 +186,12 @@ Spam checks, messaging window, stats scope and so on; the defaults are usually f
 |---|---|
 | Send any content | Starts a submission, then choose signed or anonymous. Your previous choice is marked “(last time)” and shown first; you still tap it |
 | Edit the original message with Telegram's "Edit" | Changes the submission until the review starts (scheduled, published, rejected): text, formatting, or even the image |
-| Reply to your submission with a photo / video | The choice panel gets an extra **➕ Add to that submission** button that adds the new photos to it; or submit them as a new submission as usual. Only drafts and pending submissions can take more. You can reply to the original message or to the bot's "Submitted" message |
+| Reply to your submission with a photo / video | The choice panel gets an extra **➕ Add to that submission** button that adds the new photos to it; or submit them as a new submission as usual. Only drafts and pending submissions can take more. You can reply to the original message or to the bot's "Submitted" message. This still works when you've hit the open-submission limit (`MAX_PENDING_PER_USER`), but then the photos can't be submitted as a new submission |
 | Send several photos / videos at once (an album) | Becomes one submission. Telegram sometimes delivers an album in batches (say 1 photo, then 9 more a little later); parts arriving **within 10 minutes** join the same submission and the count in the prompt is updated. Parts that arrive after you submitted are added too, and reviewers get a new preview |
 | 🗑 Remove a photo / video | Shown on the bot's message while a draft or pending submission has 2 or more photos/videos; tap it and pick the one to remove. Nothing can be changed once the review has started (scheduled, published, rejected). Deleting the photo from the chat isn't synced: Telegram doesn't tell bots about deletions in private chats |
 | `/edit new content` | Only works as a **reply** to your submission (or the bot's message about it); without a reply nothing is changed |
 | `/edit` (as a reply) | Sends a full preview of the submission as it stands (photos, text and signature, as it will be published); works after a reviewer edit or once the review has started. While you can still edit, it also sends the formatted text so you can copy and change it |
-| Preview after an edit | After each successful edit the bot sends a full preview of the submission, keeping only the newest one (previews older than 48 hours can't be deleted). Replying to it with `/edit` or `/msg` works too |
+| Preview after an edit | After each successful edit the bot sends a full preview of the submission, keeping only the newest one (previews older than 48 hours can't be deleted). Replying to it with `/edit` or `/msg` works too. Your edit and view commands and the bot's replies are also kept only for the latest one; your original submission messages are never deleted |
 | After a reviewer edit | You can't change the submission anymore (`/edit`, “Edit”, adding or removing photos are all refused); use `/msg` to talk to the reviewers. The bot tells you the first time a reviewer edits it |
 | `/msg message` | Message the reviewers: **reply** to the reviewer's message or your submission |
 | `/me` | Your submission stats |
@@ -212,7 +212,7 @@ Buttons on the control panel message: **✅ Publish now**, **⏰ Schedule**, **�
 
 **🖼 Media** (only while pending) opens the media panel: **➕ Add photo / video** (an album reply works too; if the last items of the album arrive late, they're added as well with a separate reply), **🔁 Replace N** and **🗑 Remove N** (asks to confirm; the last one can't be removed). Photos and videos only, at most 10 per submission; submissions with a file, GIF or audio can't use it. A text submission can get photos too: its text becomes their caption (see “Known limitations and risks” below).
 
-Every edit posts a new preview. The review group keeps only the original preview and the latest edited one; older edited previews are deleted (Telegram doesn't let bots delete messages older than 48 hours, so those stay).
+Every edit posts a new preview. The review group keeps only the original preview and the latest edited one; older edited previews are deleted (Telegram doesn't let bots delete messages older than 48 hours, so those stay). The reviewer's edit messages (the `/edit` command, the text or photos sent in reply to a prompt) and the “Edited” confirmations are also kept only for the latest edit; failed ones stay so you can see why.
 
 #### Confirmation and reject reasons
 

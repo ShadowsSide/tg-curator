@@ -10,13 +10,15 @@ def now_ts() -> int:
     return int(time.time())
 
 
-def fmt_ts(ts: int | None, tz: ZoneInfo, lang: str = "zh") -> str:
+def fmt_ts(ts: int | None, tz: ZoneInfo, lang: str = "zh", now: datetime | None = None) -> str:
+    """今天：今天 HH:MM；今年：MM-DD HH:MM；其他年份带上年份，免得定到明年的看起来像今年。"""
     if not ts:
         return "-"
     dt = datetime.fromtimestamp(ts, tz)
-    if dt.date() == datetime.now(tz).date():
+    now = now or datetime.now(tz)
+    if dt.date() == now.date():
         return f"{'今天' if lang == 'zh' else 'today'} {dt:%H:%M}"
-    return dt.strftime("%m-%d %H:%M")
+    return dt.strftime("%m-%d %H:%M" if dt.year == now.year else "%Y-%m-%d %H:%M")
 
 
 def start_of_today(tz: ZoneInfo) -> int:

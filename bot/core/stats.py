@@ -11,7 +11,7 @@ from aiogram.types import InlineKeyboardMarkup
 
 from ..i18n import t
 from ..keyboards import user_card_kb
-from ..render import describe, stats_text, user_link
+from ..render import describe, name_link, stats_text, user_link
 from ..timeutil import now_ts, start_of_today, utc_offset
 
 from .base import CoreBase, STATS_MSG_KEY, STATS_DEBOUNCE, _reason_line
@@ -83,7 +83,7 @@ class StatsMixin(CoreBase):
         for i, r in enumerate(rows, 1):
             reviewed = (r["approved"] or 0) + (r["rejected"] or 0)
             rate = f"{r['approved'] / reviewed * 100:.0f}%" if reviewed else "-"
-            name = user_link(await self.db.get_user(r["user_id"]), r["user_id"])
+            name = name_link(r["user_id"], r["full_name"], r["username"])  # 查询里已经 JOIN 了 users，不用再逐个查
             ban = " 🚫" if r["banned"] else ""
             anon = t(lang, "activity_anon", n=r["anonymous"]) if r["anonymous"] else ""
             lines.append(f"{i}. {name}{ban}\n" + t(

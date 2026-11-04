@@ -70,6 +70,7 @@ CREATE TABLE IF NOT EXISTS submissions (
 
 CREATE INDEX IF NOT EXISTS idx_sub_status ON submissions(status, scheduled_at);
 CREATE INDEX IF NOT EXISTS idx_sub_user   ON submissions(user_id, submitted_at);
+CREATE INDEX IF NOT EXISTS idx_sub_review ON submissions(review_msg_id);  -- 回复审核群的消息时定位投稿（旧库的控制按钮消息）
 
 -- 审核群里属于某条投稿的所有消息（预览 + 控制按钮消息），用于 /no、/ban 回复定位投稿
 CREATE TABLE IF NOT EXISTS review_messages (
@@ -92,6 +93,7 @@ CREATE TABLE IF NOT EXISTS conversations (
 );
 CREATE INDEX IF NOT EXISTS idx_conv_sid  ON conversations(sid);
 CREATE INDEX IF NOT EXISTS idx_conv_user ON conversations(user_msg_id);
+CREATE INDEX IF NOT EXISTS idx_conv_review ON conversations(review_msg_id);  -- 审核员回复的是不是转来的投稿人消息
 
 -- 等待回复的提示消息（点了“修改”“自定义理由”等按钮后，机器人发出的“请回复本消息……”）
 CREATE TABLE IF NOT EXISTS prompts (

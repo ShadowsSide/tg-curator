@@ -90,6 +90,25 @@ async def scenario():
     check("plain album reply to a relayed message → one hint, nothing relayed", len(hints) == 1 and not leaked,
           (len(hints), [e["method"] for e in leaked]))
 
+    # 投稿人用相册回复审核员转来的消息、写了 /msg（Telegram 里相册每一项都带着回复）：整组转达，不只是提醒。
+    # 带 /msg 的那项先到、后到各一次
+    relayed = group["result"][1]["message_id"]
+    to_reviewer = {"message_id": relayed, "date": lt.now(), "chat": lt.chat(USER),
+                   "from": {"id": 1, "is_bot": True, "first_name": "TestBot"}}
+    for first_has_cmd, fids in ((True, ("D1", "D2")), (False, ("E1", "E2"))):
+        n = len(log)
+        for i, fid in enumerate(fids):
+            extra = {"caption": "/msg 回复审核员", "caption_entities": [{"type": "bot_command", "offset": 0, "length": 4}]} \
+                if (i == 0) == first_has_cmd else {}
+            lt.pm(None, photo=photo(fid), media_group_id=f"g{fids[0]}", reply_to_message=to_reviewer, **extra)
+        got = await wait_for(lambda e: is_send(e, "sendMediaGroup", REVIEW), since=n)
+        await asyncio.sleep(1)
+        hints = [e for e in log[n:] if is_send(e, "sendMessage", USER, "<code>/msg</code> 开头")]
+        check(f"album /msg replying to the reviewer (/msg on the {'first' if first_has_cmd else 'second'} item) "
+              "→ relayed whole, no hint",
+              got and [m["media"] for m in got["params"]["media"]] == list(fids) and not hints,
+              (got and got["params"]["media"], len(hints)))
+
 
 if __name__ == "__main__":
     asyncio.run(lt.main(scenario, {"REMINDER_INTERVAL_MINUTES": "0"}))

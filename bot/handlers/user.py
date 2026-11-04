@@ -132,10 +132,11 @@ def build_router() -> Router:
 
     @router.message(F.media_group_id)
     async def album_part(m: Message, core: Core) -> None:
-        # 用相册直接回复了审核员的消息但没写 /msg：和单条一样提醒用 /msg（整组只提醒一次），不当成新投稿
+        # 用相册直接回复了审核员的消息但没写 /msg：和单条一样提醒用 /msg（整组只提醒一次），不当成新投稿。
+        # weak：相册里带 /msg 的那项（先到后到都一样）指定的“整组转达”优先，其余几项同样回复了审核员，不能把它改掉
         reply = explicit_reply(m)
         if reply and await core.sid_for_relay_message(m.from_user.id, reply.message_id):
-            core.albums.add(m, lambda messages: _hint_msg(messages[0], core))
+            core.albums.add(m, lambda messages: _hint_msg(messages[0], core), weak=True)
             return
         core.albums.add(m)
 

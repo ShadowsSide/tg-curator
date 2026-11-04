@@ -277,7 +277,7 @@ def build_router(settings: Settings) -> Router:
         if ans and _is_owner(m, ans.prompt):
             core.albums.add(m, lambda messages: _answer_late_media(ans, messages, core))
         else:
-            core.albums.add(m, lambda messages: _hint_relay_reply(messages[0], core))
+            core.albums.add(m, lambda messages: _hint_relay_reply(messages[0], core), weak=True)
 
     async def _finish(prompt: Prompt, m: Message, core: Core, err: Notice | None, done: str,
                       replies: list[Message] | None = None) -> None:

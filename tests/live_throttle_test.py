@@ -9,19 +9,11 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import live_test as lt  # noqa: E402
-from live_test import REVIEW, USER, check, is_send, log, wait_for  # noqa: E402
+from live_test import REVIEW, USER, check, is_send, log, user_says, wait_for  # noqa: E402
 
 TOO_OFTEN = "操作太频繁"
 
 
-def own(mid):
-    return {"message_id": mid, "date": lt.now(), "chat": lt.chat(USER)}
-
-
-async def user_says(text, mid):
-    """投稿人回复自己的投稿发一条命令，返回机器人的回复。"""
-    n = len(log); lt.pm(text, reply_to_message=own(mid))
-    return await wait_for(lambda e: is_send(e, "sendMessage", USER), since=n)
 
 
 async def scenario():

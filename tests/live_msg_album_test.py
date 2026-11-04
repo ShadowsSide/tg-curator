@@ -11,11 +11,9 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import live_test as lt  # noqa: E402
+from live_media_test import photo  # noqa: E402
 from live_test import ADMIN, REVIEW, USER, check, gm, is_send, log, wait_for  # noqa: E402
 
-
-def photo(fid):
-    return [{"file_id": fid, "file_unique_id": fid, "width": 10, "height": 10}]
 
 
 def admin_photo(fid, group, reply_to, caption=None):

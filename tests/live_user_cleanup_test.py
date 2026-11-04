@@ -14,14 +14,11 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import live_test as lt  # noqa: E402
 from live_media_test import photo, user_photo  # noqa: E402
-from live_test import REVIEW, USER, check, gm, is_send, log, wait_for  # noqa: E402
+from live_test import REVIEW, USER, check, gm, is_send, log, own, wait_for  # noqa: E402
 
 
-def own(mid):
-    return {"message_id": mid, "date": lt.now(), "chat": lt.chat(USER)}
 
-
-def deleted(since):
+def user_deleted(since):
     """since 之后机器人在投稿人私聊里删掉的消息。"""
     out = []
     for e in log[since:]:
@@ -51,15 +48,15 @@ async def scenario():
     await asyncio.sleep(0.5)
 
     n = len(log); first = await user_edit("/edit 第一次", mids[0], "投稿已更新")
-    check("first /edit → command and reply stay", len(first) == 2 and not set(first) & set(deleted(n)), first)
+    check("first /edit → command and reply stay", len(first) == 2 and not set(first) & set(user_deleted(n)), first)
 
     n = len(log); second = await user_edit("/edit 第二次", mids[0], "投稿已更新")
     check("second /edit → the first command and reply deleted, these stay",
-          set(first) <= set(deleted(n)) and not set(second) & set(deleted(n)), (first, deleted(n)))
+          set(first) <= set(user_deleted(n)) and not set(second) & set(user_deleted(n)), (first, user_deleted(n)))
 
     n = len(log); view = await user_edit("/edit", mids[0], "复制、修改后")
     check("bare /edit → the previous edit's messages deleted; command, text and hint are this time's",
-          set(second) <= set(deleted(n)) and len(view) == 3 and not set(view) & set(deleted(n)), (view, deleted(n)))
+          set(second) <= set(user_deleted(n)) and len(view) == 3 and not set(view) & set(user_deleted(n)), (view, user_deleted(n)))
 
     # 原生编辑：原消息不删，只记“已更新”的回复
     n = len(log)
@@ -70,17 +67,17 @@ async def scenario():
     await asyncio.sleep(0.5)
     native = replies_to_user(n)
     check("native edit → the previous view's messages deleted, the edited message itself kept",
-          set(view) <= set(deleted(n)) and mids[1] not in deleted(n), deleted(n))
+          set(view) <= set(user_deleted(n)) and mids[1] not in user_deleted(n), user_deleted(n))
 
     # 审核员改过之后投稿人再改：被拒，失败的留着，也不顶掉上一次的
     m = len(log); gm("/edit 审核员改的", reply_to=ctrl)
     await wait_for(lambda e: is_send(e, "sendMessage", USER, "审核员修改了你的投稿"), since=m)
     n = len(log); refused = await user_edit("/edit 想再改", mids[0], "审核员已经修改过")
-    check("refused /edit → nothing deleted", not deleted(n), deleted(n))
+    check("refused /edit → nothing deleted", not user_deleted(n), user_deleted(n))
     n = len(log); await user_edit("/edit", mids[0], "含审核员的修改")
     check("bare /edit after that → only the last successful one (native edit reply) is deleted",
-          set(native) <= set(deleted(n)) and not set(refused) & set(deleted(n)), (native, refused, deleted(n)))
-    check("the submission's own messages were never deleted", not set(mids) & set(deleted(0)), deleted(0))
+          set(native) <= set(user_deleted(n)) and not set(refused) & set(user_deleted(n)), (native, refused, user_deleted(n)))
+    check("the submission's own messages were never deleted", not set(mids) & set(user_deleted(0)), user_deleted(0))
 
 
 if __name__ == "__main__":

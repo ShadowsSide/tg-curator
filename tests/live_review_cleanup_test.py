@@ -13,19 +13,8 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import live_test as lt  # noqa: E402
-from live_test import ADMIN, REVIEW, buttons, check, gm, is_send, log, submit, wait_for  # noqa: E402
+from live_test import ADMIN, REVIEW, buttons, check, gm, is_send, log, review_deleted, submit, wait_for  # noqa: E402
 
-
-def deleted(since):
-    """since 之后机器人在审核群删掉的消息（整批和逐条）。"""
-    out = []
-    for e in log[since:]:
-        if not e.get("error") and str(e["params"].get("chat_id")) == str(REVIEW):
-            if e["method"] == "deleteMessages":
-                out += [int(i) for i in e["params"]["message_ids"]]
-            elif e["method"] == "deleteMessage":
-                out.append(int(e["params"]["message_id"]))
-    return out
 
 
 async def edit_cmd(text, ctrl):
@@ -56,7 +45,7 @@ async def scenario():
     n = len(log); lt.cb("r:purge_ok:1:0", REVIEW, ADMIN, message_id=ctrl)
     await wait_for(lambda e: e["method"] == "answerCallbackQuery", since=n)
     check("purge → the latest edit's messages (reviewer's /edit and the confirmation) deleted too",
-          set(latest) <= set(deleted(n)), (latest, deleted(n)))
+          set(latest) <= set(review_deleted(n)), (latest, review_deleted(n)))
 
     # 3. 确认封禁期间被别人拒绝了：封禁照样生效，确认面板收起
     ctrl2 = (await submit("封禁确认", 2, who=lt.BOB))["result"]["message_id"]

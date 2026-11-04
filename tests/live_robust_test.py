@@ -12,11 +12,8 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import live_test as lt  # noqa: E402
 from live_media_test import user_photo  # noqa: E402
-from live_test import REVIEW, USER, check, is_send, log, wait_for  # noqa: E402
+from live_test import REVIEW, USER, check, is_send, log, own, wait_for  # noqa: E402
 
-
-def own(mid):
-    return {"message_id": mid, "date": lt.now(), "chat": lt.chat(USER)}
 
 
 async def user_edit(text, mid):

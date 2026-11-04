@@ -15,13 +15,10 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import live_test as lt  # noqa: E402
 from live_media_test import photo, user_photo  # noqa: E402
-from live_test import BOB, REVIEW, USER, buttons, check, gm, is_send, log, wait_for  # noqa: E402
+from live_test import BOB, REVIEW, USER, buttons, check, gm, is_send, log, own, wait_for  # noqa: E402
 
 UPDATED = "投稿已更新"
 
-
-def own(mid):
-    return {"message_id": mid, "date": lt.now(), "chat": lt.chat(USER)}
 
 
 def bot_reply(mid):

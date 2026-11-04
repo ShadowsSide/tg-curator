@@ -13,6 +13,7 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import live_test as lt  # noqa: E402
+from live_media_test import toast  # noqa: E402
 from live_test import ADMIN, REVIEW, USER, buttons, check, gm, is_send, log, submit, wait_for  # noqa: E402
 
 
@@ -21,10 +22,6 @@ def ctrl_edit(message_id, since):
     return wait_for(lambda e: e["method"] in ("editMessageText", "editMessageReplyMarkup")
                     and str(e["params"].get("message_id")) == str(message_id), since=since)
 
-
-def toast(since, contains):
-    return wait_for(lambda e: e["method"] == "answerCallbackQuery" and contains in e["params"].get("text", ""),
-                    since=since)
 
 
 async def scenario():

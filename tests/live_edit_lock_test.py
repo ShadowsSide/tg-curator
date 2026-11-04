@@ -17,7 +17,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import live_test as lt  # noqa: E402
 from bot.media import media_ref  # noqa: E402
 from live_media_test import buttons, photo, user_photo  # noqa: E402
-from live_test import ADMIN, REVIEW, USER, check, gm, is_send, log, wait_for  # noqa: E402
+from live_test import ADMIN, REVIEW, USER, check, gm, is_send, log, own, user_says, wait_for  # noqa: E402
 
 DB = os.path.join(tempfile.mkdtemp(), "bot.db")
 LOCKED = "审核员已经修改过"
@@ -29,19 +29,12 @@ def version(sid):
         return conn.execute("SELECT version FROM submissions WHERE id=?", (sid,)).fetchone()[0]
 
 
-def own(mid):
-    return {"message_id": mid, "date": lt.now(), "chat": lt.chat(USER)}
-
 
 def previews(since):
     return [e for e in log[since:] if not e.get("error") and str(e["params"].get("chat_id")) == str(REVIEW)
             and e["method"] in ("sendMediaGroup", "sendPhoto", "sendMessage") and "#审核统计" not in str(e["params"])
             and "已修改" not in str(e["params"])]
 
-
-async def user_says(text, mid):
-    n = len(log); lt.pm(text, reply_to_message=own(mid))
-    return await wait_for(lambda e: is_send(e, "sendMessage", USER), since=n)
 
 
 async def submit_album(sid, group, files):

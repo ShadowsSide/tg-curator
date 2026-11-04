@@ -131,7 +131,7 @@ docker compose pull && docker compose up -d                      # 更新到最�
 | `REJECT_TEMPLATES` | 随 `LANGUAGE` 的 4 条默认理由 | 点“拒绝”后可选的理由，用 `\|` 分隔，如 `重复投稿\|广告`；设为空则不显示理由面板 |
 | `SCHEDULE_PRESETS` | `09:00,12:00,18:00,21:00` | 定时面板里的快捷时间点 |
 | `DEFAULT_SILENT` | `false` | 新投稿是否默认静音发送 |
-| `MAX_PENDING_PER_USER` | `5` | 每人同时最多保留几条未处理投稿；回复自己的投稿加图不受限制 |
+| `MAX_PENDING_PER_USER` | `5` | 每人同时最多保留几条未处理投稿，`0` 不限；回复自己的投稿加图不受限制 |
 | `REMINDER_INTERVAL_MINUTES` | `60` | 审核统计提醒的间隔（分钟），按整点对齐；`0` 表示关闭 |
 | `REMINDER_QUIET_HOURS` | — | 免打扰时段，例如 `0-8` |
 | `PROXY` | — | 代理，例如 `socks5://host:port` |

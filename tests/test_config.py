@@ -1,12 +1,15 @@
 """读取配置（bot/config.py）：填错时抛出 ConfigError，带中英文说明；填对时正常读取。用法：python tests/test_config.py
 启动后待机、健康检查文件、Telegram 核对见 live_config_test.py。
 """
+import asyncio
 import os
 import sys
+from types import SimpleNamespace
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from bot.config import load_settings  # noqa: E402
+from bot.core.submissions import SubmissionsMixin  # noqa: E402
 from bot.errors import ConfigError  # noqa: E402
 
 BASE = {"BOT_TOKEN": "123:abc", "CHANNEL_ID": "@chan", "REVIEW_CHAT_ID": "-1001"}
@@ -65,6 +68,30 @@ def test_quiet_hours():
     for value in ("8-8", "0-24"):
         got, zh, en = error(REMINDER_QUIET_HOURS=value)
         assert got == "cfg_quiet_hours_same" and value in zh and value in en, (value, got)
+
+
+COUNTS = ("MAX_PENDING_PER_USER", "MSG_WINDOW_DAYS", "REMINDER_INTERVAL_MINUTES")
+
+
+def test_counts_not_negative():
+    """负数启动时就报错；0 可以（投稿上限不限 / 审核结束后不能再沟通 / 不发提醒）。"""
+    for name in COUNTS:
+        got, zh, en = error(**{name: "-1"})
+        assert got == "cfg_negative" and name in zh and "负数" in zh and "negative" in en, (name, got, zh, en)
+    s = load(**{name: "0" for name in COUNTS})
+    assert (s.max_pending_per_user, s.msg_window_days, s.reminder_interval_min) == (0, 0, 0)
+
+
+def test_max_pending_zero_is_unlimited():
+    async def at_limit(limit, open_count):
+        async def count_open_by_user(user_id, statuses):
+            return open_count
+        core = SimpleNamespace(s=SimpleNamespace(max_pending_per_user=limit),
+                               db=SimpleNamespace(count_open_by_user=count_open_by_user))
+        return await SubmissionsMixin._at_limit(core, 1)
+    assert asyncio.run(at_limit(0, 1000)) is False  # 0：不限
+    assert asyncio.run(at_limit(5, 4)) is False
+    assert asyncio.run(at_limit(5, 5)) is True
 
 
 if __name__ == "__main__":

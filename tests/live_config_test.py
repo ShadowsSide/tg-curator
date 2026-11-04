@@ -33,6 +33,7 @@ CASES = [
     ("REVIEW_CHAT_ID not a number (English)", {"REVIEW_CHAT_ID": "-100abc", "LANGUAGE": "en"}, {}, None,
      "Configuration error: REVIEW_CHAT_ID must be a number, got '-100abc' (the bot won't run"),
     ("bad number elsewhere", {"MAX_PENDING_PER_USER": "five"}, {}, None, "MAX_PENDING_PER_USER 必须是数字"),
+    ("negative MSG_WINDOW_DAYS", {"MSG_WINDOW_DAYS": "-1"}, {}, None, "MSG_WINDOW_DAYS 不能是负数，当前是 -1"),
     ("bad time zone", {"TZ": "Mars/Base"}, {}, None, "TZ 不是有效的时区"),
     ("bad REVIEWERS", {"REVIEWERS": "admins,bob"}, {}, None, "REVIEWERS 里有无法识别的值 'bob'"),
     ("bad SCHEDULE_PRESETS", {"SCHEDULE_PRESETS": "09:00,25:00"}, {}, None, "SCHEDULE_PRESETS 里的 '25:00' 不是有效的时间"),

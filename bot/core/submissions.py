@@ -74,7 +74,7 @@ class SubmissionsMixin(CoreBase):
         # 回复自己的投稿发来的图片视频多半是要加进那条投稿，不占新名额，到了上限也照常给“加到这条投稿”；
         # 要是改点“署名 / 匿名”当新投稿，提交时再按上限拦（见 submit）
         merge_to = await self._merge_target(first, items)
-        if not merge_to and await self.db.count_open_by_user(user.id) >= self.s.max_pending_per_user:
+        if not merge_to and await self._at_limit(user.id):
             await first.reply(t(lang, "too_many"))
             return
 
@@ -131,6 +131,11 @@ class SubmissionsMixin(CoreBase):
         await first.reply(t(lang, "album_late_merged", desc=describe(items, lang)))
         return None
 
+    async def _at_limit(self, user_id: int, statuses: tuple[str, ...] = ("draft", "pending")) -> bool:
+        """未处理投稿到了 MAX_PENDING_PER_USER；设成 0 表示不限。"""
+        limit = self.s.max_pending_per_user
+        return bool(limit) and await self.db.count_open_by_user(user_id, statuses) >= limit
+
     async def _merge_target(self, first: Message, items: list[dict]) -> int | None:
         """回复自己的一条投稿（还能修改的）发来的图片视频：可以加到那条投稿里，返回它的编号。"""
         reply = explicit_reply(first)
@@ -177,7 +182,7 @@ class SubmissionsMixin(CoreBase):
         if err:
             return err
         # 草稿建的时候已经按上限查过，这里只拦没查过的：回复旧投稿发图生成的草稿（见 _receive）
-        if sub.merge_to and await self.db.count_open_by_user(user_id, ("pending",)) >= self.s.max_pending_per_user:
+        if sub.merge_to and await self._at_limit(user_id, ("pending",)):
             return notice("too_many")
         hits = spam.check(sub.items, self.s.spam_rules)
         err = self._spam_blocked(hits)  # 草稿保留，改了内容可以重新提交

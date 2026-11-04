@@ -27,6 +27,14 @@ def _num(name: str, default: str = "", *, kind: type = int, required: bool = Fal
         raise ConfigError("cfg_number", name=name, value=value) from None
 
 
+def _count(name: str, default: str) -> int:
+    """次数、天数、分钟数这类不能是负数的整数；0 的含义各自定（不限 / 关闭）。"""
+    value = _num(name, default)
+    if value < 0:
+        raise ConfigError("cfg_negative", name=name, value=value)
+    return value
+
+
 def _token(value: str) -> str:
     try:
         validate_token(value)
@@ -134,9 +142,9 @@ def load_settings() -> Settings:
         tz=_tz(_env("TZ", "Asia/Shanghai")),
         db_path=_env("DB_PATH", "/app/data/bot.db"),
         album_delay=_num("ALBUM_DELAY", "1.5", kind=float),
-        max_pending_per_user=_num("MAX_PENDING_PER_USER", "5"),
+        max_pending_per_user=_count("MAX_PENDING_PER_USER", "5"),
         schedule_presets=_presets(_env("SCHEDULE_PRESETS", "09:00,12:00,18:00,21:00")),
-        reminder_interval_min=_num("REMINDER_INTERVAL_MINUTES", "60"),
+        reminder_interval_min=_count("REMINDER_INTERVAL_MINUTES", "60"),
         reminder_only_when_pending=_bool(_env("REMINDER_ONLY_WHEN_PENDING", "true")),
         quiet_hours=_quiet_hours(_env("REMINDER_QUIET_HOURS", "")),
         stats_scope=_choice(_env("STATS_SCOPE", "today"), ("today", "all"), "STATS_SCOPE"),
@@ -146,7 +154,7 @@ def load_settings() -> Settings:
         language=language,
         user_language=_choice(_env("USER_LANGUAGE", "auto"), ("auto", *LANGS), "USER_LANGUAGE"),
         leave_unknown_chats=_bool(_env("LEAVE_UNKNOWN_CHATS", "true")),
-        msg_window_days=_num("MSG_WINDOW_DAYS", "3"),
+        msg_window_days=_count("MSG_WINDOW_DAYS", "3"),
         reviewers=_env("REVIEWERS", "admins"),
         reject_templates=_templates(reasons if reasons is not None else t(language, "default_reject_templates")),
         spam_rules=SpamRules.parse(_env("SPAM_KEYWORDS"), _num("MAX_LINKS", "0"), _env("LINK_WHITELIST")),

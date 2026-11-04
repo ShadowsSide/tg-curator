@@ -6,6 +6,7 @@
 
 用法（项目根目录下）：python tests/live_edit_cleanup_test.py
 复用 live_test.py 的模拟 Bot API 服务器。
+边界情况（整批删除失败、删稿件时带上改稿消息）见 live_review_cleanup_test.py。
 """
 import asyncio
 import os

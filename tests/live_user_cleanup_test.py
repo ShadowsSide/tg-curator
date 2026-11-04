@@ -5,6 +5,7 @@
 
 用法（项目根目录下）：python tests/live_user_cleanup_test.py
 复用 live_test.py 的模拟 Bot API 服务器。
+投稿人私聊里找投稿的边界情况见 live_user_find_test.py。
 """
 import asyncio
 import os

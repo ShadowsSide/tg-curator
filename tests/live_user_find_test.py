@@ -6,6 +6,7 @@
 
 用法（项目根目录下）：python tests/live_user_find_test.py
 复用 live_test.py 的模拟 Bot API 服务器。
+改稿 / 查看留下的消息怎么清理见 live_user_cleanup_test.py；相册 /msg 的整组转达见 live_msg_album_test.py。
 """
 import asyncio
 import os

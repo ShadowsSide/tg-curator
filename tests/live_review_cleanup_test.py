@@ -5,6 +5,7 @@
 
 用法（项目根目录下）：python tests/live_review_cleanup_test.py
 复用 live_test.py 的模拟 Bot API 服务器。
+常规的“只留最近一次”见 live_edit_cleanup_test.py。
 """
 import asyncio
 import os

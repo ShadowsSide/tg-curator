@@ -11,6 +11,11 @@ on:
     tags: ["v*"]
   workflow_dispatch:
 
+# 同一分支 / 标签连续推送时只保留最新一次：并行的话后完成的会覆盖 dev / latest 标签，可能是旧的那次
+concurrency:
+  group: docker-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
   packages: write

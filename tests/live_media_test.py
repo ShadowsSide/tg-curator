@@ -1,7 +1,7 @@
 """修改媒体：审核员的 🖼 媒体面板（添加 / 替换 / 删除，相册），投稿人“加到这条投稿”和删除自己的图片。
 
 用法（项目根目录下）：python tests/live_media_test.py
-复用 live_test.py 的模拟 Bot API 服务器。约 20 秒。
+复用 live_test.py 的模拟 Bot API 服务器。
 """
 import asyncio
 import json

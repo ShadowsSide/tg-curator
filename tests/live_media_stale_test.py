@@ -6,7 +6,7 @@
 - 内容没再改过时照常执行（另见 live_media_test）
 
 用法（项目根目录下）：python tests/live_media_stale_test.py
-复用 live_test.py 的模拟 Bot API 服务器。约 15 秒。
+复用 live_test.py 的模拟 Bot API 服务器。
 """
 import asyncio
 import os

@@ -1,7 +1,7 @@
 """记住投稿人上次选的署名 / 匿名：下次投稿时那个按钮标“（上次）”并排在前面。
 
 用法（项目根目录下）：python tests/live_choice_test.py
-复用 live_test.py 的模拟 Bot API 服务器。约 8 秒。
+复用 live_test.py 的模拟 Bot API 服务器。
 """
 import asyncio
 import os

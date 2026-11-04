@@ -2,7 +2,7 @@
 
 用法（项目根目录下）：python tests/live_perm_test.py
 以 REVIEWERS=admins,55 运行：管理员 7 和指定用户 55 可以审核，普通成员 99 和机器人不行。
-同时关闭拒绝理由（REJECT_TEMPLATES=），验证点“拒绝”直接出确认面板。约 10 秒。
+同时关闭拒绝理由（REJECT_TEMPLATES=），验证点“拒绝”直接出确认面板。
 """
 import asyncio
 import os

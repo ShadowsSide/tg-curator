@@ -5,7 +5,7 @@
 - 用相册直接回复审核员的消息（没写 /msg）：提醒用 /msg，不当成新投稿
 
 用法（项目根目录下）：python tests/live_user_find_test.py
-复用 live_test.py 的模拟 Bot API 服务器。约 15 秒。
+复用 live_test.py 的模拟 Bot API 服务器。
 """
 import asyncio
 import os

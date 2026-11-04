@@ -3,7 +3,7 @@
 审核员 → 投稿人：其余几项不会丢；不写 /msg 直接用相册回复转来的消息，只提醒一次。
 
 用法（项目根目录下）：python tests/live_msg_album_test.py
-复用 live_test.py 的模拟 Bot API 服务器。约 8 秒。
+复用 live_test.py 的模拟 Bot API 服务器。
 """
 import asyncio
 import os

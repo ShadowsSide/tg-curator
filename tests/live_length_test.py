@@ -1,7 +1,7 @@
 """落款也占长度：加上落款后超过 Telegram 限制的稿件，要在提交 / 修改时就告诉对方，不能等发送失败。
 
 用法（项目根目录下）：python tests/live_length_test.py
-复用 live_test.py 的模拟 Bot API 服务器（它和 Telegram 一样限制长度）。约 8 秒。
+复用 live_test.py 的模拟 Bot API 服务器（它和 Telegram 一样限制长度）。
 """
 import asyncio
 import os

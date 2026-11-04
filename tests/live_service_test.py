@@ -1,7 +1,7 @@
 """私聊里的服务消息（置顶、自动删除计时等）不回复“不支持”；用户发来的不支持内容（贴纸）照旧回复。
 
 用法（项目根目录下）：python tests/live_service_test.py
-复用 live_test.py 的模拟 Bot API 服务器。约 5 秒。
+复用 live_test.py 的模拟 Bot API 服务器。
 """
 import asyncio
 import os

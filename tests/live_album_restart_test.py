@@ -4,7 +4,7 @@
 - 相册已经收齐、正在处理（提示被限流，还在等）时收到 SIGTERM：等它处理完再退出
 
 用法（项目根目录下）：python tests/live_album_restart_test.py
-复用 live_test.py 的模拟 Bot API 服务器，启动两次机器人（同一个数据库）。约 20 秒。
+复用 live_test.py 的模拟 Bot API 服务器，启动两次机器人（同一个数据库）。
 """
 import asyncio
 import json

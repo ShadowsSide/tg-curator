@@ -5,7 +5,7 @@
 - 每条投稿各留各的
 
 用法（项目根目录下）：python tests/live_edit_cleanup_test.py
-复用 live_test.py 的模拟 Bot API 服务器。约 15 秒。
+复用 live_test.py 的模拟 Bot API 服务器。
 """
 import asyncio
 import os

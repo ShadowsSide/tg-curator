@@ -1,7 +1,7 @@
 """投稿防垃圾测试（SPAM_ACTION=flag，默认）：命中时照常提交，控制按钮消息上标记；改稿后重新检查；新用户冷却。
 
 用法（项目根目录下）：python tests/live_spam_test.py
-拦截模式（SPAM_ACTION=block）见 live_spam_block_test.py。复用 live_test.py 的模拟 Bot API 服务器。约 10 秒。
+拦截模式（SPAM_ACTION=block）见 live_spam_block_test.py。复用 live_test.py 的模拟 Bot API 服务器。
 """
 import asyncio
 import os

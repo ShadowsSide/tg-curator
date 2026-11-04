@@ -7,7 +7,7 @@
 - 机器人在审核群没有“删除消息”权限：照常启动，只在日志里提醒一次
 
 用法（项目根目录下）：python tests/live_config_test.py
-复用 live_test.py 的模拟 Bot API 服务器，每种情况启动一次机器人。约 1 分钟。
+复用 live_test.py 的模拟 Bot API 服务器，每种情况启动一次机器人。较慢，约 1 分钟。
 """
 import asyncio
 import os

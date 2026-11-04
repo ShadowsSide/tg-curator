@@ -3,7 +3,7 @@
 - 相册处理出错（相册不经过 aiogram 的错误处理）：和单条消息一样回复“出错了”，而不是什么都不说
 
 用法（项目根目录下）：python tests/live_robust_test.py
-复用 live_test.py 的模拟 Bot API 服务器。约 10 秒。
+复用 live_test.py 的模拟 Bot API 服务器。
 """
 import asyncio
 import os

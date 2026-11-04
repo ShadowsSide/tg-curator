@@ -4,7 +4,7 @@
 - 旧按钮：解封后点控制按钮消息或卡片上的 🗑，只提示“没有被封禁”，不删除
 
 用法（项目根目录下）：python tests/live_purge_test.py
-复用 live_test.py 的模拟 Bot API 服务器。约 15 秒。
+复用 live_test.py 的模拟 Bot API 服务器。
 """
 import asyncio
 import os

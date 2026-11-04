@@ -2,7 +2,7 @@
 联系投稿人只用 /msg：数据库里以前的“联系投稿人”提示，回复后作废，不会被当成拒绝理由。
 
 用法（项目根目录下）：python tests/live_prompt_test.py
-复用 live_test.py 的模拟 Bot API 服务器。约 15 秒。
+复用 live_test.py 的模拟 Bot API 服务器。
 """
 import asyncio
 import json

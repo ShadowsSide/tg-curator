@@ -7,7 +7,7 @@
 - 第一批失败：后到的部分也不加，回复原因
 
 用法（项目根目录下）：python tests/live_review_album_test.py
-复用 live_test.py 的模拟 Bot API 服务器。约 30 秒。
+复用 live_test.py 的模拟 Bot API 服务器。较慢，约 40 秒（要等相册收集的延迟）。
 """
 import asyncio
 import json

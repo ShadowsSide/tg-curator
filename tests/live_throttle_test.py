@@ -1,7 +1,7 @@
 """投稿人操作频率限制：/msg 和改稿合计每分钟最多 5 次，超出时提示等几秒，审核群收不到；审核员不受限制。
 
 用法（项目根目录下）：python tests/live_throttle_test.py
-复用 live_test.py 的模拟 Bot API 服务器。约 8 秒。
+复用 live_test.py 的模拟 Bot API 服务器。
 """
 import asyncio
 import os

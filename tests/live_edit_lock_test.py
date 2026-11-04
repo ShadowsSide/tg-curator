@@ -4,7 +4,7 @@
 - 只发 /edit 查看当前内容不受影响；审核员只切换静音等开关不算改稿
 
 用法（项目根目录下）：python tests/live_edit_lock_test.py
-复用 live_test.py 的模拟 Bot API 服务器。约 15 秒。
+复用 live_test.py 的模拟 Bot API 服务器。
 """
 import asyncio
 import os

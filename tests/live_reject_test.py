@@ -1,7 +1,7 @@
 """拒绝理由模板测试：自定义 REJECT_TEMPLATES。
 
 用法（项目根目录下）：python tests/live_reject_test.py
-默认理由由 live_confirm_test.py 覆盖。复用 live_test.py 的模拟 Bot API 服务器。约 8 秒。
+默认理由由 live_confirm_test.py 覆盖。复用 live_test.py 的模拟 Bot API 服务器。
 """
 import asyncio
 import os

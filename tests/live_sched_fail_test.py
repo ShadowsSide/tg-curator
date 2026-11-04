@@ -1,7 +1,7 @@
 """定时发布没有成功时提醒审核员：回复在这条稿件的控制按钮消息下面。
 
 用法（项目根目录下）：python tests/live_sched_fail_test.py
-复用 live_test.py 的模拟 Bot API 服务器。调度每 15 秒一轮，约 40 秒。
+复用 live_test.py 的模拟 Bot API 服务器。调度每 15 秒一轮，较慢，约 50 秒。
 """
 import asyncio
 import os

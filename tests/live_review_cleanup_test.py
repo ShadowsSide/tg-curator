@@ -4,7 +4,7 @@
 - 确认封禁期间这条投稿被别人处理了（拒绝）→ 封禁照样生效，控制按钮消息收起确认面板
 
 用法（项目根目录下）：python tests/live_review_cleanup_test.py
-复用 live_test.py 的模拟 Bot API 服务器。约 15 秒。
+复用 live_test.py 的模拟 Bot API 服务器。
 """
 import asyncio
 import os

@@ -4,7 +4,7 @@
 
 不需要真实的 token 和网络：启动一个模拟 Telegram Bot API 服务器，用 TELEGRAM_API_URL
 指向它，运行真实的 `python -m bot` 进程，走完投稿 / 相册 / 剧透 / 静音 / 定时 / 提醒 / /no / /ban 全流程。
-约 1 分钟（要等定时发布和每分钟一次的提醒真正触发）。
+较慢，约 1.5 分钟（要等定时发布和每分钟一次的提醒真正触发）。
 """
 import asyncio
 import json

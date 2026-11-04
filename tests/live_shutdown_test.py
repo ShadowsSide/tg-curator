@@ -1,7 +1,7 @@
 """停止（SIGTERM）时不丢状态：进行中的发布、提交、定时发布都做完才退出。
 
 用法（项目根目录下）：python tests/live_shutdown_test.py
-复用 live_test.py 的模拟 Bot API 服务器，每个场景启动一次机器人（同一个数据库）。约 40 秒。
+复用 live_test.py 的模拟 Bot API 服务器，每个场景启动一次机器人（同一个数据库）。
 """
 import asyncio
 import os

@@ -1,7 +1,7 @@
 """内容版本：审核员点“发布”之后稿件又被改过，确认时不发布；两次修改同时进行时，后保存的不会盖掉先保存的。
 
 用法（项目根目录下）：python tests/live_version_test.py
-复用 live_test.py 的模拟 Bot API 服务器。约 15 秒。
+复用 live_test.py 的模拟 Bot API 服务器。
 """
 import asyncio
 import json

@@ -5,7 +5,7 @@
   状态已经被别人改了就只刷新卡片；没投过稿的人也能预先封禁；非审核员点不了。
 
 用法（项目根目录下）：python tests/live_unban_test.py
-复用 live_test.py 的模拟 Bot API 服务器。约 10 秒。
+复用 live_test.py 的模拟 Bot API 服务器。
 """
 import asyncio
 import os

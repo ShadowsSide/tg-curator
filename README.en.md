@@ -193,7 +193,7 @@ If you prefer commands, send them as a **reply** to a submission's preview or co
 | `/edit new content` · `/edit` | Change the text (formatting kept, original saved) · show the current content |
 | `/msg message` | Message the submitter as “Reviewer” |
 | `/no [reason]` | Reject |
-| `/ban [reason]` · `/unban <user ID>` | Ban · unban; `/ban <user ID> reason` also bans someone with nothing under review |
+| `/ban [reason]` · `/unban <user ID>` | Ban · unban; `/ban <user ID> reason` supports banning in advance (nothing pending / never submitted) |
 | `/user <user ID>` | Show a contributor, with Ban / Unban buttons below |
 | `/stats` · `/queue` · `/active [days]` | Review summary · scheduled posts · activity ranking (default 30 days) |
 | `/cancel` | Drop prompts waiting for your reply |
@@ -225,26 +225,24 @@ Telegram doesn't allow GIFs in albums, so each GIF becomes its own submission.
 <summary><b>Known limitations</b></summary>
 
 **Reviewing**
-- Second-tap confirmation can't be turned off; rejecting also asks for a reason by default (set `REJECT_TEMPLATES=` to skip it). Reasons can't contain `|`
+- Second-tap confirmation can't be turned off; rejecting also asks for a reason by default (set `REJECT_TEMPLATES=` to skip it)
 - If the control panel message refreshes while a confirm panel is open (the submitter edits, a new `/msg` arrives), the buttons reset and you tap again; nothing runs by mistake
-- After reordering `REJECT_TEMPLATES` and restarting, reason panels opened earlier pick reasons by the new order
+- After reordering `REJECT_TEMPLATES` and restarting, reason panels opened earlier pick reasons by the new order and may pick the wrong one
 - After `/unban`, old 🔓 / 🗑 buttons don't disappear by themselves; they go away when tapped
-- Confirm and reason panels edit the message one extra time, so a busy review group hits Telegram's rate limits sooner and actions slow down
 
 **Photos and videos**
 - Once a text submission gets photos, its caption limit drops from 4096 to 1024 characters, the link preview goes away, and it can't become text-only again
 - The original is saved, but there's no feature to restore it
-- Submitter photo changes don't notify reviewers separately; the review group just gets a new preview and the control panel message shows “Edited (submitter)”
 
 **Spam checks**
 - Keywords match as substrings, which can catch innocent text (especially in Chinese, which has no word boundaries), so the default only flags (`SPAM_ACTION=flag`)
-- Blocked submitters aren't told which word matched; `@usernames`, emails and phone numbers don't count as links; reviewer edits are never blocked
+- Blocked submitters aren't told which word matched; `@usernames`, emails and phone numbers don't count as links
 - Submitters' `/msg` and post-submission edits are limited to 5 per minute in total; not configurable, and reset on restart
-- The new-user cooldown only applies to people with nothing published yet; rejected submissions count toward "last submitted"
+- Rejected submissions also count toward the new-user cooldown's "last submitted"
 
 **Albums**
 - The bot waits `ALBUM_DELAY` seconds to collect an album; a crash or power loss in those seconds loses the parts that already arrived
-- Late parts join the same submission within 10 minutes; if that submission is already under review, cancelled, or would exceed 10 items, they become a separate submission and the reason is shown
+- If the submission a late part would join is already under review, cancelled, or would exceed 10 items, the late part becomes a separate submission and the reason is shown
 - A reviewer's album reply to Replace only uses the first item; late parts on the reviewer side are kept in memory only and are lost on restart
 
 </details>

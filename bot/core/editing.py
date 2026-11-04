@@ -174,10 +174,10 @@ class EditingMixin(CoreBase):
         except TelegramAPIError as e:  # 投稿人拉黑了机器人等：只是看不到预览，不影响改稿
             log.info("给投稿人发 #%s 的预览失败：%s", sid, e)
             return
-        await self.db.update(sid, user_preview=[m.message_id for m in sent])
-        if sub.user_preview:
+        old = await self._swap_ids(sid, "user_preview", [m.message_id for m in sent])  # 同时改稿时取到的才是真正上一份
+        if old:
             try:
-                await self.bot.delete_messages(sub.user_id, sub.user_preview)
+                await self.bot.delete_messages(sub.user_id, old)
             except TelegramAPIError as e:  # 超过 48 小时、已被投稿人删掉
                 log.info("删除投稿人 #%s 的旧预览失败：%s", sid, e)
 

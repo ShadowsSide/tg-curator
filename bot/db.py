@@ -478,7 +478,8 @@ class DB:
 
     async def review_traces(self, chat_id: int, user_id: int) -> dict[int, list[int]]:
         """这个用户的投稿在审核群里还留着的消息：{投稿编号: [消息编号]}。
-        包括预览、控制按钮消息、改稿后的预览、转达的 /msg（都在 review_messages 里）和等待回复的提示（连同它要一起删的消息）。"""
+        包括预览、控制按钮消息、改稿后的预览、转达的 /msg（都在 review_messages 里）、等待回复的提示（连同它要一起删的消息）
+        和最近一次改稿留下的消息（edit_ack）。"""
         traces: dict[int, set[int]] = {}
         rows = await self._all(
             """SELECT rm.sid, rm.message_id FROM review_messages rm JOIN submissions s ON s.id = rm.sid WHERE s.user_id=?
@@ -493,6 +494,11 @@ class DB:
         )
         for sid, mid, cleanup in prompts:
             traces.setdefault(sid, set()).update([mid, *json.loads(cleanup or "[]")])
+        # 最近一次改稿留下的消息：审核员改过的文字、换上的图片也是这条投稿的内容
+        acks = await self._all("SELECT id, edit_ack FROM submissions WHERE user_id=? AND edit_ack IS NOT NULL", (user_id,))
+        for sid, ids in acks:
+            if ids := json.loads(ids):
+                traces.setdefault(sid, set()).update(ids)
         return {sid: sorted(ids) for sid, ids in sorted(traces.items())}
 
     async def forget_review_messages(self, chat_id: int, sids: list[int]) -> None:
@@ -501,7 +507,7 @@ class DB:
         await self.conn.execute(f"DELETE FROM review_messages WHERE sid IN ({marks})", sids)
         await self.conn.execute(f"DELETE FROM prompts WHERE chat_id=? AND sid IN ({marks})", (chat_id, *sids))
         await self.conn.execute(
-            f"UPDATE submissions SET review_msg_id=NULL, edit_preview=NULL WHERE id IN ({marks})", sids)
+            f"UPDATE submissions SET review_msg_id=NULL, edit_preview=NULL, edit_ack=NULL WHERE id IN ({marks})", sids)
         await self.conn.commit()
 
     async def sid_by_review_message(self, message_id: int) -> int | None:

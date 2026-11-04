@@ -154,7 +154,12 @@ class SubmissionsMixin(CoreBase):
                                       by_submitter=True)
         if err:
             await self.db.transition(sid, ("cancelled",), "draft")
-        return err
+            return err
+        if draft.user_msg_id:
+            # 草稿的提示会改成“已加到你之前的投稿里”：算那条投稿的回复，回复它能找到那条投稿，下次改稿时一起删掉
+            await self.db.update(sid, user_msg_id=None)
+            await self._swap_ids(draft.merge_to, "user_ack", [draft.user_msg_id], append=True)
+        return None
 
     async def remove_own_media(self, sid: int, user_id: int, index: int, editor: str, version: int) -> Notice | None:
         """投稿人删掉自己投稿里的第 index 个图片视频（草稿、待审核时）。version：删除面板是按哪个内容版本显示的。"""

@@ -37,20 +37,28 @@ class EditingMixin(CoreBase):
             target["link_preview"] = link_preview
         return await self._save_edit(sub, items, editor, allowed, by_submitter=by_submitter)
 
-    async def replace_item(self, sid: int, index: int, new_item: dict, editor: str,
+    async def replace_item(self, sid: int, msg_id: int, new_item: dict, editor: str,
                            allowed: tuple[str, ...]) -> Notice | None:
-        """投稿人用 Telegram 自带的“编辑”修改了原消息：整项替换（文字、格式、甚至换图都会同步）。"""
+        """投稿人用 Telegram 自带的“编辑”修改了原消息 msg_id：整项替换（文字、格式、甚至换图都会同步）。
+        按 msg_id 在这一刻的内容里找第几项：之前查到的序号可能已经因为删图而变了。"""
         sub = await self.db.get(sid)
         err = self._check_editable(sub, sid, allowed)
         if err:
             return err
         items = [dict(it) for it in sub.items]
+        index = next((i for i, it in enumerate(items) if msg_id in (it.get("msg_id"), it.get("text_msg_id"))), None)
+        if index is None:  # 这条消息刚被删出投稿
+            return notice("edit_race")
         old = items[index]
-        if old["type"] in media.MEDIA_TYPES and new_item["type"] == "text":
+        if old.get("text_msg_id") == msg_id:
             # 纯文字投稿加过图：原来那条文字消息现在是第一个媒体的说明，编辑它就是改说明
+            if new_item["type"] != "text":
+                return notice("type_change")
             items[index] = {**old, "text": new_item["text"], "entities": new_item["entities"]}
         elif (old["type"] == "text") != (new_item["type"] == "text"):
             return notice("type_change")
+        elif "text_msg_id" in old:  # 换图：说明来自那条文字消息，图片消息本身没有说明，保留原来的
+            items[index] = {**new_item, **{k: old[k] for k in ("text", "entities", "above", "text_msg_id") if k in old}}
         else:
             items[index] = new_item
         return await self._save_edit(sub, items, editor, allowed, by_submitter=True)

@@ -258,6 +258,11 @@ T: dict[str, dict[str, str]] = {
         "en": "↑ This is your submission as it stands, including the reviewer's edits. You can't change it anymore; "
               "use <code>/msg</code> to talk to the reviewers.",
     },
+    "u_edit_media_unused": {
+        "zh": "\n\n🖼 一起发来的 {n} 个图片 / 视频没有使用：<code>/edit</code> 只改文字。要加图，请回复你的投稿直接发送图片。",
+        "en": "\n\n🖼 The {n} photo(s) / video(s) sent with it weren't used: <code>/edit</code> only changes the text. "
+              "To add photos, reply to your submission with the photos themselves.",
+    },
     "u_edit_echo_hint": {
         "zh": "↑ 这是当前内容。复制、修改后，回复你的投稿发送 <code>/edit 新内容</code>。",
         "en": "↑ This is the current content. Copy and change it, then reply to your submission with "

@@ -375,13 +375,14 @@ class DB:
         """用户私聊里的某条消息属于哪条投稿：
         - 是投稿内容本身 → (投稿编号, 第几项)。同一条消息可能在两条投稿里（图片“加到”了旧投稿，
           新建的草稿随即作废），优先取没作废的那条
-        - 原稿里有、后来被删掉或换掉的内容，机器人的“请选择投稿方式 / 已提交”提示，或发给投稿人的完整预览
-          → (投稿编号, None)"""
+        - 原稿里有、后来被删掉或换掉的内容，机器人的“请选择投稿方式 / 已提交”提示，发给投稿人的完整预览，
+          或改稿 / 查看时机器人的回复 → (投稿编号, None)
+        纯文字投稿加了图时，原文字消息记在第一项的 text_msg_id，同样算这一项。"""
         row = await self._one(
             """SELECT s.id, CAST(j.key AS INTEGER) FROM submissions s, json_each(s.items) j
-               WHERE s.user_id=? AND json_extract(j.value, '$.msg_id')=?
+               WHERE s.user_id=? AND (json_extract(j.value, '$.msg_id')=? OR json_extract(j.value, '$.text_msg_id')=?)
                ORDER BY s.status='cancelled', s.id DESC LIMIT 1""",
-            (user_id, message_id),
+            (user_id, message_id, message_id),
         )
         if row:
             return row[0], row[1]
@@ -400,13 +401,15 @@ class DB:
         )
         if row:
             return row[0], None
-        row = await self._one(
-            """SELECT s.id FROM submissions s, json_each(s.user_preview) j
-               WHERE s.user_id=? AND j.value=? ORDER BY s.id DESC LIMIT 1""",
-            (user_id, message_id),
-        )
-        if row:
-            return row[0], None
+        # 发给投稿人的完整预览，和改稿 / 查看时机器人的回复（“投稿已更新”“已加到你之前的投稿里”等）
+        for column in ("user_preview", "user_ack"):
+            row = await self._one(
+                f"""SELECT s.id FROM submissions s, json_each(s.{column}) j
+                    WHERE s.user_id=? AND j.value=? ORDER BY s.id DESC LIMIT 1""",
+                (user_id, message_id),
+            )
+            if row:
+                return row[0], None
         sid = await self.sid_by_relay_message(user_id, message_id)
         return (sid, None) if sid else None
 

@@ -55,6 +55,10 @@ T: dict[str, dict[str, str]] = {
         "zh": "配置错误：{msg}（机器人不会运行，修改 .env 后执行 docker compose up -d）",
         "en": "Configuration error: {msg} (the bot won't run; fix .env and run docker compose up -d)",
     },
+    "health_stale": {
+        "zh": "机器人已经 {age} 秒没有响应（后台循环卡住了），查看日志后执行 docker compose restart",
+        "en": "The bot hasn't responded for {age} seconds (background loop stuck); check the logs, then run docker compose restart",
+    },
     "cfg_missing": {"zh": "没有填写 {name}", "en": "{name} is not set"},
     "cfg_number": {"zh": "{name} 必须是数字，当前是 {value!r}", "en": "{name} must be a number, got {value!r}"},
     "cfg_negative": {"zh": "{name} 不能是负数，当前是 {value}", "en": "{name} can't be negative, got {value}"},

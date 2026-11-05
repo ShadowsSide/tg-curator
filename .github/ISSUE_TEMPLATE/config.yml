@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 常见问题与使用说明
+    url: https://github.com/ShadowsSide/tg-curator/blob/main/README.md#%E5%B8%B8%E8%A7%81%E9%97%AE%E9%A2%98
+    about: 部署、配置和常见报错，先看这里
+  - name: FAQ and usage (English)
+    url: https://github.com/ShadowsSide/tg-curator/blob/main/README.en.md#faq
+    about: Deployment, settings and common errors

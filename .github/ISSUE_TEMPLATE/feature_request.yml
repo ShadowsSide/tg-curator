@@ -1,0 +1,45 @@
+name: 功能建议 / Feature request
+description: 新功能或改进现有功能 / A new feature or an improvement
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: 遇到的问题或场景 / Problem or use case
+      description: 现在哪里不方便？先说场景，再说想要什么 / What's inconvenient today? Describe the situation before the solution
+      placeholder: 审核员很多时，经常两个人同时点同一条投稿……
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: 希望的做法 / Proposed solution
+      description: 按钮、命令、配置项长什么样，谁能用 / What the buttons, commands or settings would look like, and who can use them
+    validations:
+      required: true
+
+  - type: dropdown
+    id: who
+    attributes:
+      label: 主要影响谁 / Who is it for
+      multiple: true
+      options:
+        - 投稿人 / Submitters
+        - 审核员 / Reviewers
+        - 频道读者 / Channel readers
+        - 部署和运维 / Deployment and operations
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: 考虑过的其他做法 / Alternatives considered
+      description: 现在怎么绕过去的，或者其他方案为什么不行 / Current workarounds, or why other approaches don't fit
+
+  - type: textarea
+    id: extra
+    attributes:
+      label: 其他 / Anything else
+      description: 截图、参考的机器人或频道 / Screenshots, similar bots or channels

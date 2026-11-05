@@ -1,0 +1,95 @@
+name: 问题反馈 / Bug report
+description: 机器人行为不对、报错或起不来 / Something doesn't work, errors, or the bot won't start
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        提交前请先看 README 的“常见问题”。**不要贴 `BOT_TOKEN`、`.env` 全文或别人的隐私内容。**
+        Please check the FAQ in the README first. **Don't paste `BOT_TOKEN`, your whole `.env`, or other people's private content.**
+
+  - type: textarea
+    id: what
+    attributes:
+      label: 发生了什么 / What happened
+      description: 实际看到的现象，截图也可以 / What you saw; screenshots welcome
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: 复现步骤 / Steps to reproduce
+      description: 谁（投稿人 / 审核员）在哪里（私聊 / 审核群）做了什么 / Who (submitter / reviewer) did what, and where (private chat / review group)
+      placeholder: |
+        1. 投稿人私聊发了一组 3 张图的相册
+        2. 选“署名投稿”
+        3. 审核员点“✏️ 修改”，回复了新的说明
+        4. ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: 期望的结果 / Expected behavior
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: 版本 / Version
+      description: 镜像标签（`.env` 里的 `IMAGE`，没设置就是 `latest`）或提交号 / Image tag (`IMAGE` in `.env`, `latest` if unset) or commit
+      placeholder: "v1.0.0 / latest / dev / 6b3f7b0"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: deploy
+    attributes:
+      label: 运行方式 / How you run it
+      options:
+        - Docker Compose + 官方镜像 / official image
+        - Docker Compose + 自己构建 / self-built image
+        - 直接运行 python -m bot / plain Python
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: 日志 / Logs
+      description: |
+        `docker compose logs --tail 200 bot` 里出问题前后的部分；容器显示 unhealthy 时再附上
+        `docker inspect --format '{{range .State.Health.Log}}{{.Output}}{{end}}' $(docker compose ps -q bot)` 的输出。
+        The lines around the problem from `docker compose logs --tail 200 bot`; if the container is unhealthy, also the output of the `docker inspect` command above.
+      render: text
+
+  - type: textarea
+    id: config
+    attributes:
+      label: 相关配置 / Relevant settings
+      description: 和问题有关的配置项（去掉 token 和 ID）/ Settings related to the problem (without the token or IDs)
+      placeholder: |
+        LANGUAGE=zh
+        REVIEWERS=admins
+        MAX_PENDING_PER_USER=3
+      render: ini
+
+  - type: input
+    id: client
+    attributes:
+      label: Telegram 客户端 / Telegram client
+      description: 和相册、按钮、格式有关时填写 / Fill in for album, button or formatting issues
+      placeholder: "iOS 12.1 / Android / Desktop 6.2 / Web"
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: 确认 / Checklist
+      options:
+        - label: 已搜索过现有的 issue，没有重复 / I searched existing issues and this isn't a duplicate
+          required: true
+        - label: 日志和配置里已删掉 token 等敏感信息 / I removed the token and other secrets from logs and settings
+          required: true

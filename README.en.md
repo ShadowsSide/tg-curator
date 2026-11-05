@@ -83,6 +83,12 @@ docker compose logs -f
 
 The configuration is checked at startup. If a required value is missing, the token is wrong, the channel or review group can't be found, the two IDs are swapped, or the bot can't post to the channel, the log shows one "Configuration error: …" line and the container is marked `unhealthy`. The bot doesn't run and doesn't restart in a loop; fix `.env`, then run `docker compose up -d` again. Network problems aren't configuration errors: the container restarts and retries.
 
+While running, the bot writes a heartbeat regularly. If it stops for more than 5 minutes (the bot is stuck), the container is also marked `unhealthy`. Docker only marks it and doesn't restart it; run `docker compose restart` yourself (save the logs first if you can). `docker compose ps` shows the health status; to see the reason:
+
+```bash
+docker inspect --format '{{range .State.Health.Log}}{{.Output}}{{end}}' $(docker compose ps -q bot)
+```
+
 | Image tag | Contents |
 |---|---|
 | `latest` | Latest version of the main branch |

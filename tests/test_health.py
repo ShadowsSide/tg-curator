@@ -5,6 +5,7 @@
 - 心跳太久没更新：不健康，说明按 LANGUAGE 显示
 - 后台循环每一轮都更新心跳文件
 - Dockerfile 的 HEALTHCHECK 调用的就是它，并且真的能在命令行跑起来
+- README 里写的时限和代码一致
 """
 import asyncio
 import os
@@ -117,6 +118,12 @@ def test_dockerfile_uses_it():
     text = (ROOT / "Dockerfile").read_text()
     assert 'CMD ["python", "-m", "bot.health"]' in text and "HEALTHCHECK" in text, text
     assert "/tmp/config-error" not in text  # 文件位置只在 bot/health.py 里定义
+
+
+def test_readme_states_the_limit():
+    minutes = health.HEARTBEAT_MAX_AGE // 60
+    assert f"超过 {minutes} 分钟没写" in (ROOT / "README.md").read_text()
+    assert f"more than {minutes} minutes" in (ROOT / "README.en.md").read_text()
 
 
 if __name__ == "__main__":

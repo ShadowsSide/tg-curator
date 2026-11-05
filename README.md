@@ -85,6 +85,12 @@ docker compose logs -f
 
 启动时会检查配置。必填项没填、token 不对、找不到频道或审核群、两个 ID 填反、机器人没有发布权限时，日志里会出现一行“配置错误：……”，容器显示 `unhealthy`，机器人不运行也不会反复重启；改好 `.env` 后再执行 `docker compose up -d`。网络不通不算配置错误，容器会自动重启重试。
 
+机器人运行时会定时写一次心跳；超过 5 分钟没写（程序卡住），容器也显示 `unhealthy`。Docker 只标记，不会自动重启，需要手动执行 `docker compose restart`（重启前最好先保存日志）。`docker compose ps` 能看到健康状态，原因用下面的命令查看：
+
+```bash
+docker inspect --format '{{range .State.Health.Log}}{{.Output}}{{end}}' $(docker compose ps -q bot)
+```
+
 | 镜像标签 | 内容 |
 |---|---|
 | `latest` | main 分支的最新版本 |

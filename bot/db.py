@@ -57,6 +57,7 @@ CREATE TABLE IF NOT EXISTS submissions (
     edited_by      TEXT,
     edited_at      INTEGER,
     msg_count      INTEGER NOT NULL DEFAULT 0,
+    spam_flags     TEXT,               -- 防垃圾检查的命中项（JSON 列表），见 spam.py
     error          TEXT,
     edit_preview   TEXT,
     merge_to       INTEGER,

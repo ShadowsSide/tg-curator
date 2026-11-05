@@ -10,6 +10,7 @@ from aiogram.exceptions import TelegramAPIError
 
 from ..db import Submission
 from ..errors import Notice
+from ..health import beat
 from ..i18n import t
 from ..timeutil import now_ts, start_of_today
 
@@ -23,10 +24,12 @@ class SchedulerMixin(CoreBase):
 
     async def _scheduler_loop(self) -> None:
         while not self._stopping.is_set():  # 停止时不取消：正在发布的这条发完，剩下的留给下次启动
+            beat()  # 健康检查（bot/health.py）看这个文件多久没更新，判断机器人是否卡住
             try:
                 for sub in await self.db.due_scheduled(now_ts()):
                     if self._stopping.is_set():
                         return
+                    beat()  # 一次到点的稿件很多时，一轮可能比较久
                     err = await self.publish(sub.id, from_states=("scheduled",))
                     if err:
                         log.warning("定时发布 #%s：%s", sub.id, err.key)

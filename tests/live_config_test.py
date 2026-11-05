@@ -3,7 +3,7 @@
 - 按 LANGUAGE 显示中文或英文
 - 待机时收到 SIGTERM（docker stop）马上退出
 - 网络不通不算配置错误：直接退出（退出码非 0），交给 Docker 重启重试
-- 正常启动时删掉上次留下的错误文件
+- 正常启动时删掉上次留下的错误文件，更新上次留下的旧心跳文件，健康检查（python -m bot.health）通过
 - 机器人在审核群没有“删除消息”权限：照常启动，只在日志里提醒一次
 
 用法（项目根目录下）：python tests/live_config_test.py
@@ -22,6 +22,7 @@ from live_test import CHANNEL, PROJECT, REVIEW, check, results  # noqa: E402
 from aiohttp import web  # noqa: E402
 
 ERROR_FILE = os.path.join(tempfile.mkdtemp(), "config-error")
+HEARTBEAT_FILE = os.path.join(os.path.dirname(ERROR_FILE), "heartbeat")
 NOT_ADMIN = {"status": "member", "user": {"id": lt.BOT_ID, "is_bot": True, "first_name": "TestBot"}}
 CANT_POST = {**lt.BOT_ADMIN, "can_post_messages": False}
 DELETE_WARNING = "没有“删除消息”权限"
@@ -55,7 +56,7 @@ CASES = [
 async def start(port, extra):
     env = {**os.environ, "BOT_TOKEN": "123:TEST", "CHANNEL_ID": str(CHANNEL), "REVIEW_CHAT_ID": str(REVIEW),
            "TELEGRAM_API_URL": f"http://127.0.0.1:{port}", "DB_PATH": os.path.join(tempfile.mkdtemp(), "bot.db"),
-           "CONFIG_ERROR_FILE": ERROR_FILE, "PYTHONUNBUFFERED": "1", "LANGUAGE": "zh", **extra}
+           "CONFIG_ERROR_FILE": ERROR_FILE, "HEARTBEAT_FILE": HEARTBEAT_FILE, "PYTHONUNBUFFERED": "1", "LANGUAGE": "zh", **extra}
     proc = await asyncio.create_subprocess_exec(sys.executable, "-m", "bot", cwd=PROJECT, env=env,
                                                 stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.STDOUT)
     lines = []
@@ -127,12 +128,21 @@ async def main():
 
         # 正常启动：删掉上次留下的错误文件，开始收消息
         open(ERROR_FILE, "w").write("old")
+        open(HEARTBEAT_FILE, "w").close()
+        os.utime(HEARTBEAT_FILE, (time.time() - 3600, time.time() - 3600))  # 上次留下的旧心跳
         lt.MOCK["fail"], lt.MOCK["bot_member"] = {}, lt.BOT_ADMIN
         proc, lines, pump = await start(port, {})
         polling = await until(lambda: any("Start polling" in line for line in lines))
         check("valid config → stale health file removed, bot polls, no delete-permission warning",
               polling and not os.path.exists(ERROR_FILE) and proc.returncode is None
               and not any(DELETE_WARNING in line for line in lines), lines[-5:])
+        health = await asyncio.create_subprocess_exec(
+            sys.executable, "-m", "bot.health", cwd=PROJECT, stdout=asyncio.subprocess.PIPE,
+            env={**os.environ, "CONFIG_ERROR_FILE": ERROR_FILE, "HEARTBEAT_FILE": HEARTBEAT_FILE})
+        out, _ = await health.communicate()
+        age = time.time() - os.path.getmtime(HEARTBEAT_FILE)
+        check("valid config → old heartbeat refreshed, health check passes",
+              age < 10 and health.returncode == 0, (round(age), health.returncode, out))
         took, code = await stop(proc, pump)
 
         # 审核群里只是普通成员：照常运行（能审核），日志里提醒设为管理员、给“删除消息”权限

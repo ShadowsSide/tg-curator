@@ -1,4 +1,4 @@
-"""数据库的单元测试：旧库升级（MIGRATIONS / DROPPED_COLUMNS）、等待回复的提示、按相册编号找投稿。
+"""数据库的单元测试：新库的建表语句、旧库升级（MIGRATIONS / DROPPED_COLUMNS）、等待回复的提示、按相册编号找投稿。
 用法：python tests/test_db.py
 """
 import asyncio
@@ -14,7 +14,7 @@ from types import SimpleNamespace  # noqa: E402
 from zoneinfo import ZoneInfo  # noqa: E402
 
 from bot.core.stats import StatsMixin  # noqa: E402
-from bot.db import DB, DROPPED_COLUMNS  # noqa: E402
+from bot.db import DB, DROPPED_COLUMNS, MIGRATIONS, SCHEMA  # noqa: E402
 
 # 话题模式时代的旧库：带话题列，没有后来加的 msg_count、spam_flags
 OLD_SCHEMA = """
@@ -63,6 +63,16 @@ def test_new_database_has_no_topic_columns():
         path = os.path.join(d, "new.db")
         asyncio.run(upgrade(path))
         assert not {c for _, c in DROPPED_COLUMNS} & columns(path)
+
+
+def test_create_table_has_every_migrated_column():
+    """新库只靠 CREATE TABLE 就该有全部的列；MIGRATIONS 只给旧库补列（否则新库的表结构要靠升级才完整）。"""
+    con = sqlite3.connect(":memory:")
+    con.executescript(SCHEMA)
+    missing = [(table, col) for table, col, _ in MIGRATIONS
+               if col not in {row[1] for row in con.execute(f"PRAGMA table_info({table})")}]
+    con.close()
+    assert not missing, missing
 
 
 def test_prompts_survive_restart():

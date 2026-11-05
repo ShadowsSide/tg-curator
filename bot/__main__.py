@@ -19,12 +19,10 @@ from .core import Core
 from .db import DB
 from .errors import ConfigError
 from .guard import ChatGuard
+from .health import CONFIG_ERROR_FILE, beat, log_lang
 from .handlers import errors, review, user
 from .i18n import LANGS, PRIVATE_COMMANDS, REVIEW_COMMANDS, t
 from .ratelimit import RetryAfterMiddleware
-
-# 配置错误时写下错误说明；Dockerfile 的健康检查看到这个文件就显示 unhealthy
-CONFIG_ERROR_FILE = os.getenv("CONFIG_ERROR_FILE", "/tmp/config-error")
 
 
 async def set_commands(bot: Bot, review_chat_id: int, default_lang: str) -> None:
@@ -90,11 +88,10 @@ async def run() -> None:
 async def wait_for_fix(error: ConfigError) -> None:
     """配置错误重启也修不好：退出的话 Docker 会不停重启、刷屏，所以报一次错后待机，直到容器被停止或重建。
     服务器重启后容器照常启动，再检查一次。"""
-    lang = os.getenv("LANGUAGE", "").strip().lower()
-    lang = lang if lang in LANGS else "zh"
+    lang = log_lang()
     text = t(lang, "cfg_error", msg=error.notice.text(lang))
     logging.error(text)
-    with contextlib.suppress(OSError):
+    with contextlib.suppress(OSError):  # 健康检查（bot/health.py）看到这个文件就显示 unhealthy
         with open(CONFIG_ERROR_FILE, "w", encoding="utf-8") as f:
             f.write(text + "\n")
     stop = asyncio.Event()
@@ -111,6 +108,7 @@ async def main() -> None:
     )
     with contextlib.suppress(FileNotFoundError):  # 上次留下的（容器重启后 /tmp 还在）
         os.remove(CONFIG_ERROR_FILE)
+    beat()  # 上次留下的心跳文件可能很旧；先更新，启动卡住超过时限才算不健康
     try:
         await run()
     except ConfigError as e:

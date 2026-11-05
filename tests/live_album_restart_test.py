@@ -16,7 +16,9 @@ import tempfile
 import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import live_test as lt  # noqa: E402
+from bot.core.base import SHUTDOWN_WAIT  # noqa: E402
 from live_test import PROJECT, PROMPTS, USER, check, is_send, log, results, wait_for  # noqa: E402
 from aiohttp import web  # noqa: E402
 
@@ -60,11 +62,13 @@ async def start(port):
 
 
 async def stop(proc, task):
-    """模拟 docker stop：发 SIGTERM，10 秒内没退出就强杀。返回 (用了几秒, 退出码)。"""
+    """模拟 docker stop：发 SIGTERM，机器人最多等 SHUTDOWN_WAIT 秒做完进行中的处理，再多给 5 秒还没退出就强杀
+    （和 docker-compose.yml 的 stop_grace_period 比 SHUTDOWN_WAIT 长一样）。返回 (用了几秒, 退出码)。
+    机器卡的时候（CI）停止可能超过 10 秒，等得太短会误杀，测试报退出码 -9。"""
     proc.send_signal(signal.SIGTERM)
     t = time.time()
     try:
-        await asyncio.wait_for(proc.wait(), 10)
+        await asyncio.wait_for(proc.wait(), SHUTDOWN_WAIT + 5)
     except asyncio.TimeoutError:
         proc.kill()
         await proc.wait()

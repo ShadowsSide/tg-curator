@@ -45,10 +45,10 @@ async def main():
         lt.MOCK["flood"][f"sendMessage:{CHANNEL}"] = [FLOOD]
         n = len(log); lt.cb("r:pub_ok:1:0", REVIEW, ADMIN)
         await flooded("sendMessage", CHANNEL, n)
-        _, code = await restart.stop(proc, task)
+        took, code = await restart.stop(proc, task)
         check("SIGTERM during publish → post sent once, recorded as published, clean exit",
               len([e for e in log[n:] if is_send(e, "sendMessage", CHANNEL)]) == 1
-              and status(1) == "published" and code == 0, (status(1), code, lines[-5:]))
+              and status(1) == "published" and code == 0, (status(1), code, round(took, 1), lines[-5:]))
         bad = lt.unexpected_errors(lines)
         check("no errors while stopping during publish", not bad, bad[:5])
 
@@ -59,10 +59,10 @@ async def main():
         lt.MOCK["flood"][f"sendMessage:{REVIEW}"] = [FLOOD]
         n = len(log); lt.cb("u:sign:2", USER, USER)
         await flooded("sendMessage", REVIEW, n)
-        _, code = await restart.stop(proc, task)
+        took, code = await restart.stop(proc, task)
         check("SIGTERM during submit → reaches the review group with its control panel message, clean exit",
               [e for e in log[n:] if is_send(e, "sendMessage", REVIEW, CTRL)] and status(2) == "pending" and code == 0,
-              (status(2), code, lines[-5:]))
+              (status(2), code, round(took, 1), lines[-5:]))
         bad = lt.unexpected_errors(lines)
         check("no errors while stopping during submit", not bad, bad[:5])
 
@@ -73,11 +73,10 @@ async def main():
         n = len(log)
         proc, lines, task = await restart.start(port)
         await flooded("sendMessage", CHANNEL, n)
-        t = time.time()
-        _, code = await restart.stop(proc, task)
+        took, code = await restart.stop(proc, task)
         check("SIGTERM during a scheduled publish → finishes it, recorded as published",
               len([e for e in log[n:] if is_send(e, "sendMessage", CHANNEL)]) == 1
-              and status(2) == "published" and code == 0, (status(2), code, round(time.time() - t, 1), lines[-5:]))
+              and status(2) == "published" and code == 0, (status(2), code, round(took, 1), lines[-5:]))
         bad = lt.unexpected_errors(lines)
         check("no errors while stopping during a scheduled publish", not bad, bad[:5])
 

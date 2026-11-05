@@ -244,7 +244,7 @@ def build_router(settings: Settings) -> Router:
         """回复了机器人的提示（“请回复本消息……”）。不是提示、不是点按钮的那个人、或者发的是命令，就交给后面的处理函数。"""
         reply = explicit_reply(m)
         prompt = await core.get_prompt(m.chat.id, reply.message_id) if reply else None
-        if not prompt or not _is_owner(m, prompt) or (m.text or "").startswith("/"):
+        if not prompt or not _is_owner(m, prompt) or (m.text or m.caption or "").startswith("/"):
             raise SkipHandler
         if prompt.kind in ("madd", "mrep"):
             if m.media_group_id:  # 回复的是相册：收齐所有项再一起处理；前面的部分已经开始处理，这几项就算后到的

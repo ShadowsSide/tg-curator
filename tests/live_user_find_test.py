@@ -17,8 +17,7 @@ import live_test as lt  # noqa: E402
 from live_media_test import photo, user_photo  # noqa: E402
 from live_test import BOB, REVIEW, USER, buttons, check, gm, is_send, log, own, wait_for  # noqa: E402
 
-UPDATED = "投稿已更新"
-
+UPDATED = "✏️ 投稿已更新"  # 带上开头的图标：投稿内容里也可能有“投稿已更新”这几个字（下面第二次 /edit 就是）
 
 
 def bot_reply(mid):
@@ -31,9 +30,10 @@ def new_drafts(since):
 
 
 async def user_edit(text, reply):
-    """投稿人回复 reply 发 /edit，返回机器人的回复。"""
+    """投稿人回复 reply 发 /edit，返回机器人“投稿已更新”的回复，等不到返回 None。
+    改稿成功后机器人先发完整预览、再回复；纯文字投稿的预览也是 sendMessage，所以要按回复的文字认，不能取第一条。"""
     n = len(log); lt.pm(text, reply_to_message=reply)
-    return await wait_for(lambda e: is_send(e, "sendMessage", USER), since=n)
+    return await wait_for(lambda e: is_send(e, "sendMessage", USER, UPDATED), since=n)
 
 
 async def scenario():

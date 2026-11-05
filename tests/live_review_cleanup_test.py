@@ -13,16 +13,7 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import live_test as lt  # noqa: E402
-from live_test import ADMIN, REVIEW, buttons, check, gm, is_send, log, review_deleted, submit, wait_for  # noqa: E402
-
-
-
-async def edit_cmd(text, ctrl):
-    """审核员回复控制按钮消息发 /edit，返回 [命令消息, 确认消息]。"""
-    n = len(log); cmd = 5000 + lt.uid[0]; gm(text, reply_to=ctrl)
-    ack = await wait_for(lambda e: is_send(e, "sendMessage", REVIEW, "已修改"), since=n)
-    await asyncio.sleep(0.5)
-    return [cmd, ack and ack["result"]["message_id"]]
+from live_test import ADMIN, REVIEW, buttons, check, edit_cmd, gm, is_send, log, review_deleted, submit, wait_for  # noqa: E402
 
 
 async def scenario():

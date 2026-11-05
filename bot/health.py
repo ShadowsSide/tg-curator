@@ -7,7 +7,9 @@
 """
 from __future__ import annotations
 
+import contextlib
 import os
+import pathlib
 import sys
 import time
 
@@ -17,6 +19,12 @@ CONFIG_ERROR_FILE = os.getenv("CONFIG_ERROR_FILE", "/tmp/config-error")
 HEARTBEAT_FILE = os.getenv("HEARTBEAT_FILE", "/tmp/heartbeat")
 # 后台循环每 SCHEDULER_TICK（15 秒）一轮；一轮里发布定时投稿、被 Telegram 限流时会久一些，所以留足余量
 HEARTBEAT_MAX_AGE = 300  # 秒
+
+
+def beat() -> None:
+    """更新心跳文件（机器人启动时和后台循环每一轮调用）。写不了（例如只读文件系统）就算了，不影响运行。"""
+    with contextlib.suppress(OSError):
+        pathlib.Path(HEARTBEAT_FILE).touch()
 
 
 def log_lang() -> str:

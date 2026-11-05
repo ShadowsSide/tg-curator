@@ -3,19 +3,23 @@
 - 有配置错误文件：不健康，输出里是错误说明
 - 心跳文件不存在（还在启动）或刚更新过：健康
 - 心跳太久没更新：不健康，说明按 LANGUAGE 显示
+- 后台循环每一轮都更新心跳文件
 - Dockerfile 的 HEALTHCHECK 调用的就是它，并且真的能在命令行跑起来
 """
+import asyncio
 import os
 import pathlib
 import subprocess
 import sys
 import tempfile
 import time
+from types import SimpleNamespace
 
 ROOT = pathlib.Path(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.insert(0, str(ROOT))
 
 from bot import health  # noqa: E402
+from bot.core.scheduler import SchedulerMixin  # noqa: E402
 
 
 def paths(d):
@@ -76,6 +80,37 @@ def test_cli_exit_codes():
         pathlib.Path(err).write_text("Configuration error: x\n", encoding="utf-8")
         r = run_cli(env)
         assert r.returncode == 1 and r.stdout.strip() == "Configuration error: x", r.stdout
+
+
+def test_scheduler_loop_beats():
+    async def empty(*_):
+        return []
+
+    async def noop():
+        return None
+
+    async def go(beat):
+        stopping = asyncio.Event()
+        core = SimpleNamespace(_stopping=stopping, db=SimpleNamespace(due_scheduled=empty, expire_drafts=empty),
+                               expire_prompts=noop, throttle=SimpleNamespace(prune=lambda: None))
+        task = asyncio.create_task(SchedulerMixin._scheduler_loop(core))
+        for _ in range(100):
+            await asyncio.sleep(0.01)
+            if os.path.exists(beat) and time.time() - os.path.getmtime(beat) < 5:
+                break
+        fresh = os.path.exists(beat) and time.time() - os.path.getmtime(beat) < 5
+        stopping.set()
+        await asyncio.wait_for(task, 2)
+        return fresh
+
+    old = health.HEARTBEAT_FILE
+    try:
+        with tempfile.TemporaryDirectory() as d:
+            health.HEARTBEAT_FILE = beat = os.path.join(d, "heartbeat")
+            touch(beat, age=health.HEARTBEAT_MAX_AGE + 60)  # 上次留下的旧文件
+            assert asyncio.run(go(beat)), "scheduler loop did not refresh the heartbeat"
+    finally:
+        health.HEARTBEAT_FILE = old
 
 
 def test_dockerfile_uses_it():

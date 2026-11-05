@@ -19,7 +19,7 @@ from .core import Core
 from .db import DB
 from .errors import ConfigError
 from .guard import ChatGuard
-from .health import CONFIG_ERROR_FILE, log_lang
+from .health import CONFIG_ERROR_FILE, beat, log_lang
 from .handlers import errors, review, user
 from .i18n import LANGS, PRIVATE_COMMANDS, REVIEW_COMMANDS, t
 from .ratelimit import RetryAfterMiddleware
@@ -108,6 +108,7 @@ async def main() -> None:
     )
     with contextlib.suppress(FileNotFoundError):  # 上次留下的（容器重启后 /tmp 还在）
         os.remove(CONFIG_ERROR_FILE)
+    beat()  # 上次留下的心跳文件可能很旧；先更新，启动卡住超过时限才算不健康
     try:
         await run()
     except ConfigError as e:

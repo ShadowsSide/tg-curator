@@ -6,11 +6,11 @@ import re
 import time
 from dataclasses import dataclass, field
 
-from aiogram import F, Router
+from aiogram import BaseMiddleware, F, Router
 from aiogram.dispatcher.event.bases import SkipHandler
 from aiogram.exceptions import TelegramBadRequest
 from aiogram.filters import Command, CommandObject
-from aiogram.types import CallbackQuery, Message
+from aiogram.types import CallbackQuery, Message, TelegramObject
 
 from .. import entities as ent
 from ..album import ALBUM_MERGE_WINDOW
@@ -100,6 +100,31 @@ async def _replied_sid(m: Message, core: Core) -> int | None:
     return await core.sid_for_review_message(reply.message_id) if reply else None
 
 
+# 处理完就删掉的命令：结果都在机器人的回复或动作里（拒绝、封禁的理由也写在回复里）。
+# 不删 /msg：审核群里只有它记着发给投稿人的内容；不删 /edit：它有自己的“只留最近一次”（Core.replace_edit_ack）
+CLEANUP_COMMANDS = frozenset({"stats", "queue", "active", "user", "help", "cancel", "no", "ban", "unban"})
+
+
+class DeleteCommand(BaseMiddleware):
+    """命令处理完删掉命令消息。放在 ReviewerOnly 里面：没权限的人发的不删；
+    只看 Command 过滤器认出的命令（data["command"]）：/no@别的机器人、/foo 这类不是本机器人处理的，不删。"""
+
+    async def __call__(self, handler, event: TelegramObject, data: dict):
+        result = await handler(event, data)  # SkipHandler 或出错时不会走到下面
+        command = data.get("command")
+        if isinstance(event, Message) and command and command.command in CLEANUP_COMMANDS:
+            await data["core"].delete_command(event.message_id)
+        return result
+
+
+async def _reply(m: Message, core: Core, sid: int | None, text: str, **kwargs) -> None:
+    """命令的回复：有对应投稿就挂在它的控制按钮消息下面，命令删掉后回复的引用不会落空；没有就照常回复命令。"""
+    if sid is None:
+        await m.reply(text, **kwargs)
+    else:
+        await core.reply_on_control(sid, text, **kwargs)
+
+
 def build_router(settings: Settings) -> Router:
     router = Router(name="review")
     router.message.filter(F.chat.id == settings.review_chat_id)
@@ -108,6 +133,7 @@ def build_router(settings: Settings) -> Router:
     guard = ReviewerOnly(ReviewerCheck(ReviewerPolicy.parse(settings.reviewers), settings.review_chat_id),
                          settings.language)
     router.message.middleware(guard)
+    router.message.middleware(DeleteCommand())  # 在 guard 之后注册，只处理审核员的命令
     router.callback_query.middleware(guard)
 
     # ---------- 控制按钮 ----------
@@ -414,10 +440,10 @@ def build_router(settings: Settings) -> Router:
 
         err = await core.reject(sid, m.from_user, reason)
         if err:
-            await m.reply(err.text(core.lang))
+            await _reply(m, core, sid, err.text(core.lang))
             return
-        await m.reply(t(core.lang, "rejected_reply")
-                      + (t(core.lang, "reason_line", reason=html.escape(reason)) if reason else ""))
+        await _reply(m, core, sid, t(core.lang, "rejected_reply")
+                     + (t(core.lang, "reason_line", reason=html.escape(reason)) if reason else ""))
 
     @router.message(Command("edit"))
     async def edit_cmd(m: Message, core: Core) -> None:
@@ -487,7 +513,7 @@ def build_router(settings: Settings) -> Router:
             text += t(core.lang, "reason_line", reason=html.escape(reason))
         if rejected:
             text += t(core.lang, "banned_reply_rejected", n=len(rejected))
-        await m.reply(text, link_preview_options=NO_PREVIEW)
+        await _reply(m, core, sid, text, link_preview_options=NO_PREVIEW)
 
     @router.message(Command("unban"))
     async def unban_cmd(m: Message, command: CommandObject, core: Core) -> None:
@@ -499,11 +525,11 @@ def build_router(settings: Settings) -> Router:
             await m.reply(t(core.lang, "usage_unban"))
             return
         if not await core.unban_user(uid):
-            await m.reply(t(core.lang, "not_banned", uid=uid))
+            await _reply(m, core, sid, t(core.lang, "not_banned", uid=uid))
             return
         if sid is not None:  # 收起回复的那条控制按钮消息上的“解除封禁”；别的控制按钮消息上的旧按钮点了再收起
             await core.refresh_control(sid)
-        await m.reply(t(core.lang, "unbanned_reply", uid=uid))
+        await _reply(m, core, sid, t(core.lang, "unbanned_reply", uid=uid))
 
     @router.message(F.reply_to_message)
     async def plain_reply(m: Message, core: Core) -> None:

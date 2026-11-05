@@ -25,7 +25,7 @@ def bot_msg(chat_id, message_id):
 
 
 def admin_media(reply_to, group=None, text=None, **media):
-    """审核员在审核群回复一条机器人的消息，发图片 / 视频 / 文字。"""
+    """审核员在审核群回复一条机器人的消息，发图片 / 视频 / 文字，返回它的消息编号。"""
     d = {"message_id": 7000 + lt.uid[0], "date": lt.now(), "chat": lt.chat(REVIEW),
          "from": {"id": ADMIN, "is_bot": False, "first_name": "Admin"},
          "reply_to_message": bot_msg(REVIEW, reply_to), **media}
@@ -34,6 +34,7 @@ def admin_media(reply_to, group=None, text=None, **media):
     if group:
         d["media_group_id"] = group
     lt.push(message=d)
+    return d["message_id"]
 
 
 def user_photo(fid, reply_to=None, group=None):

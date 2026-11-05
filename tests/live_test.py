@@ -195,6 +195,7 @@ def pm_edit(message_id, text, entities=None, who=USER):
 
 
 def gm(text, reply_to=None, entities=None):
+    """审核员（ADMIN）在审核群发一条文字消息，返回它的消息编号。"""
     d = {"message_id": 5000 + uid[0], "date": now(), "chat": chat(REVIEW),
          "from": {"id": ADMIN, "is_bot": False, "first_name": "Admin"}, "text": text}
     if text.startswith("/"):
@@ -203,6 +204,15 @@ def gm(text, reply_to=None, entities=None):
         d["reply_to_message"] = {"message_id": reply_to, "date": now(), "chat": chat(REVIEW),
                                  "from": {"id": 1, "is_bot": True, "first_name": "TestBot"}}
     push(message=d)
+    return d["message_id"]
+
+
+async def edit_cmd(text, ctrl):
+    """审核员回复控制按钮消息发 /edit，等到“已修改”的确认，返回 (命令消息, 确认消息) 的编号；没等到确认时后者为 None。"""
+    n = len(log); cmd = gm(text, reply_to=ctrl)
+    ack = await wait_for(lambda e: is_send(e, "sendMessage", REVIEW, "已修改"), since=n)
+    await asyncio.sleep(0.5)
+    return cmd, ack and ack["result"]["message_id"]
 
 
 def cb(data, chat_id, from_id, message_id=999):
@@ -463,13 +473,13 @@ async def scenario():
     ctrl6 = await wait_for(lambda e: is_send(e, "sendMessage", REVIEW, CTRL), since=n)
     check("user's own media spoiler kept as default", ctrl6 and "剧透遮罩：🙈 开" in ctrl6["params"]["text"])
 
-    edit_cmd = "/edit 🎉 新的说明，详见官网"
+    edit_text = "/edit 🎉 新的说明，详见官网"
     # 管理员消息里的格式：自定义 emoji、粗体“说明”、“官网”超链接
     edit_ents = [{"type": "custom_emoji", "offset": 6, "length": 2, "custom_emoji_id": "777"},
                  {"type": "bold", "offset": 11, "length": 2},
                  {"type": "text_link", "offset": 16, "length": 2, "url": "https://example.org"}]
-    assert edit_cmd.encode("utf-16-le")[16 * 2:18 * 2].decode("utf-16-le") == "官网"
-    n = len(log); gm(edit_cmd, reply_to=ctrl6["result"]["message_id"], entities=edit_ents)
+    assert edit_text.encode("utf-16-le")[16 * 2:18 * 2].decode("utf-16-le") == "官网"
+    n = len(log); gm(edit_text, reply_to=ctrl6["result"]["message_id"], entities=edit_ents)
     ok_msg = await wait_for(lambda e: is_send(e, "sendMessage", REVIEW, "已修改"), since=n)
     new_pv = await wait_for(lambda e: is_send(e, "sendPhoto", REVIEW), since=n)
     body = "🎉 新的说明，详见官网"

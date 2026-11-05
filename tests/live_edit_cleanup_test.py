@@ -15,15 +15,7 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import live_test as lt  # noqa: E402
 from live_media_test import admin_media, ask, photo  # noqa: E402
-from live_test import REVIEW, check, gm, is_send, log, review_deleted, submit, wait_for  # noqa: E402
-
-
-async def edit_cmd(text, ctrl):
-    """审核员回复控制按钮消息发 /edit，返回 (命令消息, 确认消息)。"""
-    n = len(log); cmd = 5000 + lt.uid[0]; gm(text, reply_to=ctrl)
-    ack = await wait_for(lambda e: is_send(e, "sendMessage", REVIEW, "已修改"), since=n)
-    await asyncio.sleep(0.5)
-    return cmd, ack and ack["result"]["message_id"]
+from live_test import REVIEW, check, edit_cmd, gm, is_send, log, review_deleted, submit, wait_for  # noqa: E402
 
 
 async def scenario():
@@ -37,7 +29,7 @@ async def scenario():
 
     # 回复“✏️ 修改”的提示：顶掉第一次的，这次的留着
     p = await ask("edit", 1, ctrl, "回复本消息")
-    n = len(log); reply_id = 5000 + lt.uid[0]; gm("提示里改的", reply_to=p["result"]["message_id"])
+    n = len(log); reply_id = gm("提示里改的", reply_to=p["result"]["message_id"])
     ack = await wait_for(lambda e: is_send(e, "sendMessage", REVIEW, "已修改"), since=n)
     await asyncio.sleep(0.5)
     second = (reply_id, ack and ack["result"]["message_id"])
@@ -46,7 +38,7 @@ async def scenario():
 
     # 添加媒体：顶掉上一次的；这次只记确认，审核员的图片留着
     p = await ask("madd", 1, ctrl, "要添加的图片")
-    n = len(log); pic = 7000 + lt.uid[0]; admin_media(p["result"]["message_id"], photo=photo("X"))
+    n = len(log); pic = admin_media(p["result"]["message_id"], photo=photo("X"))
     ack = await wait_for(lambda e: is_send(e, "sendMessage", REVIEW, "已修改"), since=n)
     await asyncio.sleep(0.5)
     third = ack and ack["result"]["message_id"]
@@ -60,10 +52,10 @@ async def scenario():
     p = await ask("madd", 1, ctrl, "要添加的图片")
     n = len(log); pics = []
     for fid in ("Y1", "Y2"):
-        pics.append(7000 + lt.uid[0]); admin_media(p["result"]["message_id"], group="ga", photo=photo(fid))
+        pics.append(admin_media(p["result"]["message_id"], group="ga", photo=photo(fid)))
     ack = await wait_for(lambda e: is_send(e, "sendMessage", REVIEW, "已修改"), since=n)
     await asyncio.sleep(1)  # 超过 ALBUM_DELAY：后到的部分单独处理
-    pics.append(7000 + lt.uid[0]); admin_media(p["result"]["message_id"], group="ga", photo=photo("Y3"))
+    pics.append(admin_media(p["result"]["message_id"], group="ga", photo=photo("Y3")))
     late = await wait_for(lambda e: is_send(e, "sendMessage", REVIEW, "也已加进去"), since=n)
     await asyncio.sleep(0.5)
     album = {*pics, ack and ack["result"]["message_id"], late and late["result"]["message_id"]}

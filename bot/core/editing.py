@@ -57,8 +57,11 @@ class EditingMixin(CoreBase):
             items[index] = {**old, "text": new_item["text"], "entities": new_item["entities"]}
         elif (old["type"] == "text") != (new_item["type"] == "text"):
             return notice("type_change")
-        elif "text_msg_id" in old:  # 换图：说明来自那条文字消息，图片消息本身没有说明，保留原来的
-            items[index] = {**new_item, **{k: old[k] for k in ("text", "entities", "above", "text_msg_id") if k in old}}
+        elif "text_msg_id" in old:
+            # 换图：说明来自那条文字消息。图片消息上没写说明就保留原来的；写了就用新写的。
+            # text_msg_id 都留着：以后再编辑那条文字消息，仍然是改这段说明
+            keep = ("text_msg_id",) if new_item.get("text") else ("text", "entities", "above", "text_msg_id")
+            items[index] = {**new_item, **{k: old[k] for k in keep if k in old}}
         else:
             items[index] = new_item
         return await self._save_edit(sub, items, editor, allowed, by_submitter=True)

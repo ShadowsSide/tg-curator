@@ -183,6 +183,23 @@ def test_core_native_text_edit_after_conversion_updates_caption():
     _with_core([text_item()], check)
 
 
+def test_core_native_photo_edit_after_conversion_keeps_a_new_caption():
+    """纯文字投稿加了图，投稿人“编辑”那张图时写了说明：用新写的；之后再改原文字消息，仍然改这段说明。"""
+    async def check(core, db, sid):
+        await core.change_media(sid, "add", 0, [photo("p", msg_id=777)], "投稿人", ("draft",), True)
+        swapped = {"type": "photo", "file_id": "p2", "text": "图上写的说明", "entities": [{"type": "bold", "offset": 0,
+                   "length": 2}], "above": True, "msg_id": 777}
+        assert await core.replace_item(sid, 777, swapped, "投稿人", ("draft",)) is None
+        it = (await db.get(sid)).items[0]
+        assert (it["file_id"], it["text"], it["above"], it["text_msg_id"]) == ("p2", "图上写的说明", True, 50), it
+        assert it["entities"] == swapped["entities"]
+        new = {"type": "text", "text": "又改回文字消息", "entities": [], "msg_id": 50}
+        assert await core.replace_item(sid, 50, new, "投稿人", ("draft",)) is None
+        it = (await db.get(sid)).items[0]
+        assert it["file_id"] == "p2" and it["text"] == "又改回文字消息" and it["text_msg_id"] == 50
+    _with_core([text_item()], check)
+
+
 def test_text_msg_id_follows_the_caption():
     """纯文字投稿加了图：说明来自原文字消息（text_msg_id），替换、删除时跟着说明走。"""
     items, _ = media.add([text_item()], [photo("a", msg_id=1), photo("b", msg_id=2)])

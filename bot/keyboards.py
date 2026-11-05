@@ -97,6 +97,14 @@ def user_confirm_kb(uid: int, action: str, lang: str) -> InlineKeyboardMarkup:
     ])
 
 
+def stats_kb(oldest_url: str | None, lang: str) -> InlineKeyboardMarkup | None:
+    """统计消息（定时提醒、/stats）：有待审核的投稿时，一个按钮跳到等得最久的那条的控制按钮消息。"""
+    if not oldest_url:
+        return None
+    return InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text=t(lang, "btn_oldest_pending"),
+                                                                        url=oldest_url)]])
+
+
 def _rb(text: str, a: str, sid: int, v: int = 0, style: ButtonStyle | None = None) -> InlineKeyboardButton:
     return InlineKeyboardButton(text=text, callback_data=ReviewCB(a=a, sid=sid, v=v).pack(), style=style)
 

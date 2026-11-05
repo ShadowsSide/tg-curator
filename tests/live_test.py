@@ -4,7 +4,7 @@
 
 不需要真实的 token 和网络：启动一个模拟 Telegram Bot API 服务器，用 TELEGRAM_API_URL
 指向它，运行真实的 `python -m bot` 进程，走完投稿 / 相册 / 剧透 / 静音 / 定时 / 提醒 / /no / /ban 全流程。
-约 1 分钟（要等定时发布和每分钟一次的提醒真正触发）。
+较慢，约 1.5 分钟（要等定时发布和每分钟一次的提醒真正触发）。
 """
 import asyncio
 import json
@@ -243,6 +243,29 @@ async def wait_for(pred, timeout=10.0, since=None):
 def check(name, ok, detail=""):
     results.append((name, bool(ok)))
     print(f"{'PASS' if ok else 'FAIL'}  {name}" + (f"  — {detail}" if detail else ""), flush=True)
+
+
+def own(mid):
+    """投稿人自己的消息（供回复用）。"""
+    return {"message_id": mid, "date": now(), "chat": chat(USER)}
+
+
+async def user_says(text, mid):
+    """投稿人回复自己的投稿发一条命令，返回机器人的回复。"""
+    n = len(log); pm(text, reply_to_message=own(mid))
+    return await wait_for(lambda e: is_send(e, "sendMessage", USER), since=n)
+
+
+def review_deleted(since):
+    """since 之后机器人在审核群删掉的消息（整批 deleteMessages 和逐条 deleteMessage 都算）。"""
+    out = []
+    for e in log[since:]:
+        if not e.get("error") and str(e["params"].get("chat_id")) == str(REVIEW):
+            if e["method"] == "deleteMessages":
+                out += [int(i) for i in e["params"]["message_ids"]]
+            elif e["method"] == "deleteMessage":
+                out.append(int(e["params"]["message_id"]))
+    return out
 
 
 def is_send(e, method, chat_id, contains=None):

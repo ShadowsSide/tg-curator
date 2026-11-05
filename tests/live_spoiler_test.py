@@ -4,7 +4,7 @@
 - 回复自己的投稿发一张带剧透的图并“加到这条投稿”，剧透也跟着打开
 
 用法（项目根目录下）：python tests/live_spoiler_test.py
-复用 live_test.py 的模拟 Bot API 服务器。约 10 秒。
+复用 live_test.py 的模拟 Bot API 服务器。
 """
 import asyncio
 import os

@@ -1,7 +1,7 @@
 """其余审核按钮：🔁 重试发布、↩️ 取消定时（不需要二次确认；取消定时、改时间都会通知投稿人）。
 
 用法（项目根目录下）：python tests/live_buttons_test.py
-发布失败用模拟服务器的失败注入（MOCK["fail"]）制造。复用 live_test.py 的模拟 Bot API 服务器。约 8 秒。
+发布失败用模拟服务器的失败注入（MOCK["fail"]）制造。复用 live_test.py 的模拟 Bot API 服务器。
 """
 import asyncio
 import os

@@ -2,7 +2,7 @@
 联系投稿人只用 /msg：数据库里以前的“联系投稿人”提示，回复后作废，不会被当成拒绝理由。
 
 用法（项目根目录下）：python tests/live_prompt_test.py
-复用 live_test.py 的模拟 Bot API 服务器。约 15 秒。
+复用 live_test.py 的模拟 Bot API 服务器。
 """
 import asyncio
 import json
@@ -31,7 +31,7 @@ def is_prompt(e, contains):
     return is_send(e, "sendMessage", REVIEW, contains) and "force_reply" in json.dumps(e["params"])
 
 
-def deleted(since):
+def batch_deleted(since):
     """since 之后被删掉的审核群消息。"""
     return {int(i) for e in log[since:] if e["method"] == "deleteMessages"
             and str(e["params"].get("chat_id")) == str(REVIEW) for i in json.loads(str(e["params"]["message_ids"]))}
@@ -82,15 +82,15 @@ async def scenario():
     preview1 = next((e for e in log[n:] if is_send(e, "sendMessage", REVIEW, "提示测试 改一") and e is not done), None)
     await wait_for(lambda e: e["method"] == "deleteMessages", since=n)
     check("reply → edited, new preview posted, prompt + echo deleted",
-          done and preview1 and {prompt["result"]["message_id"], echo["result"]["message_id"]} <= deleted(n),
-          deleted(n))
-    check("first edit deletes no preview (the original stays)", first_preview not in deleted(n0))
+          done and preview1 and {prompt["result"]["message_id"], echo["result"]["message_id"]} <= batch_deleted(n),
+          batch_deleted(n))
+    check("first edit deletes no preview (the original stays)", first_preview not in batch_deleted(n0))
 
     # 4. 再改一次：删掉上一份修改预览，最初的预览保留；被删的预览不再能定位投稿
     n = len(log)
     _, _, preview2, done2 = await edit_via_button(ctrl1, 1, "提示测试 改二")
     await asyncio.sleep(0.5)
-    gone = deleted(n)
+    gone = batch_deleted(n)
     check("second edit → previous edited preview deleted, original preview kept",
           preview2 and done2 and preview1["result"]["message_id"] in gone and first_preview not in gone, gone)
     n = len(log); lt.gm("/no", reply_to=preview1["result"]["message_id"])
@@ -108,12 +108,12 @@ async def scenario():
     p = await wait_for(lambda e: is_prompt(e, "/cancel"), since=n)
     n = len(log); reply_from(OTHER_ADMIN, "/cancel", p["result"]["message_id"])
     told = await wait_for(lambda e: is_send(e, "sendMessage", REVIEW, "没有等你回复"), since=n)
-    check("/cancel on someone else's prompt → not cancelled", told and p["result"]["message_id"] not in deleted(n))
+    check("/cancel on someone else's prompt → not cancelled", told and p["result"]["message_id"] not in batch_deleted(n))
     n = len(log); lt.gm("/cancel", reply_to=p["result"]["message_id"])
     told = await wait_for(lambda e: is_send(e, "sendMessage", REVIEW, "已取消"), since=n)
     await wait_for(lambda e: e["method"] == "deleteMessages", since=n)
     check("/cancel as a reply → that prompt deleted, nothing edited",
-          told and p["result"]["message_id"] in deleted(n)
+          told and p["result"]["message_id"] in batch_deleted(n)
           and not any(is_send(e, "sendMessage", REVIEW, "已修改") for e in log[n:]))
     n = len(log)
     lt.cb("r:edit:1:0", REVIEW, ADMIN, message_id=ctrl1)
@@ -124,7 +124,7 @@ async def scenario():
     await wait_for(lambda e: is_send(e, "sendMessage", REVIEW, "已取消"), since=n)
     await asyncio.sleep(0.5)
     check("/cancel on its own → all my open prompts dropped",
-          {p1["result"]["message_id"], p2["result"]["message_id"]} <= deleted(n), deleted(n))
+          {p1["result"]["message_id"], p2["result"]["message_id"]} <= batch_deleted(n), batch_deleted(n))
     n = len(log); lt.gm("/cancel")
     check("/cancel with nothing open → told so",
           await wait_for(lambda e: is_send(e, "sendMessage", REVIEW, "没有等你回复"), since=n))

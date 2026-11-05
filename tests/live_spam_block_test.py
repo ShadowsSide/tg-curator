@@ -1,7 +1,7 @@
 """投稿防垃圾测试（SPAM_ACTION=block）：命中时拦下不让提交，不透露命中的词；修改后可以重新提交。
 
 用法（项目根目录下）：python tests/live_spam_block_test.py
-复用 live_test.py 的模拟 Bot API 服务器。约 6 秒。
+复用 live_test.py 的模拟 Bot API 服务器。
 """
 import asyncio
 import os

@@ -6,7 +6,7 @@ from zoneinfo import ZoneInfo
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from bot.timeutil import MAX_AHEAD, TimeTooFar, parse_time  # noqa: E402
+from bot.timeutil import MAX_AHEAD, TimeTooFar, fmt_ts, parse_time  # noqa: E402
 
 TZ = ZoneInfo("Asia/Shanghai")
 
@@ -42,6 +42,20 @@ def test_huge_relative_time():
     except TimeTooFar:
         pass
     assert parse_time(f"+{MAX_AHEAD // 86400}d", TZ, now) == int(now.timestamp()) + MAX_AHEAD
+
+
+def test_fmt_ts_year():
+    now = at(2026, 12, 20, 12, 0)
+    ts = lambda *a: int(at(*a).timestamp())  # noqa: E731
+    assert fmt_ts(ts(2026, 12, 20, 21, 0), TZ, "zh", now) == "今天 21:00"
+    assert fmt_ts(ts(2026, 12, 20, 21, 0), TZ, "en", now) == "today 21:00"
+    assert fmt_ts(ts(2026, 3, 1, 9, 5), TZ, "zh", now) == "03-01 09:05"
+    # 12-20 定时 “01-05 09:00” 存的是明年：要带上年份，不然看起来像今年
+    assert fmt_ts(parse_time("01-05 09:00", TZ, now), TZ, "zh", now) == "2027-01-05 09:00"
+    assert fmt_ts(ts(2025, 12, 31, 23, 0), TZ, "zh", now) == "2025-12-31 23:00"
+    assert fmt_ts(None, TZ, "zh", now) == "-"
+    next_year = datetime.now(TZ).year + 1  # 不传 now：按当前时间
+    assert fmt_ts(ts(next_year, 1, 5, 9, 0), TZ) == f"{next_year}-01-05 09:00"
 
 
 if __name__ == "__main__":

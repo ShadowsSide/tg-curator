@@ -57,6 +57,7 @@ T: dict[str, dict[str, str]] = {
     },
     "cfg_missing": {"zh": "没有填写 {name}", "en": "{name} is not set"},
     "cfg_number": {"zh": "{name} 必须是数字，当前是 {value!r}", "en": "{name} must be a number, got {value!r}"},
+    "cfg_negative": {"zh": "{name} 不能是负数，当前是 {value}", "en": "{name} can't be negative, got {value}"},
     "cfg_choice": {"zh": "{name} 只能是 {allowed}，当前是 {value!r}", "en": "{name} must be one of {allowed}, got {value!r}"},
     "cfg_tz": {"zh": "TZ 不是有效的时区：{value!r}（例如 Asia/Shanghai、UTC）",
                "en": "TZ is not a valid time zone: {value!r} (e.g. Asia/Shanghai, UTC)"},

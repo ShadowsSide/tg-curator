@@ -1,7 +1,7 @@
 """限流（429）测试：自动等待重试、限流太久时改为稍后发布、统计消息合并更新。
 
 用法（项目根目录下）：python tests/live_flood_test.py
-复用 live_test.py 的模拟 Bot API 服务器，按需注入 429 响应。约 20 秒。
+复用 live_test.py 的模拟 Bot API 服务器，按需注入 429 响应。
 """
 import asyncio
 import os

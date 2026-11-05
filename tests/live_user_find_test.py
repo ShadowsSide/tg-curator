@@ -5,7 +5,8 @@
 - 用相册直接回复审核员的消息（没写 /msg）：提醒用 /msg，不当成新投稿
 
 用法（项目根目录下）：python tests/live_user_find_test.py
-复用 live_test.py 的模拟 Bot API 服务器。约 15 秒。
+复用 live_test.py 的模拟 Bot API 服务器。
+改稿 / 查看留下的消息怎么清理见 live_user_cleanup_test.py；相册 /msg 的整组转达见 live_msg_album_test.py。
 """
 import asyncio
 import os
@@ -14,13 +15,10 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import live_test as lt  # noqa: E402
 from live_media_test import photo, user_photo  # noqa: E402
-from live_test import BOB, REVIEW, USER, buttons, check, gm, is_send, log, wait_for  # noqa: E402
+from live_test import BOB, REVIEW, USER, buttons, check, gm, is_send, log, own, wait_for  # noqa: E402
 
 UPDATED = "投稿已更新"
 
-
-def own(mid):
-    return {"message_id": mid, "date": lt.now(), "chat": lt.chat(USER)}
 
 
 def bot_reply(mid):

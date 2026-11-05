@@ -30,20 +30,22 @@ class ReviewMixin(CoreBase):
         return fields
 
     async def toggle_spoiler(self, sid: int) -> Notice:
-        sub = await self.db.get(sid)
-        if not sub or sub.status not in OPEN_STATES:
-            return notice("toast_state_locked")
-        await self.db.update(sid, spoiler=int(not sub.spoiler))
-        await self.refresh_control(sid)
-        return notice("toast_spoiler", state=notice("on" if not sub.spoiler else "off"))
+        return await self._toggle(sid, "spoiler", "toast_spoiler")
 
     async def toggle_silent(self, sid: int) -> Notice:
+        return await self._toggle(sid, "silent", "toast_silent")
+
+    async def _toggle(self, sid: int, field: str, toast: str) -> Notice:
+        """切换发布选项（剧透 / 静音）。带状态条件写：发布先把状态改成 publishing 再读设置，
+        晚到的切换写不进去，提示“已经开始处理”，而不是提示已切换、发出去的却是旧设置。"""
         sub = await self.db.get(sid)
         if not sub or sub.status not in OPEN_STATES:
             return notice("toast_state_locked")
-        await self.db.update(sid, silent=int(not sub.silent))
+        on = not getattr(sub, field)
+        if not await self.db.update_if(sid, OPEN_STATES, **{field: int(on)}):
+            return notice("toast_state_locked")
         await self.refresh_control(sid)
-        return notice("toast_silent", state=notice("on" if not sub.silent else "off"))
+        return notice(toast, state=notice("on" if on else "off"))
 
     async def publish(self, sid: int, reviewer: TgUser | None = None,
                       from_states: tuple[str, ...] = OPEN_STATES,

@@ -1,7 +1,7 @@
 """二次确认测试：立即发布、拒绝、封禁要再点一次确认才执行。
 
 用法（项目根目录下）：python tests/live_confirm_test.py
-复用 live_test.py 的模拟 Bot API 服务器。约 10 秒。
+复用 live_test.py 的模拟 Bot API 服务器。
 """
 import asyncio
 import json

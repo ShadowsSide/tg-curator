@@ -4,7 +4,7 @@
 - 这份草稿改点“署名 / 匿名”当新投稿提交 → 按上限拦，草稿留着，还能加到投稿里
 
 用法（项目根目录下）：python tests/live_limit_merge_test.py
-复用 live_test.py 的模拟 Bot API 服务器。约 10 秒。
+复用 live_test.py 的模拟 Bot API 服务器。
 """
 import asyncio
 import os

@@ -3,7 +3,7 @@
 - 相册处理出错（相册不经过 aiogram 的错误处理）：和单条消息一样回复“出错了”，而不是什么都不说
 
 用法（项目根目录下）：python tests/live_robust_test.py
-复用 live_test.py 的模拟 Bot API 服务器。约 10 秒。
+复用 live_test.py 的模拟 Bot API 服务器。
 """
 import asyncio
 import os
@@ -12,11 +12,8 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import live_test as lt  # noqa: E402
 from live_media_test import user_photo  # noqa: E402
-from live_test import REVIEW, USER, check, is_send, log, wait_for  # noqa: E402
+from live_test import REVIEW, USER, check, is_send, log, own, wait_for  # noqa: E402
 
-
-def own(mid):
-    return {"message_id": mid, "date": lt.now(), "chat": lt.chat(USER)}
 
 
 async def user_edit(text, mid):

@@ -7,7 +7,7 @@
 - 机器人在审核群没有“删除消息”权限：照常启动，只在日志里提醒一次
 
 用法（项目根目录下）：python tests/live_config_test.py
-复用 live_test.py 的模拟 Bot API 服务器，每种情况启动一次机器人。约 1 分钟。
+复用 live_test.py 的模拟 Bot API 服务器，每种情况启动一次机器人。较慢，约 1 分钟。
 """
 import asyncio
 import os
@@ -33,6 +33,7 @@ CASES = [
     ("REVIEW_CHAT_ID not a number (English)", {"REVIEW_CHAT_ID": "-100abc", "LANGUAGE": "en"}, {}, None,
      "Configuration error: REVIEW_CHAT_ID must be a number, got '-100abc' (the bot won't run"),
     ("bad number elsewhere", {"MAX_PENDING_PER_USER": "five"}, {}, None, "MAX_PENDING_PER_USER 必须是数字"),
+    ("negative MSG_WINDOW_DAYS", {"MSG_WINDOW_DAYS": "-1"}, {}, None, "MSG_WINDOW_DAYS 不能是负数，当前是 -1"),
     ("bad time zone", {"TZ": "Mars/Base"}, {}, None, "TZ 不是有效的时区"),
     ("bad REVIEWERS", {"REVIEWERS": "admins,bob"}, {}, None, "REVIEWERS 里有无法识别的值 'bob'"),
     ("bad SCHEDULE_PRESETS", {"SCHEDULE_PRESETS": "09:00,25:00"}, {}, None, "SCHEDULE_PRESETS 里的 '25:00' 不是有效的时间"),

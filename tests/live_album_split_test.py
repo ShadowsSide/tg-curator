@@ -6,7 +6,7 @@
 - 对照：同一次 getUpdates 里返回、间隔小于 ALBUM_DELAY，本来就是一条
 
 用法（项目根目录下）：python tests/live_album_split_test.py
-复用 live_test.py 的模拟 Bot API 服务器。约 40 秒。
+复用 live_test.py 的模拟 Bot API 服务器。较慢，约 40 秒（要等相册收集的延迟）。
 """
 import asyncio
 import json

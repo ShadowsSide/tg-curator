@@ -1,7 +1,7 @@
 """发送失败后的状态：提交退回草稿、发布不卡在“发布中”、改稿预览发不出去就不保存。
 
 用法（项目根目录下）：python tests/live_send_fail_test.py
-复用 live_test.py 的模拟 Bot API 服务器，按需注入失败。约 10 秒。
+复用 live_test.py 的模拟 Bot API 服务器，按需注入失败。
 """
 import asyncio
 import os

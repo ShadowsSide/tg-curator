@@ -3,7 +3,7 @@
 审核员 → 投稿人：其余几项不会丢；不写 /msg 直接用相册回复转来的消息，只提醒一次。
 
 用法（项目根目录下）：python tests/live_msg_album_test.py
-复用 live_test.py 的模拟 Bot API 服务器。约 8 秒。
+复用 live_test.py 的模拟 Bot API 服务器。
 """
 import asyncio
 import os
@@ -11,11 +11,9 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import live_test as lt  # noqa: E402
+from live_media_test import photo  # noqa: E402
 from live_test import ADMIN, REVIEW, USER, check, gm, is_send, log, wait_for  # noqa: E402
 
-
-def photo(fid):
-    return [{"file_id": fid, "file_unique_id": fid, "width": 10, "height": 10}]
 
 
 def admin_photo(fid, group, reply_to, caption=None):

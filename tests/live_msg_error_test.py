@@ -1,7 +1,7 @@
 """/msg 送不出去时，回复里带的 Telegram 错误原文要转义：原文里有 < > 时消息按 HTML 解析会出错、整条发不出去。
 
 用法（项目根目录下）：python tests/live_msg_error_test.py
-复用 live_test.py 的模拟 Bot API 服务器，按需注入失败。约 6 秒。
+复用 live_test.py 的模拟 Bot API 服务器，按需注入失败。
 """
 import asyncio
 import os

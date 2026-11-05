@@ -1,7 +1,7 @@
 """投稿人操作频率限制：/msg 和改稿合计每分钟最多 5 次，超出时提示等几秒，审核群收不到；审核员不受限制。
 
 用法（项目根目录下）：python tests/live_throttle_test.py
-复用 live_test.py 的模拟 Bot API 服务器。约 8 秒。
+复用 live_test.py 的模拟 Bot API 服务器。
 """
 import asyncio
 import os
@@ -9,19 +9,11 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import live_test as lt  # noqa: E402
-from live_test import REVIEW, USER, check, is_send, log, wait_for  # noqa: E402
+from live_test import REVIEW, USER, check, is_send, log, user_says, wait_for  # noqa: E402
 
 TOO_OFTEN = "操作太频繁"
 
 
-def own(mid):
-    return {"message_id": mid, "date": lt.now(), "chat": lt.chat(USER)}
-
-
-async def user_says(text, mid):
-    """投稿人回复自己的投稿发一条命令，返回机器人的回复。"""
-    n = len(log); lt.pm(text, reply_to_message=own(mid))
-    return await wait_for(lambda e: is_send(e, "sendMessage", USER), since=n)
 
 
 async def scenario():

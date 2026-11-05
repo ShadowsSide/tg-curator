@@ -129,7 +129,7 @@ Options most deployments adjust as needed.
 | `REJECT_TEMPLATES` | 4 default reasons, depends on `LANGUAGE` | Reasons offered after tapping Reject, separated by `\|`, e.g. `Duplicate\|Ads`; set it to empty to skip the reason panel |
 | `SCHEDULE_PRESETS` | `09:00,12:00,18:00,21:00` | Quick time buttons in the schedule panel |
 | `DEFAULT_SILENT` | `false` | Whether new submissions are published silently by default |
-| `MAX_PENDING_PER_USER` | `5` | Maximum open submissions per user at a time; adding photos to your own submission by replying isn't limited |
+| `MAX_PENDING_PER_USER` | `5` | Maximum open submissions per user at a time, `0` for no limit; adding photos to your own submission by replying isn't limited |
 | `REMINDER_INTERVAL_MINUTES` | `60` | Interval of the review summary, aligned to the clock; `0` turns it off |
 | `REMINDER_QUIET_HOURS` | — | Quiet hours with no summaries, e.g. `0-8` |
 | `PROXY` | — | Proxy, e.g. `socks5://host:port` |

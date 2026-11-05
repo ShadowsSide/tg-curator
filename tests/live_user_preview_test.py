@@ -4,7 +4,7 @@
 - 回复这份预览发 /msg 也能找到这条投稿
 
 用法（项目根目录下）：python tests/live_user_preview_test.py
-复用 live_test.py 的模拟 Bot API 服务器。约 15 秒。
+复用 live_test.py 的模拟 Bot API 服务器。
 """
 import asyncio
 import os
@@ -13,13 +13,10 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import live_test as lt  # noqa: E402
 from live_media_test import buttons, kb_edit, photo, user_photo  # noqa: E402
-from live_test import ADMIN, CHANNEL, REVIEW, USER, check, is_send, log, wait_for  # noqa: E402
+from live_test import ADMIN, CHANNEL, REVIEW, USER, check, is_send, log, own, wait_for  # noqa: E402
 
 SIG = "via Alice"
 
-
-def own(mid):
-    return {"message_id": mid, "date": lt.now(), "chat": lt.chat(USER)}
 
 
 def captions(e):

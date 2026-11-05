@@ -147,11 +147,11 @@ class EditingMixin(CoreBase):
             return notice("edit_conflict" if changed else "edit_race")
         if throttled:  # 保存成功才算一次
             self.throttle.record(sub.user_id)
+        saved = sub.version + 1  # update_if 成功时版本加 1
         sub = await self.db.get(sub.id)
         if ids:
             await self.db.link_review_messages(sub.id, ids)
-            await self.db.update(sub.id, edit_preview=ids)
-            await self._delete_old_preview(sub.edit_preview)
+            await self._delete_old_preview(await self._swap_preview(sub.id, ids, saved))
             await self.refresh_control(sub.id)
         if by_submitter:  # 投稿人自己的聊天里只有他当初发的那几条，看不出改完的样子
             await self.send_user_preview(sub.id)
@@ -159,6 +159,17 @@ class EditingMixin(CoreBase):
             await self.notify(sub, "notify_reviewer_edited")
             await self.refresh_user_kb(sub.id)  # 收起“删除图片”
         return None
+
+    async def _swap_preview(self, sid: int, ids: list[int], version: int) -> list[int]:
+        """把这次改稿的预览 ids 记成“最新一份修改预览”，返回该删掉的那份。
+        保存成功到记录预览之间别人可能又改了一次（版本更新）：那份才是最新的，这次的预览已经过时，删掉这次的；
+        否则换上这次的，删掉上一份。两次改稿的记录谁先谁后，最后都只留最新的一份。"""
+        async with self._ids_lock:
+            sub = await self.db.get(sid)
+            if not sub or sub.version != version:
+                return ids
+            await self.db.update(sid, edit_preview=ids)
+        return sub.edit_preview or []
 
     async def _delete_old_preview(self, ids: list[int] | None) -> None:
         """改稿后删掉上一份修改后的预览，审核群里只留最初的预览（控制按钮消息回复的就是它）和最新一份。

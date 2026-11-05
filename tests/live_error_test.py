@@ -1,7 +1,7 @@
 """处理函数里没被处理的异常：点按钮的人收到“出错了”弹窗，发消息的人收到回复，日志照常记录。
 
 用法（项目根目录下）：python tests/live_error_test.py
-复用 live_test.py 的模拟 Bot API 服务器，用失败注入制造处理函数里的异常。约 8 秒。
+复用 live_test.py 的模拟 Bot API 服务器，用失败注入制造处理函数里的异常。
 """
 import asyncio
 import os

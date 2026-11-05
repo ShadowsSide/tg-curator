@@ -2,7 +2,7 @@
 双方都只能用 /msg 沟通：投稿人不写 /msg 直接回复（包括发图）只会收到提示，不会转达。
 
 用法（项目根目录下）：python tests/live_msg_test.py
-以 MSG_WINDOW_DAYS=0 运行（审核结束后立即关闭沟通），复用 live_test.py 的模拟 Bot API 服务器。约 10 秒。
+以 MSG_WINDOW_DAYS=0 运行（审核结束后立即关闭沟通），复用 live_test.py 的模拟 Bot API 服务器。
 """
 import asyncio
 import os

@@ -6,9 +6,14 @@ import os
 import sqlite3
 import sys
 import tempfile
+import time
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+from types import SimpleNamespace  # noqa: E402
+from zoneinfo import ZoneInfo  # noqa: E402
+
+from bot.core.stats import StatsMixin  # noqa: E402
 from bot.db import DB, DROPPED_COLUMNS  # noqa: E402
 
 # 话题模式时代的旧库：带话题列，没有后来加的 msg_count、spam_flags
@@ -210,6 +215,56 @@ def test_expire_drafts_skips_one_submitted_meanwhile():
 
     with tempfile.TemporaryDirectory() as d:
         asyncio.run(run(os.path.join(d, "e.db")))
+
+
+
+def test_review_message_lookups_use_indexes():
+    """回复审核群的消息时按 review_msg_id 定位：两张表都要走索引，不能整表扫描（旧库升级后也一样）。"""
+    async def run(path):
+        db = DB(path)
+        await db.connect()
+        try:
+            for table, index in (("submissions", "idx_sub_review"), ("conversations", "idx_conv_review")):
+                async with db.conn.execute(f"EXPLAIN QUERY PLAN SELECT 1 FROM {table} WHERE review_msg_id=?",
+                                           (1,)) as cur:
+                    plan = " ".join(str(r[-1]) for r in await cur.fetchall())
+                assert index in plan, (table, plan)
+        finally:
+            await db.close()
+
+    with tempfile.TemporaryDirectory() as d:
+        asyncio.run(run(os.path.join(d, "i.db")))
+
+
+def test_activity_links_without_extra_queries():
+    """/active 的名字链接直接用查询里 JOIN 到的用户名和名字，不再逐个 get_user；每行带上用户 ID。"""
+    async def run(path):
+        db = DB(path)
+        await db.connect()
+        try:
+            item = [{"type": "text", "text": "a", "entities": []}]
+            await db.touch_user(1, "alice", "Alice <A>")
+            await db.touch_user(2, None, "Bob")
+            for uid in (1, 1, 2, 3):  # 3：没有用户记录，显示 ID
+                await db.update(await db.create_draft(uid, item), status="pending", submitted_at=int(time.time()))
+
+            async def no_get_user(*_):
+                raise AssertionError("activity_text should not call get_user")
+            db.get_user = no_get_user
+            core = SimpleNamespace(db=db, lang="zh", s=SimpleNamespace(tz=ZoneInfo("Asia/Shanghai")),
+                                   fmt=lambda ts, lang=None: "-")
+            text = await StatsMixin.activity_text(core, 30)
+            assert '<a href="https://t.me/alice">Alice &lt;A&gt;</a>' in text, text
+            assert '<a href="tg://user?id=2">Bob</a>' in text, text
+            assert '<a href="tg://user?id=3">3</a>' in text, text
+            # 每行带 ID（和控制按钮消息的“投稿人：名字  ID”一样），名字点不开时也能复制 ID 发 /user
+            assert '<a href="tg://user?id=2">Bob</a>  <code>2</code>' in text, text
+            assert '<a href="https://t.me/alice">Alice &lt;A&gt;</a>  <code>1</code>' in text, text
+        finally:
+            await db.close()
+
+    with tempfile.TemporaryDirectory() as d:
+        asyncio.run(run(os.path.join(d, "a.db")))
 
 
 if __name__ == "__main__":

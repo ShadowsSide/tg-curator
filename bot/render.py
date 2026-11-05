@@ -95,9 +95,14 @@ def describe(items: list[dict[str, Any]], lang: str) -> str:
 
 
 def user_link(user: User | None, user_id: int) -> str:
-    name = html.escape(user.full_name if user and user.full_name else str(user_id))
-    if user and user.username:
-        return f'<a href="https://t.me/{user.username}">{name}</a>'
+    return name_link(user_id, user.full_name if user else None, user.username if user else None)
+
+
+def name_link(user_id: int, full_name: str | None, username: str | None) -> str:
+    """投稿人链接：有用户名链到 t.me，没有就用 tg://user；没记下名字时显示 ID。"""
+    name = html.escape(full_name or str(user_id))
+    if username:
+        return f'<a href="https://t.me/{username}">{name}</a>'
     return f'<a href="tg://user?id={user_id}">{name}</a>'
 
 

@@ -4,7 +4,7 @@
 - 旧按钮：解封后点控制按钮消息或卡片上的 🗑，只提示“没有被封禁”，不删除
 
 用法（项目根目录下）：python tests/live_purge_test.py
-复用 live_test.py 的模拟 Bot API 服务器。约 15 秒。
+复用 live_test.py 的模拟 Bot API 服务器。
 """
 import asyncio
 import os
@@ -12,6 +12,7 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import live_test as lt  # noqa: E402
+from live_media_test import toast  # noqa: E402
 from live_test import ADMIN, BOB, REVIEW, USER, buttons, check, gm, is_send, log, submit, wait_for  # noqa: E402
 
 PURGE_BTN = "🗑 删除 TA 的稿件"
@@ -22,10 +23,6 @@ def edited(message_id, since):
     return wait_for(lambda e: e["method"] in ("editMessageText", "editMessageReplyMarkup")
                     and str(e["params"].get("message_id")) == str(message_id), since=since)
 
-
-def toast(since, contains):
-    return wait_for(lambda e: e["method"] == "answerCallbackQuery" and contains in e["params"].get("text", ""),
-                    since=since)
 
 
 def review_ids(marker):

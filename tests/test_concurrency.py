@@ -223,6 +223,48 @@ async def test_late_album_part_retries_when_edited_during_merge(db):
     sub = await db.get(sid)
     assert [it["file_id"] for it in sub.items] == ["A1", "A2", "A3"] and sub.items[0]["text"] == "改好的说明", sub.items
 
+
+class Yielding:
+    """包住 DB：每次读写之后让出几次控制权，同时跑的几个操作就会在读和写之间交错。"""
+
+    def __init__(self, db):
+        self._db = db
+
+    def __getattr__(self, name):
+        attr = getattr(self._db, name)
+        if name not in ("get", "update"):
+            return attr
+
+        async def wrapped(*a, **kw):
+            result = await attr(*a, **kw)
+            for _ in range(3):
+                await asyncio.sleep(0)
+            return result
+        return wrapped
+
+
+@with_db
+async def test_concurrent_ack_appends_keep_every_id(db):
+    """两次 add_edit_ack 同时跑（相册后到的部分和另一条回复）：两边记下的消息编号一个都不能丢。"""
+    sid = await db.create_draft(42, TEXT)
+    await db.update(sid, status="pending", edit_ack=[1])
+    core = real_core(Yielding(db))
+    await asyncio.gather(core.add_edit_ack(sid, [2, 3]), core.add_edit_ack(sid, [4]))
+    assert sorted((await db.get(sid)).edit_ack) == [1, 2, 3, 4], (await db.get(sid)).edit_ack
+
+
+@with_db
+async def test_concurrent_ack_replaces_delete_each_old_set_once(db):
+    """两次改稿同时调用 replace_edit_ack：最后记着其中一次的消息，上一次的和另一次的都删掉，而且每组只删一次。"""
+    sid = await db.create_draft(42, TEXT)
+    await db.update(sid, status="pending", edit_ack=[900])
+    core = real_core(Yielding(db))
+    await asyncio.gather(core.replace_edit_ack(sid, [1, 2]), core.replace_edit_ack(sid, [3]))
+    kept = (await db.get(sid)).edit_ack
+    assert kept in ([1, 2], [3]), kept
+    gone = [3] if kept == [1, 2] else [1, 2]
+    assert sorted(core.bot.deleted) == sorted([900, *gone]), (kept, core.bot.deleted)
+
 if __name__ == "__main__":
     tests = [v for k, v in dict(globals()).items() if k.startswith("test_")]
     for fn in tests:

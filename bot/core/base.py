@@ -99,14 +99,14 @@ class CoreBase:
         await self.db.reset_stuck_publishing()
 
     async def _check_review_admin(self, chat_id: int, bot_id: int) -> None:
-        """审核群里机器人要有“删除消息”权限，才删得掉审核员改稿留下的消息、被封禁用户的稿件。
+        """审核群里机器人要有“删除消息”权限，才删得掉审核员的命令、改稿留下的消息、被封禁用户的稿件。
         没有也能审核，所以只提醒，不阻止启动。"""
         try:
             member = await self.bot.get_chat_member(chat_id, bot_id)
         except (TelegramBadRequest, TelegramForbiddenError):
             member = None
         if not (member and member.status == ChatMemberStatus.ADMINISTRATOR and member.can_delete_messages):
-            log.warning("机器人不是审核群的管理员，或者没有“删除消息”权限：审核员改稿留下的消息、被封禁用户的稿件会删不掉。"
+            log.warning("机器人不是审核群的管理员，或者没有“删除消息”权限：审核员的命令、改稿留下的消息、被封禁用户的稿件会删不掉。"
                         "请在审核群把机器人设为管理员，只给“删除消息”权限即可")
 
     async def _config_chat(self, chat_id: int | str, missing: str) -> ChatFullInfo:

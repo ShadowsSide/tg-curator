@@ -59,7 +59,7 @@ Curator is built with Python 3.12, [aiogram 3](https://github.com/aiogram/aiogra
 
 1. Create a bot with [@BotFather](https://t.me/BotFather) and get its token. Leave privacy mode on (the default)
 2. Make the bot an admin of your **channel** with the "Post messages" permission
-3. Create a **review group**, add the bot and make it an admin with only the "Delete messages" permission (used to clean up reviewers' edit messages and to delete a banned user's posts; reviewing works without it, and the log warns at startup). By default only the group's admins and owner can review (see `REVIEWERS`)
+3. Create a **review group**, add the bot and make it an admin with only the "Delete messages" permission (used to delete reviewers' commands once handled, clean up their edit messages and delete a banned user's posts; reviewing works without it, and the log warns at startup). By default only the group's admins and owner can review (see `REVIEWERS`)
 4. Get the channel ID and the review group ID (both are numbers starting with `-100`): open the channel or group in [Telegram Web](https://web.telegram.org/a/), and the number after `#` in the address bar is the ID. You can also forward a message from the channel or group to [@RawDataBot](https://t.me/RawDataBot). The channel can also be given as `@username`
 
 > [!NOTE]
@@ -206,6 +206,8 @@ If you prefer commands, send them as a **reply** to a submission's preview or co
 | `/user <user ID>` | Show a contributor, with Ban / Unban buttons below |
 | `/stats` · `/queue` · `/active [days]` | Review summary · scheduled posts · activity ranking (default 30 days) |
 | `/cancel` | Drop prompts waiting for your reply |
+
+Commands are deleted once handled (needs the "Delete messages" permission); results about a submission are posted as a reply to its control panel message. `/msg` and `/edit` are kept: the first is the group's only record of what the submitter was sent, the second keeps only the latest one.
 
 ## FAQ
 

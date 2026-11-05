@@ -277,6 +277,40 @@ def test_activity_links_without_extra_queries():
         asyncio.run(run(os.path.join(d, "a.db")))
 
 
+def test_oldest_pending_is_the_longest_waiting():
+    """统计消息按钮跳到的投稿：待审核里提交得最早的（不是编号最小的：草稿可能很久以后才提交）；
+    没有控制按钮消息的、发布失败的、草稿都不算；审核完就轮到下一条，没有了返回 None。"""
+    async def run(path):
+        db = DB(path)
+        await db.connect()
+        try:
+            item = [{"type": "text", "text": "a", "entities": []}]
+            draft, late, early, no_msg, failed = [await db.create_draft(42, item) for _ in range(5)]
+            await db.update(late, status="pending", submitted_at=20, review_msg_id=902)
+            await db.update(early, status="pending", submitted_at=10, review_msg_id=903)
+            await db.update(no_msg, status="pending", submitted_at=5)
+            await db.update(failed, status="failed", submitted_at=1, review_msg_id=905)
+            assert (await db.oldest_pending()).id == early
+            await db.update(early, status="published")
+            assert (await db.oldest_pending()).id == late
+            await db.update(late, status="rejected")
+            assert await db.oldest_pending() is None
+        finally:
+            await db.close()
+
+    with tempfile.TemporaryDirectory() as d:
+        asyncio.run(run(os.path.join(d, "o.db")))
+
+
+def test_stats_button():
+    """有链接时一个跳转按钮（URL 按钮，中英文）；没有待审核的就不带按钮。"""
+    from bot.keyboards import stats_kb
+    assert stats_kb(None, "zh") is None
+    for lang, text in (("zh", "👀 查看等得最久的投稿"), ("en", "👀 Oldest pending submission")):
+        [[b]] = stats_kb("https://t.me/c/123/45", lang).inline_keyboard
+        assert (b.text, b.url, b.callback_data) == (text, "https://t.me/c/123/45", None)
+
+
 if __name__ == "__main__":
     tests = [v for k, v in dict(globals()).items() if k.startswith("test_")]
     for fn in tests:

@@ -543,6 +543,14 @@ class DB:
         )
         return [Submission.from_row(r) for r in rows]
 
+    async def oldest_pending(self) -> Submission | None:
+        """等得最久的待审核投稿（按提交时间），统计消息上的按钮跳到它。没有控制按钮消息的（发到审核群失败）跳不过去，不算。"""
+        row = await self._one(
+            "SELECT * FROM submissions WHERE status='pending' AND review_msg_id IS NOT NULL "
+            "ORDER BY submitted_at, id LIMIT 1"
+        )
+        return Submission.from_row(row) if row else None
+
     async def expire_drafts(self, older_than: int) -> list[Submission]:
         """作废过期的草稿，返回作废了的。一条语句完成：先查再改的话，中间刚好被提交的草稿也会被当成过期。"""
         rows = await self._all(

@@ -10,7 +10,7 @@ from aiogram.exceptions import TelegramAPIError, TelegramBadRequest
 from aiogram.types import InlineKeyboardMarkup
 
 from ..i18n import t
-from ..keyboards import user_card_kb
+from ..keyboards import stats_kb, user_card_kb
 from ..render import describe, name_link, stats_text, user_link
 from ..timeutil import now_ts, start_of_today, utc_offset
 
@@ -22,16 +22,20 @@ log = logging.getLogger(__name__)
 class StatsMixin(CoreBase):
     # ---------- 审核统计 ----------
 
-    async def _stats_text(self) -> str:
+    async def _stats_message(self) -> tuple[str, InlineKeyboardMarkup | None]:
+        """统计消息的文字和按钮：有待审核的投稿时，按钮跳到等得最久的那条。"""
         since = start_of_today(self.s.tz) if self.s.stats_scope == "today" else 0
         accepted, rejected, pending = await self.db.review_counts(since)
-        return stats_text(accepted, rejected, pending, datetime.now(self.s.tz), self.lang)
+        text = stats_text(accepted, rejected, pending, datetime.now(self.s.tz), self.lang)
+        oldest = await self.db.oldest_pending()
+        return text, stats_kb(self.review_link(oldest) if oldest else None, self.lang)
 
     async def post_stats(self) -> None:
         """发一条新的统计消息，并删掉上一条，保证群里只有一条最新的。"""
         async with self._stats_lock:
             old = await self.db.kv_get(STATS_MSG_KEY)
-            msg = await self.bot.send_message(self.s.review_chat_id, await self._stats_text())
+            text, kb = await self._stats_message()
+            msg = await self.bot.send_message(self.s.review_chat_id, text, reply_markup=kb)
             await self.db.kv_set(STATS_MSG_KEY, str(msg.message_id))
             if old:
                 try:
@@ -57,14 +61,16 @@ class StatsMixin(CoreBase):
                 log.exception("刷新统计消息出错")
 
     async def _refresh_stats_now(self) -> None:
-        """就地更新当前那条统计消息（“更新于”时间随之刷新）。"""
+        """就地更新当前那条统计消息（“更新于”时间随之刷新）。按钮也要一起传：
+        编辑文字时不带 reply_markup，Telegram 会把原来的按钮去掉；没有待审核的投稿时就是去掉按钮。"""
         async with self._stats_lock:
             mid = await self.db.kv_get(STATS_MSG_KEY)
             if not mid:
                 return
+            text, kb = await self._stats_message()
             try:
                 await self.bot.edit_message_text(
-                    text=await self._stats_text(), chat_id=self.s.review_chat_id, message_id=int(mid)
+                    text=text, chat_id=self.s.review_chat_id, message_id=int(mid), reply_markup=kb
                 )
             except TelegramBadRequest as e:
                 if "not modified" in str(e):

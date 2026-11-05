@@ -457,6 +457,7 @@ T: dict[str, dict[str, str]] = {
     "btn_plus_hours": {"zh": "+{n} 小时", "en": "+{n}h"},
     "btn_custom_time": {"zh": "✏️ 自定义时间", "en": "✏️ Custom time"},
     "btn_back": {"zh": "« 返回", "en": "« Back"},
+    "btn_oldest_pending": {"zh": "👀 查看等得最久的投稿", "en": "👀 Oldest pending submission"},
     "btn_confirm_pub": {"zh": "✅ 确认发布", "en": "✅ Confirm publish"},
     "btn_confirm_reject": {"zh": "❌ 确认拒绝", "en": "❌ Confirm reject"},
     "btn_confirm_with": {"zh": "{label}：{detail}", "en": "{label}: {detail}"},

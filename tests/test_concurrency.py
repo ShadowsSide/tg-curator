@@ -163,6 +163,66 @@ async def test_single_edit_replaces_previous_preview(db):
         editing.send_items = original
     assert (await db.get(sid)).edit_preview == [1001] and core.bot.deleted == [900], core.bot.deleted
 
+
+def photo(fid, msg_id, text=""):
+    return {"type": "photo", "file_id": fid, "text": text, "entities": [], "msg_id": msg_id}
+
+
+def album_part():
+    """相册后到部分的第一条消息：只用到 reply 和发送人的名字。"""
+    replies = []
+
+    async def reply(text, **_):
+        replies.append(text)
+    return SimpleNamespace(reply=reply, from_user=SimpleNamespace(full_name="Alice"), replies=replies)
+
+
+async def album_target(db, status):
+    sid = await db.create_draft(42, [photo("A1", 1), photo("A2", 2)])
+    await db.update(sid, status=status, review_msg_id=500 if status == "pending" else None)
+    return sid
+
+
+async def fix_caption(db, sid, status):
+    """投稿人用 Telegram 的编辑改了第一张的说明（和真正的改稿一样带版本号保存）。"""
+    sub = await db.get(sid)
+    assert await db.update_if(sid, (status,), version=sub.version, items=[{**sub.items[0], "text": "改好的说明"},
+                                                                          *sub.items[1:]])
+
+
+@with_db
+async def test_late_album_part_keeps_edit_made_meanwhile(db):
+    """相册后到的部分并进投稿时，投稿刚被改过（读到的 target 是改之前的）：并进去之后那次修改还在。
+    草稿、待审核两种都要。"""
+    for status in ("draft", "pending"):
+        sid = await album_target(db, status)
+        stale = await db.get(sid)
+        await fix_caption(db, sid, status)
+        core = real_core(db)
+        editing.send_items, original = fake_previews(), editing.send_items
+        try:
+            err = await core._join_album(stale, album_part(), [photo("A3", 3)], "zh")
+        finally:
+            editing.send_items = original
+        assert err is None, (status, err)
+        sub = await db.get(sid)
+        assert [it["file_id"] for it in sub.items] == ["A1", "A2", "A3"], (status, sub.items)
+        assert sub.items[0]["text"] == "改好的说明", (status, sub.items[0])
+        assert sub.version == stale.version + 2, (status, sub.version)  # 改稿一次 + 并进去一次
+
+
+@with_db
+async def test_late_album_part_retries_when_edited_during_merge(db):
+    """读到投稿之后、写入之前投稿被改了：版本对不上，重新读一次再合并，修改和后到的部分都在。"""
+    sid = await album_target(db, "draft")
+
+    async def edit_meanwhile():
+        await fix_caption(db, sid, "draft")
+    core = real_core(Interleave(db, "get", edit_meanwhile))
+    assert await core._join_album(await db.get(sid), album_part(), [photo("A3", 3)], "zh") is None
+    sub = await db.get(sid)
+    assert [it["file_id"] for it in sub.items] == ["A1", "A2", "A3"] and sub.items[0]["text"] == "改好的说明", sub.items
+
 if __name__ == "__main__":
     tests = [v for k, v in dict(globals()).items() if k.startswith("test_")]
     for fn in tests:

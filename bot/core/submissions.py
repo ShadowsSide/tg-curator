@@ -20,6 +20,7 @@ from ..timeutil import now_ts
 from .base import CoreBase, NO_PREVIEW, _reply_to, _reason_line, explicit_reply
 
 log = logging.getLogger(__name__)
+JOIN_TRIES = 3  # 相册后到的部分并进投稿时，碰上投稿刚被改过就重新读、重新合并，最多几次
 
 
 class SubmissionsMixin(CoreBase):
@@ -102,34 +103,50 @@ class SubmissionsMixin(CoreBase):
         - 还是草稿：直接加进去，原来那条“请选择投稿方式”改成新的数量，不再发新的提示
         - 已提交、待审核：加进去，审核群收到修改后的预览，并告诉投稿人
         返回 None 表示已经并进去；否则返回原因（比如已经开始审核），调用方把这部分当成新投稿。"""
-        known = {it.get("msg_id") for it in target.items}
-        items = [it for it in items if it.get("msg_id") not in known]  # 重启前后同一项收到两次：只算一次
-        if not items:
+        # 每次都按最新读到的投稿合并、带版本号写：合并期间投稿人可能用 Telegram 的编辑改了别的项，
+        # 按旧内容写会把那次修改盖掉。版本变了（被改过）或刚好被提交了，就重新读一次再合并
+        sid = target.id
+        for _ in range(JOIN_TRIES):
+            target = await self.db.get(sid)
+            if not target:
+                return notice("sub_not_found", sid=sid)
+            known = {it.get("msg_id") for it in target.items}
+            new = [it for it in items if it.get("msg_id") not in known]  # 重启前后同一项收到两次：只算一次
+            if not new:
+                return None
+            merged = [*target.items, *new]  # 后到的部分在相册里也排在后面
+            if len(merged) > media.MAX_MEDIA:
+                return notice("media_too_many", max=media.MAX_MEDIA)
+            if target.status == "draft":
+                spoiler = int(any(it.get("spoiler") for it in merged))
+                if await self.db.update_if(sid, ("draft",), version=target.version, items=merged, spoiler=spoiler):
+                    await self._refresh_draft_prompt(sid, lang)
+                    return None
+                continue
+            err = self._check_editable(target, sid, ("pending",))
+            if not err:
+                editor = t(self.lang, "submitter_label", name=first.from_user.full_name)
+                err = await self._save_edit(target, merged, editor, ("pending",), by_submitter=True)
+                if err and err.key == "edit_conflict":
+                    continue
+            if err:
+                return err
+            await self.refresh_user_kb(sid)
+            await first.reply(t(lang, "album_late_merged", desc=describe(new, lang)))
             return None
-        merged = [*target.items, *items]  # 后到的部分在相册里也排在后面
-        if len(merged) > media.MAX_MEDIA:
-            return notice("media_too_many", max=media.MAX_MEDIA)
-        spoiler = int(any(it.get("spoiler") for it in merged))
-        if target.status == "draft" and await self.db.update_if(target.id, ("draft",), items=merged, spoiler=spoiler):
-            sub = await self.db.get(target.id)
-            if sub.user_msg_id:
-                try:
-                    await self.bot.edit_message_text(
-                        chat_id=sub.user_id, message_id=sub.user_msg_id, text=self._draft_prompt(sub, lang),
-                        reply_markup=await self.user_keyboard(sub, lang))
-                except TelegramAPIError as e:
-                    log.info("更新草稿 #%s 的提示失败：%s", sub.id, e)
-            return None
-        target = await self.db.get(target.id)  # 可能刚好被投稿人提交了
-        err = self._check_editable(target, target.id, ("pending",))
-        if not err:
-            editor = t(self.lang, "submitter_label", name=first.from_user.full_name)
-            err = await self._save_edit(target, merged, editor, ("pending",), by_submitter=True)
-        if err:
-            return err
-        await self.refresh_user_kb(target.id)
-        await first.reply(t(lang, "album_late_merged", desc=describe(items, lang)))
-        return None
+        return notice("edit_conflict")
+
+    async def _refresh_draft_prompt(self, sid: int, lang: str) -> None:
+        """草稿内容变了：原来那条“请选择投稿方式”改成新的数量和按钮。"""
+        sub = await self.db.get(sid)
+        if not sub.user_msg_id:
+            return
+        try:
+            await self.bot.edit_message_text(
+                chat_id=sub.user_id, message_id=sub.user_msg_id, text=self._draft_prompt(sub, lang),
+                reply_markup=await self.user_keyboard(sub, lang))
+        except TelegramAPIError as e:
+            log.info("更新草稿 #%s 的提示失败：%s", sub.id, e)
 
     async def _at_limit(self, user_id: int, statuses: tuple[str, ...] = ("draft", "pending")) -> bool:
         """未处理投稿到了 MAX_PENDING_PER_USER；设成 0 表示不限。"""

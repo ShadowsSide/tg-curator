@@ -11,7 +11,7 @@ from ..db import Submission
 from ..entities import u16len
 from ..errors import Notice, notice
 from ..i18n import t
-from ..render import caption_index, send_items
+from ..render import caption_index, over_limit, send_items
 from ..timeutil import now_ts
 from .base import CoreBase
 
@@ -39,6 +39,12 @@ class MessagingMixin(CoreBase):
                                   sep="\n")
         return [*items[:i], {**items[i], "text": text, "entities": entities}, *items[i + 1:]]
 
+    @staticmethod
+    def _labeled_too_long(labeled: list[dict]) -> Notice | None:
+        """加上前缀后可能超过 Telegram 的长度上限（原消息里的 “/msg ” 比前缀短）：发之前拦下，不让对方看到英文报错。"""
+        over = over_limit(labeled)
+        return notice("msg_too_long", n=over[0], limit=over[1]) if over else None
+
     async def relay_to_user(self, sid: int, reviewer: TgUser, items: list[dict]) -> Notice | None:
         """审核员 → 投稿人：以“审核员”的身份发到投稿人那条投稿下面。items：一条，或相册的每一项。"""
         sub = await self.db.get(sid)
@@ -48,9 +54,13 @@ class MessagingMixin(CoreBase):
         if err:
             return err
         lang = await self.user_lang(sub.user_id)
+        labeled = self._labeled(items, t(lang, "msg_from_reviewer"))
+        err = self._labeled_too_long(labeled)
+        if err:
+            return err
         try:
             sent = await send_items(
-                self.bot, sub.user_id, self._labeled(items, t(lang, "msg_from_reviewer")), sig=("", []),
+                self.bot, sub.user_id, labeled, sig=("", []),
                 spoiler=any(it.get("spoiler") for it in items), reply_to=sub.user_msg_id,
             )
         except TelegramAPIError as e:
@@ -68,13 +78,14 @@ class MessagingMixin(CoreBase):
         db_user = await self.db.get_user(user.id)
         if db_user and db_user.banned:
             return notice("banned")
-        err = self.msg_blocked(sub) or self._too_often(user.id)
+        labeled = self._labeled(items, t(self.lang, "msg_from_submitter"))
+        err = self.msg_blocked(sub) or self._labeled_too_long(labeled) or self._too_often(user.id)
         if err:
             return err
         try:
             sent = await send_items(
-                self.bot, self.s.review_chat_id, self._labeled(items, t(self.lang, "msg_from_submitter")),
-                sig=("", []), spoiler=any(it.get("spoiler") for it in items), reply_to=sub.review_msg_id,
+                self.bot, self.s.review_chat_id, labeled, sig=("", []),
+                spoiler=any(it.get("spoiler") for it in items), reply_to=sub.review_msg_id,
             )
         except TelegramAPIError as e:
             return notice("msg_failed", error=html.escape(str(e)))  # 错误原文可能带 < >，消息按 HTML 解析

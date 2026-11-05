@@ -38,6 +38,22 @@ async def scenario():
     n = len(log); lt.pm("/msg 补充一下", reply_to_message=own)
     e = await wait_for(lambda e: is_send(e, "sendMessage", USER, "发送失败"), since=n)
     check("submitter /msg failed → error text escaped", escaped(e), e and e["params"]["text"])
+
+    # 加上“💬 审核员：/ 投稿人：”后超过 4096：发之前拦下，说清楚原因；原消息本身没超（“/msg ”比前缀短）
+    body = "长" * 4090
+    n = len(log); gm("/msg " + body, reply_to=ctrl["result"]["message_id"])
+    e = await wait_for(lambda e: is_send(e, "sendMessage", REVIEW, "内容太长"), since=n)
+    check("reviewer /msg too long after the label → told the limit, nothing sent to the submitter",
+          e and "4096" in e["params"]["text"] and not any(is_send(x, "sendMessage", USER, body) for x in log[n:]),
+          e and e["params"]["text"])
+    n = len(log); lt.pm("/msg " + body, reply_to_message=own)
+    e = await wait_for(lambda e: is_send(e, "sendMessage", USER, "内容太长"), since=n)
+    check("submitter /msg too long after the label → told the limit, nothing sent to reviewers",
+          e and "4096" in e["params"]["text"] and not any(is_send(x, "sendMessage", REVIEW, body) for x in log[n:]),
+          e and e["params"]["text"])
+    n = len(log); lt.pm("/msg 短一点", reply_to_message=own)
+    e = await wait_for(lambda e: is_send(e, "sendMessage", USER, "已发送给审核员"), since=n)
+    check("the rejected long message doesn't count towards the send limit", e)
     await asyncio.sleep(0.2)
 
 

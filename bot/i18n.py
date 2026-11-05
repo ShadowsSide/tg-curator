@@ -650,6 +650,11 @@ T: dict[str, dict[str, str]] = {
     # ---------- 沟通（/msg） ----------
     "msg_from_reviewer": {"zh": "💬 审核员：", "en": "💬 Reviewer:"},
     "msg_from_submitter": {"zh": "💬 投稿人：", "en": "💬 Submitter:"},
+    "msg_too_long": {
+        "zh": "内容太长：转达时前面会加上“💬 审核员 / 投稿人：”，加上后 {n} 字，上限 {limit}，请删短一点再发",
+        "en": "Too long: with the “💬 Reviewer / Submitter:” label added it's {n} characters, the limit is {limit}; "
+              "please shorten it and send again",
+    },
     "msg_sent_to_user": {"zh": "✅ 已发送给投稿人", "en": "✅ Sent to the submitter"},
     "msg_sent_to_review": {"zh": "✅ 已发送给审核员", "en": "✅ Sent to the reviewers"},
     "msg_usage_admin": {

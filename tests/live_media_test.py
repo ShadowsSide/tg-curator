@@ -132,6 +132,18 @@ async def scenario():
     check("Add an album → handled once, preview has all 3",
           done and len(edits) == 1 and pv and group_ids(pv[0]) == ["A1", "A2", "A3"], pv and group_ids(pv[0]))
 
+    # 3b. 回复“添加”提示的图片，说明以命令开头（/msg …）：当作命令处理，不加进投稿，提示保留
+    p = await ask("madd", 1, ctrl1, "要添加的图片")
+    n = len(log)
+    admin_media(p["result"]["message_id"], photo=photo("CMD"), caption="/msg 稍等",
+                caption_entities=[{"type": "bot_command", "offset": 0, "length": 4}])
+    told = await wait_for(lambda e: is_send(e, "sendMessage", REVIEW, "请回复投稿"), since=n)
+    added = await wait_for(lambda e: is_send(e, "sendMessage", REVIEW, "已修改"), timeout=1, since=n)
+    check("photo captioned with a command as a prompt reply → run as the command, not added",
+          told and not added and not any("CMD" in json.dumps(e["params"]) for e in previews(n, 4)))
+    n = len(log); lt.gm("/cancel", reply_to=p["result"]["message_id"])
+    await wait_for(lambda e: is_send(e, "sendMessage", REVIEW, "已取消"), since=n)
+
     # 4. 删除第 2 个：先确认
     n = len(log); lt.cb("r:media:1:0", REVIEW, ADMIN, message_id=ctrl1)
     panel = await kb_edit(REVIEW, n)

@@ -87,6 +87,19 @@ def caption_index(items: list[dict[str, Any]]) -> int:
     return next((i for i, it in enumerate(items) if it.get("text")), 0)
 
 
+def over_limit(items: list[dict[str, Any]], tail: str = "") -> tuple[int, int] | None:
+    """第一项超过 Telegram 长度限制的：(字数, 上限)，都没超就是 None。文字 4096，说明 1024（按 UTF-16 计）。
+    tail：发送时还会接在说明那一项后面的内容（落款）。"""
+    carrier = caption_index(items)
+    for i, it in enumerate(items):
+        limit = 4096 if it["type"] == "text" else 1024
+        text = it.get("text", "")
+        n = ent.u16len(ent.join(text, [], tail, [])[0] if i == carrier else text)
+        if n > limit:
+            return n, limit
+    return None
+
+
 def describe(items: list[dict[str, Any]], lang: str) -> str:
     counts = Counter(i["type"] for i in items)
     if list(counts) == ["text"]:

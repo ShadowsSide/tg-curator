@@ -49,7 +49,7 @@ Curator is built with Python 3.12, [aiogram 3](https://github.com/aiogram/aiogra
 - **Anonymous two-way messaging**: both sides use `/msg` and the bot relays it; submitters only ever see “Reviewer”, and neither side sees the other's account
 - **Safe against mistakes**: publishing, rejecting and banning need a second tap; two admins tapping Publish at once publish only once; what gets published is always the version a reviewer saw
 - **Spam checks (optional)**: keyword blacklist, link limit and a cooldown for new users, which flag or block a submission; submitters' `/msg` and edits are rate-limited
-- **Scheduling and stats**: scheduled posts live in the database and survive restarts; the review group gets a periodic summary that refreshes after each review, plus activity rankings and per-user stats
+- **Scheduling and stats**: scheduled posts live in the database and survive restarts; the review group gets a periodic summary that refreshes after each review and has a button that jumps to the longest-waiting submission, plus activity rankings and per-user stats
 - **English and Chinese**: submitters see the language of their Telegram app; the review group and channel use `LANGUAGE`
 - **Easy to run**: amd64 / arm64 images, proxy and self-hosted Bot API server support; a configuration mistake logs one clear line instead of a restart loop
 

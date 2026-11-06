@@ -91,7 +91,8 @@ docker inspect --format '{{range .State.Health.Log}}{{.Output}}{{end}}' $(docker
 
 | Image tag | Contents |
 |---|---|
-| `latest` | Latest version of the main branch |
+| `latest` | Latest release (updated when a `v*` tag is pushed) |
+| `main` | Latest code on the main branch, merged but maybe not released yet |
 | `dev` | The DEV branch: unmerged features, may be unstable |
 | `vX.Y.Z` | A release |
 | `sha-xxxxxxx` | One specific build, handy for rolling back |
@@ -320,6 +321,6 @@ scripts/          multi-arch image build script
 
 ### Publishing your own image (for a fork)
 
-Pushes to `main` or `DEV` and `v*` tags make Actions build amd64 + arm64 images and publish them to `ghcr.io/<owner>/tg-curator`. Set `IMAGE=ghcr.io/<owner>/tg-curator:latest` in `.env` to deploy it.
+Pushes to `main` or `DEV` and `v*` tags make Actions build amd64 + arm64 images and publish them to `ghcr.io/<owner>/tg-curator`. Set `IMAGE=ghcr.io/<owner>/tg-curator:latest` in `.env` to deploy it; `latest` only exists after your first `v*` tag, so use `:main` until then.
 
 To publish to Docker Hub as well, add the variable `DOCKERHUB_USERNAME` and the secret `DOCKERHUB_TOKEN` (with Read & Write access) under the repository's **Settings → Secrets and variables → Actions**. You can also build and push locally with `scripts/build-multiarch.sh <image:tag>`.

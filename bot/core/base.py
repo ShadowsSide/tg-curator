@@ -99,14 +99,14 @@ class CoreBase:
         await self.db.reset_stuck_publishing()
 
     async def _check_review_admin(self, chat_id: int, bot_id: int) -> None:
-        """审核群里机器人要有“删除消息”权限，才删得掉审核员改稿留下的消息、被封禁用户的稿件。
+        """审核群里机器人要有“删除消息”权限，才删得掉审核员的命令、改稿留下的消息、被封禁用户的稿件。
         没有也能审核，所以只提醒，不阻止启动。"""
         try:
             member = await self.bot.get_chat_member(chat_id, bot_id)
         except (TelegramBadRequest, TelegramForbiddenError):
             member = None
         if not (member and member.status == ChatMemberStatus.ADMINISTRATOR and member.can_delete_messages):
-            log.warning("机器人不是审核群的管理员，或者没有“删除消息”权限：审核员改稿留下的消息、被封禁用户的稿件会删不掉。"
+            log.warning("机器人不是审核群的管理员，或者没有“删除消息”权限：审核员的命令、改稿留下的消息、被封禁用户的稿件会删不掉。"
                         "请在审核群把机器人设为管理员，只给“删除消息”权限即可")
 
     async def _config_chat(self, chat_id: int | str, missing: str) -> ChatFullInfo:
@@ -171,6 +171,19 @@ class CoreBase:
             for mid in old:
                 with contextlib.suppress(TelegramAPIError):
                     await self.bot.delete_message(self.s.review_chat_id, mid)
+
+    async def delete_command(self, message_id: int) -> None:
+        """审核员的命令处理完了，删掉命令本身。删不掉（没有“删除消息”权限、超过 48 小时）就留着，不影响结果。"""
+        try:
+            await self.bot.delete_message(self.s.review_chat_id, message_id)
+        except TelegramAPIError as e:
+            log.info("删除审核员的命令消息失败：%s", e)
+
+    async def reply_on_control(self, sid: int, text: str, **kwargs) -> None:
+        """回复在这条投稿的控制按钮消息下面（命令处理完会被删掉，回复不挂在命令上）。"""
+        sub = await self.db.get(sid)
+        await self.bot.send_message(self.s.review_chat_id, text,
+                                    reply_parameters=_reply_to(sub.review_msg_id if sub else None), **kwargs)
 
     async def replace_user_ack(self, sid: int, message_ids: list[int]) -> None:
         """投稿人私聊里改稿 / 查看留下的命令和回复，每条投稿只留最近一次：记下这次的，删掉上一次的。

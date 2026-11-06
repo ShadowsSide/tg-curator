@@ -94,8 +94,7 @@ docker inspect --format '{{range .State.Health.Log}}{{.Output}}{{end}}' $(docker
 | `latest` | Latest release (updated when a `v*` tag is pushed) |
 | `main` | Latest code on the main branch, merged but maybe not released yet |
 | `dev` | The DEV branch: unmerged features, may be unstable |
-| `vX.Y.Z` | A release |
-| `sha-xxxxxxx` | One specific build, handy for rolling back |
+| `vX.Y.Z` | A release; to roll back, set `IMAGE` to the previous version |
 
 Set `IMAGE` in `.env` to use another tag or image. To build from source, clone the repository and run `docker compose -f docker-compose.yml -f docker-compose.build.yml up -d --build`.
 

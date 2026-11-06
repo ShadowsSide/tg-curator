@@ -1,6 +1,6 @@
 # 推送到 main、DEV 或打 v* 标签时，先跑完整测试（test.yml），通过后构建 amd64 + arm64 镜像并发布：
 #   - 标签：v* 标签 → 同名，正式版（不带 -，如 v1.2.0）同时更新 latest；main → main（已合并、还没发布的代码）；
-#     DEV → dev（合并前在服务器上试新功能）；每次构建另有 sha-xxxxxxx
+#     DEV → dev（合并前在服务器上试新功能）。不再打 sha-xxxxxxx：回滚用版本号
 #   - GHCR（始终）：ghcr.io/<owner>/tg-curator
 #   - Docker Hub（可选）：在仓库 Settings → Secrets and variables → Actions 中
 #       Variables 添加 DOCKERHUB_USERNAME，Secrets 添加 DOCKERHUB_TOKEN 后自动启用
@@ -65,7 +65,6 @@ jobs:
             type=raw,value=main,enable={{is_default_branch}}
             type=raw,value=dev,enable=${{ github.ref == 'refs/heads/DEV' }}
             type=ref,event=tag
-            type=sha
 
       - uses: docker/build-push-action@v7
         with:

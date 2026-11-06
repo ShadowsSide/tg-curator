@@ -96,8 +96,7 @@ docker inspect --format '{{range .State.Health.Log}}{{.Output}}{{end}}' $(docker
 | `latest` | 最新的正式版本（打 `v*` 标签时更新） |
 | `main` | main 分支的最新代码，已合并、可能还没发布 |
 | `dev` | DEV 分支，还没合并的新功能，可能不稳定 |
-| `vX.Y.Z` | 发布版本 |
-| `sha-xxxxxxx` | 某次具体构建，方便回滚 |
+| `vX.Y.Z` | 发布版本；出问题时把 `IMAGE` 改回上一个版本号即可回滚 |
 
 在 `.env` 里设置 `IMAGE` 可以换标签或换成别的镜像。想从源码构建：clone 仓库后执行 `docker compose -f docker-compose.yml -f docker-compose.build.yml up -d --build`。
 

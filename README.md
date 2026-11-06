@@ -3,7 +3,7 @@
 
 # Curator
 
-[![docker](https://img.shields.io/github/actions/workflow/status/ShadowsSide/tg-curator/docker.yml?style=flat-square&label=build)](https://github.com/ShadowsSide/tg-curator/actions/workflows/docker.yml)
+[![docker](https://img.shields.io/github/actions/workflow/status/ShadowsSide/tg-curator/docker.yml?branch=DEV&style=flat-square&label=build)](https://github.com/ShadowsSide/tg-curator/actions/workflows/docker.yml)
 ![python](https://img.shields.io/badge/Python-3.12-3776ab?style=flat-square&logo=python&logoColor=white)
 [![aiogram](https://img.shields.io/badge/aiogram-3-2ca5e0?style=flat-square&logo=telegram&logoColor=white)](https://github.com/aiogram/aiogram)
 ![platform](https://img.shields.io/badge/platform-amd64%20%7C%20arm64-lightgrey?style=flat-square)
@@ -279,7 +279,7 @@ for f in tests/test_*.py tests/live_*.py; do .venv/bin/python "$f" || echo "FAIL
 .venv/bin/python -m pyflakes bot tests
 ```
 
-GitHub Actions 在每个 PR、推送到 `main` / `DEV` 和打标签时运行同样的检查，通过后才构建镜像。
+GitHub Actions 在推送到 `DEV`、打标签和其他分支发来的 PR 上运行同样的检查，通过后才构建镜像（`DEV` 发来的 PR 直接用推送时的结果，`main` 只通过这种 PR 更新，不再重跑）。
 
 <details>
 <summary><b>项目结构</b></summary>
@@ -323,6 +323,6 @@ scripts/          多架构镜像构建脚本
 
 ### 发布自己的镜像（Fork 后）
 
-推送到 `DEV` 或打 `v*` 标签时，Actions 会构建 amd64 + arm64 镜像并发布到 `ghcr.io/<owner>/tg-curator`（推送到 `main` 只跑测试）。部署时在 `.env` 里设置 `IMAGE=ghcr.io/<owner>/tg-curator:latest` 才会用上它；`latest` 要打过第一个 `v*` 标签后才有，之前可以先用 `:dev`。
+推送到 `DEV` 或打 `v*` 标签时，Actions 会构建 amd64 + arm64 镜像并发布到 `ghcr.io/<owner>/tg-curator`（推送到 `main` 不触发，`main` 请通过 `DEV` 发来的 PR 更新）。部署时在 `.env` 里设置 `IMAGE=ghcr.io/<owner>/tg-curator:latest` 才会用上它；`latest` 要打过第一个 `v*` 标签后才有，之前可以先用 `:dev`。
 
 想同时发布到 Docker Hub，在仓库的 **Settings → Secrets and variables → Actions** 里添加变量 `DOCKERHUB_USERNAME` 和密钥 `DOCKERHUB_TOKEN`（需要 Read & Write 权限）。也可以在本地构建并推送：`scripts/build-multiarch.sh <镜像名:标签>`。

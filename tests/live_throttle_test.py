@@ -12,6 +12,8 @@ import live_test as lt  # noqa: E402
 from live_test import REVIEW, USER, check, is_send, log, user_says, wait_for  # noqa: E402
 
 TOO_OFTEN = "操作太频繁"
+# 每种操作成功时的回复：等到它才算这次操作做完（见 live_test.user_says 的 expect）
+DRAFT_EDITED, EDITED, SENT = "✏️ 已更新", "投稿已更新", "已发送给审核员"
 
 
 
@@ -23,21 +25,21 @@ async def scenario():
 
     # 草稿阶段改稿不发审核群：不计数
     for i in range(6):
-        await user_says(f"/edit 草稿第 {i} 版", mid)
+        await user_says(f"/edit 草稿第 {i} 版", mid, (DRAFT_EDITED,))
     n = len(log); lt.cb("u:sign:1", USER, USER)
     ctrl = await wait_for(lambda e: is_send(e, "sendMessage", REVIEW, lt.CTRL), since=n)
     check("draft edits are not limited", ctrl)
 
     # 提交后：3 次 /msg + 2 次改稿 = 5 次，都送到审核群
-    replies = [await user_says(f"/msg 第 {i} 条留言", mid) for i in range(3)]
-    replies += [await user_says(f"/edit 提交后第 {i} 版", mid) for i in range(2)]
+    replies = [await user_says(f"/msg 第 {i} 条留言", mid, (SENT, TOO_OFTEN)) for i in range(3)]
+    replies += [await user_says(f"/edit 提交后第 {i} 版", mid, (EDITED, TOO_OFTEN)) for i in range(2)]
     check("5 actions within a minute → all go through",
           all(r and TOO_OFTEN not in r["params"]["text"] for r in replies), [r and r["params"]["text"] for r in replies])
 
     # 第 6 次：/msg 和改稿都被拦下，审核群收不到
     n = len(log)
-    msg = await user_says("/msg 第六条留言", mid)
-    edit = await user_says("/edit 第六版", mid)
+    msg = await user_says("/msg 第六条留言", mid, (SENT, TOO_OFTEN))
+    edit = await user_says("/edit 第六版", mid, (EDITED, TOO_OFTEN))
     await asyncio.sleep(0.5)
     check("6th action → refused with how long to wait, nothing sent to review",
           msg and TOO_OFTEN in msg["params"]["text"] and edit and TOO_OFTEN in edit["params"]["text"]

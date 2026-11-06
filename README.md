@@ -106,8 +106,10 @@ docker inspect --format '{{range .State.Health.Log}}{{.Output}}{{end}}' $(docker
 
 ```bash
 docker compose cp bot:/app/data/bot.db ./backup-$(date +%F).db   # 备份数据库
-docker compose pull && docker compose up -d                      # 更新到最新镜像
+docker compose pull && docker compose up -d && docker image prune -f   # 更新到最新镜像，并清掉旧镜像
 ```
+
+`docker image prune -f` 只删除没有被任何容器使用的旧镜像，正在运行的那个不会删。每次更新都会留下一份一两百 MB 的旧镜像，磁盘小的 VPS、树莓派最好加上；想保留上一个版本、断网时也能快速回滚的话，可以不加。用 `docker system df` 可以查看镜像占了多少空间。
 
 数据库保存在 Docker 卷 `bot-data` 中。停止或更新时，机器人会先做完正在进行的发布（最多 45 秒）再退出，所以 `docker-compose.yml` 里的 `stop_grace_period: 60s` 不要删；新版本改了 `docker-compose.yml` 时，更新前也要重新下载它。
 

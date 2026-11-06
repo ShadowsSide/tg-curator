@@ -104,8 +104,10 @@ Set `IMAGE` in `.env` to use another tag or image. To build from source, clone t
 
 ```bash
 docker compose cp bot:/app/data/bot.db ./backup-$(date +%F).db   # back up the database
-docker compose pull && docker compose up -d                      # update to the latest image
+docker compose pull && docker compose up -d && docker image prune -f   # update to the latest image and remove old ones
 ```
+
+`docker image prune -f` only removes old images no container is using; the running one is never deleted. Every update leaves an old image of one or two hundred MB behind, so keep it on small VPSes and Raspberry Pis; leave it out if you want to keep the previous version around for a quick offline rollback. `docker system df` shows how much space images take.
 
 The database lives in the Docker volume `bot-data`. When stopping or updating, the bot finishes publishing in progress (up to 45 seconds) before exiting, so keep `stop_grace_period: 60s` in `docker-compose.yml`. When a new version changes `docker-compose.yml`, download it again before updating.
 

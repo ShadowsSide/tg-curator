@@ -77,10 +77,12 @@ async def scenario():
     check("/edit after a reviewer edit → refused, pointed to /msg",
           r and LOCKED in r["params"]["text"] and "/msg" in r["params"]["text"], r and r["params"]["text"])
 
+    # 从推送之前开始找：上一步 /edit 的拒绝回复也含 LOCKED，从它开始找的话原生编辑没被拦也会通过
+    m = len(log)
     lt.push(edited_message={"message_id": mids[1], "date": lt.now() - 5, "edit_date": lt.now(), "chat": lt.chat(USER),
                             "from": {"id": USER, "is_bot": False, "first_name": "Alice"}, "media_group_id": "g1",
                             "photo": photo("B2"), "caption": "原生编辑"})
-    r = await wait_for(lambda e: is_send(e, "sendMessage", USER, LOCKED), since=len(log) - 1)
+    r = await wait_for(lambda e: is_send(e, "sendMessage", USER, LOCKED), since=m)
     check("native edit after a reviewer edit → refused", r)
 
     m = len(log); user_photo("NEW", reply_to=mids[0])

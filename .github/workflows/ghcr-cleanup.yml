@@ -1,0 +1,34 @@
+# 手动清理 GHCR 上不再需要的镜像（Actions → ghcr-cleanup → Run workflow）：
+#   - 永远保留：latest、dev、所有 v* 版本
+#   - 删除：以前的 sha-xxxxxxx、main 标签，以及没有标签的旧版本（每次更新 dev 后旧的那份、以前的构建证明条目）
+#   - 能识别多架构：正在用的镜像下面的 amd64 / arm64 子版本不会被当成“没有标签”删掉
+#     （不要换成 actions/delete-package-versions 按“未打标签”删除，会删掉它们）
+# 第一次用之前：镜像包页面 → Package settings → Manage Actions access，把本仓库加进去并选 Admin，否则没有删除权限。
+# 默认只空跑（dry_run）：日志里列出要删什么，不真删；确认无误后再取消勾选运行一次。
+name: ghcr-cleanup
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "只列出要删除的版本，不真删"
+        type: boolean
+        default: true
+
+permissions:
+  packages: write
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      # 第三方 action 拿着删除权限：固定到具体提交，标签以后被改指也不会影响这里
+      - uses: dataaxiom/ghcr-cleanup-action@d52806a0dc70b430571a37da1fde39733ffd640f  # v1.2.2
+        with:
+          package: tg-curator
+          dry-run: ${{ inputs.dry_run }}
+          exclude-tags: latest,dev,v*
+          delete-tags: sha-*,main
+          delete-untagged: true
+          validate: true
+          token: ${{ secrets.GITHUB_TOKEN }}

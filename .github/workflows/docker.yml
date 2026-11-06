@@ -26,8 +26,39 @@ env:
   DOCKERHUB_USERNAME: ${{ vars.DOCKERHUB_USERNAME }}
 
 jobs:
+  # 合并 PR 后 DEV 快进到 main 的合并提交：代码和上一次推送到 DEV 的完全一样，那次已经测过并出了 :dev，
+  # 这次不再测试、不再构建（:dev 保持不变）。只在上一次推送的运行成功时才跳过，被取消或失败的照常跑
+  changes:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read  # 查上一次推送的运行结果
+    outputs:
+      run: ${{ steps.check.outputs.run }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - id: check
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BEFORE: ${{ github.event.before }}
+        run: |
+          run=true
+          if [ "$GITHUB_EVENT_NAME" = push ] && [ "$GITHUB_REF" = refs/heads/DEV ] \
+             && git cat-file -e "$BEFORE^{commit}" 2>/dev/null && git diff --quiet "$BEFORE" HEAD; then
+            ok=$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/docker.yml/runs?branch=DEV&head_sha=$BEFORE&status=success" --jq .total_count) || ok=0  # 查询失败就照常跑
+            if [ "$ok" -gt 0 ]; then
+              run=false
+              echo "::notice::代码和上一次推送（${BEFORE:0:7}）相同，那次已通过测试并构建，跳过"
+            fi
+          fi
+          echo "run=$run" >> "$GITHUB_OUTPUT"
+
   # 测试没通过就不发布：部署默认拉取 latest（最新的正式版），有问题的版本会直接到用户的服务器上
   test:
+    needs: changes
+    if: needs.changes.outputs.run == 'true'
     uses: ./.github/workflows/test.yml
     permissions:
       contents: read

@@ -27,6 +27,21 @@ def reply_from(user_id, text, reply_to):
                                           "from": {"id": 1, "is_bot": True, "first_name": "TestBot"}}})
 
 
+ANON_ADMIN = 1087968824  # 以群身份匿名发言时 from_user 是 Telegram 的匿名管理员机器人
+
+
+def anon(text, reply_to=None):
+    """审核群里匿名管理员（以群的身份）发的消息。"""
+    d = {"message_id": 6500 + lt.uid[0], "date": lt.now(), "chat": lt.chat(REVIEW), "text": text,
+         "from": {"id": ANON_ADMIN, "is_bot": True, "first_name": "Group"},
+         "sender_chat": {"id": REVIEW, "type": "supergroup", "title": "Review"},
+         "entities": [{"type": "bot_command", "offset": 0, "length": len(text.split()[0])}]}
+    if reply_to:
+        d["reply_to_message"] = {"message_id": reply_to, "date": lt.now(), "chat": lt.chat(REVIEW),
+                                 "from": {"id": 1, "is_bot": True, "first_name": "TestBot"}}
+    lt.push(message=d)
+
+
 def is_prompt(e, contains):
     return is_send(e, "sendMessage", REVIEW, contains) and "force_reply" in json.dumps(e["params"])
 
@@ -128,6 +143,20 @@ async def scenario():
     n = len(log); lt.gm("/cancel")
     check("/cancel with nothing open → told so",
           await wait_for(lambda e: is_send(e, "sendMessage", REVIEW, "没有等你回复"), since=n))
+    # 匿名管理员：提示记的是点按钮的人，直接发 /cancel 对不上 → 请他回复那条提示；回复提示发送照常放弃
+    n = len(log); lt.cb("r:edit:1:0", REVIEW, ADMIN, message_id=ctrl1)
+    p = await wait_for(lambda e: is_prompt(e, "修改后的正文"), since=n)
+    n = len(log); anon("/cancel")
+    told = await wait_for(lambda e: is_send(e, "sendMessage", REVIEW, "匿名发言"), since=n)
+    await asyncio.sleep(0.5)
+    check("anonymous admin, plain /cancel → told to reply to the prompt (not “nothing waiting”), prompt kept",
+          told and "/cancel" in told["params"]["text"] and p["result"]["message_id"] not in batch_deleted(n)
+          and not any(is_send(e, "sendMessage", REVIEW, "没有等你回复") for e in log[n:]))
+    n = len(log); anon("/cancel", reply_to=p["result"]["message_id"])
+    told = await wait_for(lambda e: is_send(e, "sendMessage", REVIEW, "已取消"), since=n)
+    await wait_for(lambda e: e["method"] == "deleteMessages", since=n)
+    check("anonymous admin, /cancel as a reply → that prompt dropped",
+          told and p["result"]["message_id"] in batch_deleted(n))
 
     # 7. 文字太长：提示保留，可以重新回复
     n = len(log); lt.cb("r:edit:1:0", REVIEW, ADMIN, message_id=ctrl1)

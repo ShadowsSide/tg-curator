@@ -5,6 +5,7 @@ import asyncio
 import os
 import sys
 import tempfile
+from types import SimpleNamespace
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -21,9 +22,17 @@ NO_RIGHTS = "Bad Request: not enough rights to delete a message"  # 下次可能
 class FakeBot:
     """记录删除请求，行为和 Telegram 一样：
     - delete_messages：有一条删不掉（undeletable 太旧 / broken 其他原因）整批失败；找不到的跳过
-    - delete_message：太旧报 can't be deleted，其他原因报 not enough rights，已经不在了报 not found"""
-    def __init__(self, undeletable=(), broken=()):
+    - delete_message：太旧报 can't be deleted，其他原因报 not enough rights，已经不在了报 not found
+    - get_chat_member：rights=False 时机器人在审核群没有“删除消息”权限"""
+    id = 1
+
+    def __init__(self, undeletable=(), broken=(), rights=True):
         self.calls, self.undeletable, self.broken, self.deleted = [], set(undeletable), set(broken), set()
+        self.rights = rights
+
+    async def get_chat_member(self, chat_id, user_id):
+        assert (chat_id, user_id) == (REVIEW, self.id)
+        return SimpleNamespace(status="administrator" if self.rights else "member", can_delete_messages=self.rights)
 
     async def delete_messages(self, chat_id, message_ids):
         self.calls.append((chat_id, list(message_ids)))
@@ -164,11 +173,31 @@ def test_too_old_messages_are_forgotten_not_retried():
     _with_core(check, FakeBot(undeletable={100, 101}))
 
 
+def test_without_delete_rights_undeletable_messages_are_kept_for_retry():
+    """机器人没有删除权限：审核员发的消息（改稿留下的）也报 can't be deleted，不能当成超过 48 小时忘掉。
+    机器人自己的消息照常删掉，删不掉的留着，提示说明缺权限；补上权限后再点一次全部删掉。"""
+    async def check(core, db):
+        await db.ban(42, None, "Admin")
+        s1 = await _sub(db, 42, "rejected", 100, linked=(101, 102))  # 101 是审核员发的 /edit 消息
+        res = await core.purge_review_messages(42)
+        assert (res.key, res.params["n"], res.params["failed"]) == ("purge_partial", 0, 1), res
+        assert res.params["note"].key == "purge_no_rights", res
+        assert "删除消息" in res.text("zh") and "超过 48 小时" not in res.text("zh"), res.text("zh")
+        assert core.bot.deleted == {100, 102}
+        assert await db.review_traces(REVIEW, 42) == {s1: [100, 101]}, "删不掉的那条还记着"
+        core.bot.rights, core.bot.undeletable = True, set()  # 补上权限
+        res = await core.purge_review_messages(42)
+        assert (res.key, res.params) == ("purge_done", {"n": 1, "note": ""}), res
+        assert 101 in core.bot.deleted and await db.review_traces(REVIEW, 42) == {}
+    _with_core(check, FakeBot(undeletable={101}, rights=False))
+
+
 def test_purge_texts_in_both_languages():
     from bot.errors import notice
     assert notice("purge_partial", n=1, failed=2, note="").text("zh").startswith("已删除 1 条稿件；2 条删除失败")
     assert "couldn't be deleted" in notice("purge_partial", n=1, failed=2, note="").text("en")
     assert "older than 48 hours" in notice("purge_done", n=1, note=notice("purge_too_old", n=3)).text("en")
+    assert "Delete messages" in notice("purge_partial", n=0, failed=1, note=notice("purge_no_rights")).text("en")
 
 
 if __name__ == "__main__":

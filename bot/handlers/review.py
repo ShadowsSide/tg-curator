@@ -54,10 +54,14 @@ def _confirm_toast(action: str) -> str:
     return "toast_confirm_purge" if action == "purge" else "toast_confirm"
 
 
+def _anonymous_admin(m: Message) -> bool:
+    """以群的身份匿名发言的管理员：from_user 是 Telegram 的匿名管理员机器人，看不出是谁。"""
+    return m.sender_chat is not None and m.sender_chat.id == m.chat.id
+
+
 def _is_owner(m: Message, prompt: Prompt) -> bool:
-    """这条消息是不是点按钮的那个人发的。匿名管理员（以群的身份发言）看不出是谁，一律算数。"""
-    anonymous_admin = m.sender_chat is not None and m.sender_chat.id == m.chat.id
-    return m.from_user.id == prompt.user_id or anonymous_admin
+    """这条消息是不是点按钮的那个人发的。匿名管理员看不出是谁，一律算数。"""
+    return m.from_user.id == prompt.user_id or _anonymous_admin(m)
 
 
 def _parse_user_id(text: str) -> int | None:
@@ -224,9 +228,15 @@ def build_router(settings: Settings) -> Router:
             await cq.answer(t(lang, "toast_unbanned" if ok else "toast_not_banned"), show_alert=not ok)
         elif action == "purge":
             sub = await core.get_submission(sid)
-            res = await core.purge_review_messages(sub.user_id) if sub else notice("sub_not_found", sid=sid)
+            if not sub:
+                await cq.answer(t(lang, "sub_not_found", sid=sid), show_alert=True)
+                return
+            # 先回应再删：逐条删很多消息可能超过 15 秒，按钮回应超时会被 Telegram 拒绝；结果另发一条消息
+            await cq.answer(t(lang, "toast_purging"))
+            res = await core.purge_review_messages(sub.user_id)
             await core.refresh_control(sid)  # 删成功时这条控制按钮消息已经没了（不会再刷新）；没删掉就收起确认面板
-            await cq.answer(res.text(lang), show_alert=True)
+            # 不用回复：控制按钮消息可能已经删掉了
+            await core.bot.send_message(cq.message.chat.id, res.text(lang))
         else:
             await cq.answer()
 
@@ -237,7 +247,7 @@ def build_router(settings: Settings) -> Router:
         action = a.removesuffix("_ok")
         user = await core.get_user(uid)
         banned = bool(user and user.banned)
-        toast, alert = None, False
+        toast, alert, result = None, False, None
         if action in ("ban", "unban") and banned == (action == "ban"):  # 已经是想要的状态了
             toast, alert = t(lang, "toast_already_banned" if banned else "toast_not_banned"), True
         elif action == "purge" and not banned:  # 删除只对被封禁的人；已经被解封了，按钮是旧的
@@ -253,15 +263,19 @@ def build_router(settings: Settings) -> Router:
             await core.unban_user(uid)
             toast, alert = t(lang, "toast_unbanned"), False
         elif a == "purge_ok":
-            res = await core.purge_review_messages(uid)
-            toast, alert = res.text(lang), res.key != "purge_done"
+            # 先回应再删（同控制按钮消息上的 🗑）：结果在刷新卡片后回复在卡片下面
+            await cq.answer(t(lang, "toast_purging"))
+            result = (await core.purge_review_messages(uid)).text(lang)
         text, kb = await core.user_card(uid)
         try:
             await cq.message.edit_text(text, reply_markup=kb, link_preview_options=NO_PREVIEW)
         except TelegramBadRequest as e:
             if "not modified" not in str(e):
                 raise
-        await cq.answer(toast, show_alert=bool(toast) and alert)
+        if result:
+            await cq.message.reply(result)
+        else:
+            await cq.answer(toast, show_alert=bool(toast) and alert)
 
     # ---------- 回复提示 ----------
 
@@ -395,6 +409,9 @@ def build_router(settings: Settings) -> Router:
         prompt = await core.get_prompt(m.chat.id, reply.message_id) if reply else None
         if prompt:
             prompts = [prompt] if _is_owner(m, prompt) else []
+        elif _anonymous_admin(m):  # 提示记的是点按钮的人的真实身份，匿名发言对不上：请他回复那条提示
+            await m.reply(t(core.lang, "prompt_cancel_anonymous"))
+            return
         else:
             prompts = await core.prompts_of(m.chat.id, m.from_user.id)
         for p in prompts:

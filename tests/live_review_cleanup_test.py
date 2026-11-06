@@ -34,7 +34,7 @@ async def scenario():
     n = len(log); lt.cb("r:ban_ok:1:0", REVIEW, ADMIN, message_id=ctrl)
     await wait_for(lambda e: e["method"] == "answerCallbackQuery", since=n)
     n = len(log); lt.cb("r:purge_ok:1:0", REVIEW, ADMIN, message_id=ctrl)
-    await wait_for(lambda e: e["method"] == "answerCallbackQuery", since=n)
+    await wait_for(lambda e: is_send(e, "sendMessage", REVIEW, "已删除"), since=n)  # 按钮先回应，删完才发结果
     check("purge → the latest edit's messages (reviewer's /edit and the confirmation) deleted too",
           set(latest) <= set(review_deleted(n)), (latest, review_deleted(n)))
 

@@ -492,6 +492,7 @@ T: dict[str, dict[str, str]] = {
                             "en": "This deletes all their posts in this group and can't be undone. "
                                   "Tap again to confirm, or go back"},
     "toast_publishing": {"zh": "发布中…", "en": "Publishing…"},
+    "toast_purging": {"zh": "删除中…", "en": "Deleting…"},
     "toast_retrying": {"zh": "重试中…", "en": "Retrying…"},
     "toast_scheduled": {"zh": "已定时：{when}", "en": "Scheduled: {when}"},
     "toast_unscheduled": {"zh": "已取消定时，回到待审核", "en": "Unscheduled, back to pending review"},
@@ -508,6 +509,11 @@ T: dict[str, dict[str, str]] = {
         "zh": "。其中 {n} 条消息超过 48 小时，Telegram 不允许机器人删除，需要管理员手动删除",
         "en": ". {n} message(s) are older than 48 hours, which Telegram doesn't let bots delete; an admin has to "
               "delete them by hand",
+    },
+    "purge_no_rights": {
+        "zh": "。机器人在审核群没有“删除消息”权限，审核员发的消息删不掉：把机器人设为管理员并给“删除消息”权限后再点一次",
+        "en": ". The bot doesn't have the “Delete messages” right in this group, so messages sent by reviewers can't be "
+              "deleted: make the bot an admin with “Delete messages” and tap again",
     },
     "purge_nothing": {"zh": "TA 在审核群里没有可删除的稿件", "en": "They have nothing left to delete in the review group"},
     "toast_already_banned": {"zh": "这个投稿人已经被封禁了", "en": "This submitter is already banned"},
@@ -571,6 +577,11 @@ T: dict[str, dict[str, str]] = {
     },
     "prompt_cancelled": {"zh": "已取消。", "en": "Cancelled."},
     "prompt_none": {"zh": "没有等你回复的操作。", "en": "Nothing is waiting for your reply."},
+    "prompt_cancel_anonymous": {
+        "zh": "匿名发言时看不出是谁的提示：请回复要放弃的那条提示发送 <code>/cancel</code>。",
+        "en": "When posting anonymously the bot can't tell which prompts are yours: reply to the prompt you want to "
+              "drop with <code>/cancel</code>.",
+    },
     "prompt_text_needed": {"zh": "请发送文字。", "en": "Please send text."},
     "custom_time_bad": {
         "zh": "看不懂这个时间 🤔 例如 <code>20:30</code>、<code>10-20 09:00</code>、<code>+2h</code>、<code>+1d</code>",

@@ -54,7 +54,7 @@ CASES = [
 
 
 async def start(port, extra):
-    env = {**os.environ, "BOT_TOKEN": "123:TEST", "CHANNEL_ID": str(CHANNEL), "REVIEW_CHAT_ID": str(REVIEW),
+    env = {**os.environ, "BOT_TOKEN": f"{lt.BOT_ID}:TEST", "CHANNEL_ID": str(CHANNEL), "REVIEW_CHAT_ID": str(REVIEW),
            "TELEGRAM_API_URL": f"http://127.0.0.1:{port}", "DB_PATH": os.path.join(tempfile.mkdtemp(), "bot.db"),
            "CONFIG_ERROR_FILE": ERROR_FILE, "HEARTBEAT_FILE": HEARTBEAT_FILE, "PYTHONUNBUFFERED": "1", "LANGUAGE": "zh", **extra}
     proc = await asyncio.create_subprocess_exec(sys.executable, "-m", "bot", cwd=PROJECT, env=env,

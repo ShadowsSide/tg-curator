@@ -44,7 +44,7 @@ def album(ids, group="g-restart"):
 
 
 async def start(port):
-    env = {**os.environ, "BOT_TOKEN": "123:TEST", "CHANNEL_ID": str(lt.CHANNEL), "REVIEW_CHAT_ID": str(lt.REVIEW),
+    env = {**os.environ, "BOT_TOKEN": f"{lt.BOT_ID}:TEST", "CHANNEL_ID": str(lt.CHANNEL), "REVIEW_CHAT_ID": str(lt.REVIEW),
            "TELEGRAM_API_URL": f"http://127.0.0.1:{port}", "DB_PATH": DB, "ALBUM_DELAY": str(DELAY),
            "PYTHONUNBUFFERED": "1"}
     n = len(log)

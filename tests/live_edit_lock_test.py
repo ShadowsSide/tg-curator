@@ -22,6 +22,7 @@ from live_test import ADMIN, REVIEW, USER, check, gm, is_send, log, own, user_sa
 DB = os.path.join(tempfile.mkdtemp(), "bot.db")
 LOCKED = "审核员已经修改过"
 NOTIFIED = "审核员修改了你的投稿"
+EDITED = "投稿已更新"
 
 
 def version(sid):
@@ -48,12 +49,13 @@ async def submit_album(sid, group, files):
 
 
 async def scenario():
+    # user_says 都带 expect（成功和被拒两种回复都等）：只取第一条的话，多出来的、晚到的消息会被当成回复
     await wait_for(lambda e: e["method"] == "setMyCommands", 15, since=0)
     mids, prompt, ctrl = await submit_album(1, "g1", ["A", "B"])
 
     # 审核员改稿之前，投稿人能改
-    r = await user_says("/edit 投稿人自己的说明", mids[0])
-    check("before a reviewer edit → submitter can edit", r and "投稿已更新" in r["params"]["text"], r and r["params"]["text"])
+    r = await user_says("/edit 投稿人自己的说明", mids[0], (EDITED, LOCKED))
+    check("before a reviewer edit → submitter can edit", r and EDITED in r["params"]["text"], r and r["params"]["text"])
 
     # 审核员第一次改稿：投稿人收到一次通知，“删除图片”收起
     n = len(log); gm("/edit 审核员改过的说明", reply_to=ctrl)
@@ -73,14 +75,16 @@ async def scenario():
 
     # 投稿人的四种改法都被拒，审核群收不到新预览
     n = len(log)
-    r = await user_says("/edit 想覆盖审核员", mids[0])
+    r = await user_says("/edit 想覆盖审核员", mids[0], (LOCKED, EDITED))
     check("/edit after a reviewer edit → refused, pointed to /msg",
           r and LOCKED in r["params"]["text"] and "/msg" in r["params"]["text"], r and r["params"]["text"])
 
+    # 从推送之前开始找：上一步 /edit 的拒绝回复也含 LOCKED，从它开始找的话原生编辑没被拦也会通过
+    m = len(log)
     lt.push(edited_message={"message_id": mids[1], "date": lt.now() - 5, "edit_date": lt.now(), "chat": lt.chat(USER),
                             "from": {"id": USER, "is_bot": False, "first_name": "Alice"}, "media_group_id": "g1",
                             "photo": photo("B2"), "caption": "原生编辑"})
-    r = await wait_for(lambda e: is_send(e, "sendMessage", USER, LOCKED), since=len(log) - 1)
+    r = await wait_for(lambda e: is_send(e, "sendMessage", USER, LOCKED), since=m)
     check("native edit after a reviewer edit → refused", r)
 
     m = len(log); user_photo("NEW", reply_to=mids[0])
@@ -107,9 +111,9 @@ async def scenario():
     mids2, _, ctrl2 = await submit_album(3, "g2", ["C", "D"])
     n = len(log); lt.cb("r:silent:3:0", REVIEW, ADMIN, message_id=ctrl2)
     await wait_for(lambda e: e["method"] == "answerCallbackQuery", since=n)
-    r = await user_says("/edit 开关之后改", mids2[0])
+    r = await user_says("/edit 开关之后改", mids2[0], (EDITED, LOCKED))
     check("reviewer only toggled Silent → submitter can still edit",
-          r and "投稿已更新" in r["params"]["text"], r and r["params"]["text"])
+          r and EDITED in r["params"]["text"], r and r["params"]["text"])
 
 
 if __name__ == "__main__":

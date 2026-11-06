@@ -228,9 +228,15 @@ def build_router(settings: Settings) -> Router:
             await cq.answer(t(lang, "toast_unbanned" if ok else "toast_not_banned"), show_alert=not ok)
         elif action == "purge":
             sub = await core.get_submission(sid)
-            res = await core.purge_review_messages(sub.user_id) if sub else notice("sub_not_found", sid=sid)
+            if not sub:
+                await cq.answer(t(lang, "sub_not_found", sid=sid), show_alert=True)
+                return
+            # 先回应再删：逐条删很多消息可能超过 15 秒，按钮回应超时会被 Telegram 拒绝；结果另发一条消息
+            await cq.answer(t(lang, "toast_purging"))
+            res = await core.purge_review_messages(sub.user_id)
             await core.refresh_control(sid)  # 删成功时这条控制按钮消息已经没了（不会再刷新）；没删掉就收起确认面板
-            await cq.answer(res.text(lang), show_alert=True)
+            # 不用回复：控制按钮消息可能已经删掉了
+            await core.bot.send_message(cq.message.chat.id, res.text(lang))
         else:
             await cq.answer()
 
@@ -241,7 +247,7 @@ def build_router(settings: Settings) -> Router:
         action = a.removesuffix("_ok")
         user = await core.get_user(uid)
         banned = bool(user and user.banned)
-        toast, alert = None, False
+        toast, alert, result = None, False, None
         if action in ("ban", "unban") and banned == (action == "ban"):  # 已经是想要的状态了
             toast, alert = t(lang, "toast_already_banned" if banned else "toast_not_banned"), True
         elif action == "purge" and not banned:  # 删除只对被封禁的人；已经被解封了，按钮是旧的
@@ -257,15 +263,19 @@ def build_router(settings: Settings) -> Router:
             await core.unban_user(uid)
             toast, alert = t(lang, "toast_unbanned"), False
         elif a == "purge_ok":
-            res = await core.purge_review_messages(uid)
-            toast, alert = res.text(lang), res.key != "purge_done"
+            # 先回应再删（同控制按钮消息上的 🗑）：结果在刷新卡片后回复在卡片下面
+            await cq.answer(t(lang, "toast_purging"))
+            result = (await core.purge_review_messages(uid)).text(lang)
         text, kb = await core.user_card(uid)
         try:
             await cq.message.edit_text(text, reply_markup=kb, link_preview_options=NO_PREVIEW)
         except TelegramBadRequest as e:
             if "not modified" not in str(e):
                 raise
-        await cq.answer(toast, show_alert=bool(toast) and alert)
+        if result:
+            await cq.message.reply(result)
+        else:
+            await cq.answer(toast, show_alert=bool(toast) and alert)
 
     # ---------- 回复提示 ----------
 

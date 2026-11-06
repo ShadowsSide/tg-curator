@@ -92,9 +92,8 @@ docker inspect --format '{{range .State.Health.Log}}{{.Output}}{{end}}' $(docker
 | Image tag | Contents |
 |---|---|
 | `latest` | Latest release (updated when a `v*` tag is pushed) |
-| `main` | Latest code on the main branch, merged but maybe not released yet |
-| `dev` | The DEV branch: unmerged features, may be unstable |
-| `vX.Y.Z` | A release; to roll back, set `IMAGE` to the previous version |
+| `dev` | The DEV branch, for trying features before they're merged; may be unstable |
+| `vX.Y.Z` | A pinned version; to roll back, set `IMAGE` to the previous version |
 
 Set `IMAGE` in `.env` to use another tag or image. To build from source, clone the repository and run `docker compose -f docker-compose.yml -f docker-compose.build.yml up -d --build`.
 
@@ -320,6 +319,6 @@ scripts/          multi-arch image build script
 
 ### Publishing your own image (for a fork)
 
-Pushes to `main` or `DEV` and `v*` tags make Actions build amd64 + arm64 images and publish them to `ghcr.io/<owner>/tg-curator`. Set `IMAGE=ghcr.io/<owner>/tg-curator:latest` in `.env` to deploy it; `latest` only exists after your first `v*` tag, so use `:main` until then.
+Pushes to `DEV` and `v*` tags make Actions build amd64 + arm64 images and publish them to `ghcr.io/<owner>/tg-curator` (pushes to `main` only run the tests). Set `IMAGE=ghcr.io/<owner>/tg-curator:latest` in `.env` to deploy it; `latest` only exists after your first `v*` tag, so use `:dev` until then.
 
 To publish to Docker Hub as well, add the variable `DOCKERHUB_USERNAME` and the secret `DOCKERHUB_TOKEN` (with Read & Write access) under the repository's **Settings → Secrets and variables → Actions**. You can also build and push locally with `scripts/build-multiarch.sh <image:tag>`.

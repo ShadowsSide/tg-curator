@@ -94,9 +94,8 @@ docker inspect --format '{{range .State.Health.Log}}{{.Output}}{{end}}' $(docker
 | 镜像标签 | 内容 |
 |---|---|
 | `latest` | 最新的正式版本（打 `v*` 标签时更新） |
-| `main` | main 分支的最新代码，已合并、可能还没发布 |
-| `dev` | DEV 分支，还没合并的新功能，可能不稳定 |
-| `vX.Y.Z` | 发布版本；出问题时把 `IMAGE` 改回上一个版本号即可回滚 |
+| `dev` | DEV 分支，合并前试新功能，可能不稳定 |
+| `vX.Y.Z` | 固定版本；出问题时把 `IMAGE` 改回上一个版本号即可回滚 |
 
 在 `.env` 里设置 `IMAGE` 可以换标签或换成别的镜像。想从源码构建：clone 仓库后执行 `docker compose -f docker-compose.yml -f docker-compose.build.yml up -d --build`。
 
@@ -322,6 +321,6 @@ scripts/          多架构镜像构建脚本
 
 ### 发布自己的镜像（Fork 后）
 
-推送到 `main`、`DEV` 或打 `v*` 标签时，Actions 会构建 amd64 + arm64 镜像并发布到 `ghcr.io/<owner>/tg-curator`。部署时在 `.env` 里设置 `IMAGE=ghcr.io/<owner>/tg-curator:latest` 才会用上它；`latest` 要打过第一个 `v*` 标签后才有，之前可以先用 `:main`。
+推送到 `DEV` 或打 `v*` 标签时，Actions 会构建 amd64 + arm64 镜像并发布到 `ghcr.io/<owner>/tg-curator`（推送到 `main` 只跑测试）。部署时在 `.env` 里设置 `IMAGE=ghcr.io/<owner>/tg-curator:latest` 才会用上它；`latest` 要打过第一个 `v*` 标签后才有，之前可以先用 `:dev`。
 
 想同时发布到 Docker Hub，在仓库的 **Settings → Secrets and variables → Actions** 里添加变量 `DOCKERHUB_USERNAME` 和密钥 `DOCKERHUB_TOKEN`（需要 Read & Write 权限）。也可以在本地构建并推送：`scripts/build-multiarch.sh <镜像名:标签>`。

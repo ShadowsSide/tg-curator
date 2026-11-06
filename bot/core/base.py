@@ -88,7 +88,9 @@ class CoreBase:
             raise ConfigError("cfg_review_basic_group", value=self.s.review_chat_id)
         if review.type != ChatType.SUPERGROUP:
             raise ConfigError("cfg_review_type", value=self.s.review_chat_id)
-        await self._check_review_admin(review.id, me.id)
+        if not await self.can_delete_in_review():
+            log.warning("机器人不是审核群的管理员，或者没有“删除消息”权限：审核员的命令、改稿留下的消息、被封禁用户的稿件会删不掉。"
+                        "请在审核群把机器人设为管理员，只给“删除消息”权限即可")
 
         self.channel_chat_id = chat.id
         self.channel_linked_chat_id = chat.linked_chat_id
@@ -98,16 +100,14 @@ class CoreBase:
             self.channel_post_base = f"https://t.me/c/{str(chat.id).removeprefix('-100')}/"
         await self.db.reset_stuck_publishing()
 
-    async def _check_review_admin(self, chat_id: int, bot_id: int) -> None:
-        """审核群里机器人要有“删除消息”权限，才删得掉审核员的命令、改稿留下的消息、被封禁用户的稿件。
-        没有也能审核，所以只提醒，不阻止启动。"""
+    async def can_delete_in_review(self) -> bool:
+        """机器人在审核群是不是有“删除消息”权限的管理员：有才删得掉审核员的命令、改稿留下的消息、被封禁用户的稿件。
+        没有也能审核，所以启动时只提醒，不阻止启动。网络等其他错误照常抛出。"""
         try:
-            member = await self.bot.get_chat_member(chat_id, bot_id)
+            member = await self.bot.get_chat_member(self.s.review_chat_id, self.bot.id)
         except (TelegramBadRequest, TelegramForbiddenError):
-            member = None
-        if not (member and member.status == ChatMemberStatus.ADMINISTRATOR and member.can_delete_messages):
-            log.warning("机器人不是审核群的管理员，或者没有“删除消息”权限：审核员的命令、改稿留下的消息、被封禁用户的稿件会删不掉。"
-                        "请在审核群把机器人设为管理员，只给“删除消息”权限即可")
+            return False
+        return member.status == ChatMemberStatus.ADMINISTRATOR and bool(member.can_delete_messages)
 
     async def _config_chat(self, chat_id: int | str, missing: str) -> ChatFullInfo:
         try:

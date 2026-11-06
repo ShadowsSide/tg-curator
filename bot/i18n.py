@@ -509,6 +509,11 @@ T: dict[str, dict[str, str]] = {
         "en": ". {n} message(s) are older than 48 hours, which Telegram doesn't let bots delete; an admin has to "
               "delete them by hand",
     },
+    "purge_no_rights": {
+        "zh": "。机器人在审核群没有“删除消息”权限，审核员发的消息删不掉：把机器人设为管理员并给“删除消息”权限后再点一次",
+        "en": ". The bot doesn't have the “Delete messages” right in this group, so messages sent by reviewers can't be "
+              "deleted: make the bot an admin with “Delete messages” and tap again",
+    },
     "purge_nothing": {"zh": "TA 在审核群里没有可删除的稿件", "en": "They have nothing left to delete in the review group"},
     "toast_already_banned": {"zh": "这个投稿人已经被封禁了", "en": "This submitter is already banned"},
     "toast_banned": {

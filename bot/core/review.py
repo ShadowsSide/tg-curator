@@ -183,6 +183,11 @@ class ReviewMixin(CoreBase):
         traces = await self.db.review_traces(self.s.review_chat_id, user_id)
         if not traces:
             return notice("purge_nothing")
+        # 没有删除权限时，审核员发的消息也报“can't be deleted”，和太旧分不开：都留着，补上权限后再点一次能删掉
+        try:
+            rights = await self.can_delete_in_review()
+        except TelegramAPIError:
+            rights = True  # 查不到就按有权限处理（原来的做法）
         done = failed = old = 0
         for sids, ids in _delete_batches(traces):
             if await self._delete_review_messages(ids):
@@ -192,7 +197,7 @@ class ReviewMixin(CoreBase):
             for sid in sids:  # 整批失败：一条一条投稿地删；这条投稿还删不掉，再一条一条消息地删
                 # 只有一条投稿的批次刚刚已经整体试过了，直接逐条
                 whole = len(sids) > 1 and await self._delete_review_messages(traces[sid])
-                too_old = 0 if whole else await self._delete_one_by_one(sid, traces[sid])
+                too_old = 0 if whole else await self._delete_one_by_one(sid, traces[sid], rights)
                 if too_old is None:
                     failed += 1
                     continue
@@ -200,6 +205,8 @@ class ReviewMixin(CoreBase):
                 done += 1
                 old += too_old
         note = notice("purge_too_old", n=old) if old else ""
+        if failed and not rights:
+            note = notice("purge_no_rights")
         if failed:
             return notice("purge_partial", n=done, failed=failed, note=note)
         return notice("purge_done", n=done, note=note)
@@ -213,16 +220,20 @@ class ReviewMixin(CoreBase):
             return False
         return True
 
-    async def _delete_one_by_one(self, sid: int, ids: list[int]) -> int | None:
+    async def _delete_one_by_one(self, sid: int, ids: list[int], rights: bool = True) -> int | None:
         """这条投稿的消息一条一条删。返回其中有几条太旧、删不掉（Telegram 不允许，不用再试）；
-        有别的错误（网络、权限等，下次可能成功）返回 None，能删的已经删掉，删不掉的记进日志，下次再试。"""
+        有别的错误（网络、权限等，下次可能成功）返回 None，能删的已经删掉，删不掉的记进日志，下次再试。
+        rights：机器人有没有删除权限。没有时“can't be deleted”也可能是权限不够，不当成太旧，留着下次再试。"""
         gone, too_old, bad = [], [], {}
         for mid in ids:
             try:
                 await self.bot.delete_message(self.s.review_chat_id, mid)
             except TelegramBadRequest as e:
-                if "can't be deleted" in e.message:  # 机器人自己发的消息只有超过 48 小时才会这样
-                    too_old.append(mid)
+                if "can't be deleted" in e.message:  # 有删除权限时，只有超过 48 小时才会这样
+                    if rights:
+                        too_old.append(mid)
+                    else:
+                        bad[mid] = "没有“删除消息”权限，或超过 48 小时"
                     continue
                 if "not found" not in e.message:  # 已经不在了（手动删过、上次删掉了）就算删掉了
                     bad[mid] = e.message

@@ -54,10 +54,14 @@ def _confirm_toast(action: str) -> str:
     return "toast_confirm_purge" if action == "purge" else "toast_confirm"
 
 
+def _anonymous_admin(m: Message) -> bool:
+    """以群的身份匿名发言的管理员：from_user 是 Telegram 的匿名管理员机器人，看不出是谁。"""
+    return m.sender_chat is not None and m.sender_chat.id == m.chat.id
+
+
 def _is_owner(m: Message, prompt: Prompt) -> bool:
-    """这条消息是不是点按钮的那个人发的。匿名管理员（以群的身份发言）看不出是谁，一律算数。"""
-    anonymous_admin = m.sender_chat is not None and m.sender_chat.id == m.chat.id
-    return m.from_user.id == prompt.user_id or anonymous_admin
+    """这条消息是不是点按钮的那个人发的。匿名管理员看不出是谁，一律算数。"""
+    return m.from_user.id == prompt.user_id or _anonymous_admin(m)
 
 
 def _parse_user_id(text: str) -> int | None:
@@ -395,6 +399,9 @@ def build_router(settings: Settings) -> Router:
         prompt = await core.get_prompt(m.chat.id, reply.message_id) if reply else None
         if prompt:
             prompts = [prompt] if _is_owner(m, prompt) else []
+        elif _anonymous_admin(m):  # 提示记的是点按钮的人的真实身份，匿名发言对不上：请他回复那条提示
+            await m.reply(t(core.lang, "prompt_cancel_anonymous"))
+            return
         else:
             prompts = await core.prompts_of(m.chat.id, m.from_user.id)
         for p in prompts:

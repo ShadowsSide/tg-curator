@@ -576,6 +576,11 @@ T: dict[str, dict[str, str]] = {
     },
     "prompt_cancelled": {"zh": "已取消。", "en": "Cancelled."},
     "prompt_none": {"zh": "没有等你回复的操作。", "en": "Nothing is waiting for your reply."},
+    "prompt_cancel_anonymous": {
+        "zh": "匿名发言时看不出是谁的提示：请回复要放弃的那条提示发送 <code>/cancel</code>。",
+        "en": "When posting anonymously the bot can't tell which prompts are yours: reply to the prompt you want to "
+              "drop with <code>/cancel</code>.",
+    },
     "prompt_text_needed": {"zh": "请发送文字。", "en": "Please send text."},
     "custom_time_bad": {
         "zh": "看不懂这个时间 🤔 例如 <code>20:30</code>、<code>10-20 09:00</code>、<code>+2h</code>、<code>+1d</code>",

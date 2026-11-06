@@ -3,7 +3,7 @@
 
 # Curator
 
-[![docker](https://img.shields.io/github/actions/workflow/status/ShadowsSide/tg-curator/docker.yml?style=flat-square&label=build)](https://github.com/ShadowsSide/tg-curator/actions/workflows/docker.yml)
+[![docker](https://img.shields.io/github/actions/workflow/status/ShadowsSide/tg-curator/docker.yml?branch=DEV&style=flat-square&label=build)](https://github.com/ShadowsSide/tg-curator/actions/workflows/docker.yml)
 ![python](https://img.shields.io/badge/Python-3.12-3776ab?style=flat-square&logo=python&logoColor=white)
 [![aiogram](https://img.shields.io/badge/aiogram-3-2ca5e0?style=flat-square&logo=telegram&logoColor=white)](https://github.com/aiogram/aiogram)
 ![platform](https://img.shields.io/badge/platform-amd64%20%7C%20arm64-lightgrey?style=flat-square)
@@ -277,7 +277,7 @@ for f in tests/test_*.py tests/live_*.py; do .venv/bin/python "$f" || echo "FAIL
 .venv/bin/python -m pyflakes bot tests
 ```
 
-GitHub Actions runs the same checks on every PR, on pushes to `main` / `DEV` and on tags, and only builds images when they pass.
+GitHub Actions runs the same checks on pushes to `DEV`, on tags and on PRs from other branches, and only builds images when they pass (PRs from `DEV` reuse the result of the push, and `main` is only updated through such PRs, so it is not tested again).
 
 <details>
 <summary><b>Project layout</b></summary>
@@ -321,6 +321,6 @@ scripts/          multi-arch image build script
 
 ### Publishing your own image (for a fork)
 
-Pushes to `DEV` and `v*` tags make Actions build amd64 + arm64 images and publish them to `ghcr.io/<owner>/tg-curator` (pushes to `main` only run the tests). Set `IMAGE=ghcr.io/<owner>/tg-curator:latest` in `.env` to deploy it; `latest` only exists after your first `v*` tag, so use `:dev` until then.
+Pushes to `DEV` and `v*` tags make Actions build amd64 + arm64 images and publish them to `ghcr.io/<owner>/tg-curator` (pushes to `main` trigger nothing; update `main` through PRs from `DEV`). Set `IMAGE=ghcr.io/<owner>/tg-curator:latest` in `.env` to deploy it; `latest` only exists after your first `v*` tag, so use `:dev` until then.
 
 To publish to Docker Hub as well, add the variable `DOCKERHUB_USERNAME` and the secret `DOCKERHUB_TOKEN` (with Read & Write access) under the repository's **Settings → Secrets and variables → Actions**. You can also build and push locally with `scripts/build-multiarch.sh <image:tag>`.

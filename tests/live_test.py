@@ -260,10 +260,13 @@ def own(mid):
     return {"message_id": mid, "date": now(), "chat": chat(USER)}
 
 
-async def user_says(text, mid):
-    """投稿人回复自己的投稿发一条命令，返回机器人的回复。"""
+async def user_says(text, mid, expect=None):
+    """投稿人回复自己的投稿发一条命令，返回机器人的回复。
+    expect：等包含其中任一段文字的那条回复。一条命令可能有多条回复（提交后 /edit 先发预览、再发“投稿已更新”），
+    只取第一条的话，晚到的那条会被下一次调用当成它的回复，后面全部错位。不传就取第一条。"""
     n = len(log); pm(text, reply_to_message=own(mid))
-    return await wait_for(lambda e: is_send(e, "sendMessage", USER), since=n)
+    return await wait_for(lambda e: is_send(e, "sendMessage", USER)
+                          and (expect is None or any(x in e["params"].get("text", "") for x in expect)), since=n)
 
 
 def review_deleted(since):

@@ -31,6 +31,9 @@ async def scenario():
     n = len(log); pm("/msg here it is", who=BOB, reply_to_message=reply_to(BOB, relay))
     e = await wait_for(lambda e: is_send(e, "sendMessage", REVIEW, "here it is"), since=n)
     check("review group label stays in the review language", e and e["params"]["text"].startswith("💬 投稿人："))
+    # 等投稿人收到“已发送”：转达之后机器人还会刷新控制按钮消息，这条回复在全部做完后才发。
+    # 不等的话，晚到的刷新会落进下一步“审核群收不到任何东西”的检查里
+    await wait_for(lambda e: is_send(e, "sendMessage", BOB, "Sent to the reviewers"), since=n)
     n = len(log); pm(None, who=BOB, reply_to_message=reply_to(BOB, relay), caption="the source",
                      photo=[{"file_id": "SRC", "file_unique_id": "SRC", "width": 1, "height": 1}])
     e = await wait_for(lambda e: is_send(e, "sendMessage", BOB, "starting with <code>/msg</code>"), since=n)

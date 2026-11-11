@@ -424,6 +424,8 @@ T: dict[str, dict[str, str]] = {
     "ctrl_mode_signed": {"zh": "方式：👤 署名", "en": "Mode: 👤 signed"},
     "ctrl_content": {"zh": "内容：{desc}", "en": "Content: {desc}"},
     "ctrl_edited": {"zh": "✏️ 已修改（{by}，{when}）", "en": "✏️ Edited ({by}, {when})"},
+    "ctrl_edited_n": {"zh": "✏️ 已修改 {n} 次（最近：{by}，{when}）", "en": "✏️ Edited {n} times (last: {by}, {when})"},
+    "ctrl_edited_view": {"zh": "查看最新版本", "en": "View latest"},
     "ctrl_spoiler": {"zh": "剧透遮罩：{state}", "en": "Spoiler: {state}"},
     "ctrl_silent": {"zh": "静音发送：{state}", "en": "Silent: {state}"},
     "status_pending": {"zh": "状态：⏳ 待审核", "en": "Status: ⏳ pending review"},

@@ -84,6 +84,8 @@ def test_english_review_ui_has_no_chinese():
         sub = _sub(status)
         text = control_text(sub, user, TZ, "https://t.me/c/1/5", "en")
         assert not CJK.search(text), (status, text)
+        many = control_text(_sub(status, edit_count=3), user, TZ, None, "en", edit_url="https://t.me/c/1/9")
+        assert not CJK.search(many) and "Edited 3 times" in many and "View latest" in many, (status, many)
         assert not any(CJK.search(x) for x in _texts(control_kb(sub, "en", banned=True))), status
     assert not any(CJK.search(x) for x in _texts(schedule_kb(7, ("09:00", "21:00"), TZ, "en")))
     assert not any(CJK.search(x) for x in _texts(media_kb(_sub(), "en")))

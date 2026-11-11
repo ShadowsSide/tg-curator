@@ -1,7 +1,7 @@
 """按钮回应的时限：Telegram 只给按钮几秒钟回应，超时后 answerCallbackQuery 报 “query is too old”。
 模拟服务器同样执行时限（测试里调成 2 秒），并且同一个按钮只能回应一次；兜底（CALLBACK_FALLBACK_SECONDS）调成 1 秒。
 - 很快处理完的按钮：照常显示自己的提示，没有“处理中…”
-- 确认封禁时被限流（刷新控制按钮消息要等 3 秒）：兜底先回应“处理中…”，之后的普通提示丢掉，不出“出错了”
+- 确认封禁时被限流（刷新控制按钮消息要等 3 秒）：检查通过后先回应“封禁中…”，不出“出错了”
   （控制按钮消息上的封禁和 /user 卡片上的封禁两处）
 - 处理得慢、最后要弹窗的（解封一个没被封禁的人）：兜底回应之后，弹窗改成回复控制按钮消息
 - 兜底的回应自己被限流：不等、不重试，只记日志；处理照常完成
@@ -22,6 +22,7 @@ FALLBACK = 1  # 秒
 FLOOD = 3  # 秒：比时限长，等完再回应就来不及了
 ERROR = "出错了"
 WORKING = "处理中"
+BANNING = "封禁中"  # 封禁是已知的慢操作：检查通过后自己先回应，不靠兜底
 
 
 def answers(since):
@@ -67,10 +68,10 @@ async def scenario():
     await control_edited(ctrl, n)
     await asyncio.sleep(0.5)
     ok = [e for e in answers(n) if not e.get("error")]
-    check("ban on the control panel while rate limited → answered in time with “working on it”, once",
-          len(answers(n)) == 1 and ok and WORKING in ok[0]["params"].get("text", ""),
+    check("ban on the control panel while rate limited → answered in time with “banning…” (before the slow part), once",
+          len(answers(n)) == 1 and ok and BANNING in ok[0]["params"].get("text", ""),
           [(e["params"].get("text"), e.get("error")) for e in answers(n)])
-    check("… the later “banned” toast is dropped, no “something went wrong”",
+    check("… no “something went wrong”, no extra result message",
           not told_error(n) and not [e for e in log[n:] if is_send(e, "sendMessage", REVIEW, "已封禁")],
           [e["params"].get("text") for e in told_error(n)])
 
@@ -93,8 +94,8 @@ async def scenario():
     await control_edited(cid, n)  # 刷新卡片在最后
     await asyncio.sleep(0.5)
     ok = [e for e in answers(n) if not e.get("error")]
-    check("ban on the /user card while rate limited → answered in time with “working on it”, once",
-          len(answers(n)) == 1 and ok and WORKING in ok[0]["params"].get("text", ""),
+    check("ban on the /user card while rate limited → answered in time with “banning…”, once",
+          len(answers(n)) == 1 and ok and BANNING in ok[0]["params"].get("text", ""),
           [(e["params"].get("text"), e.get("error")) for e in answers(n)])
     check("… no “something went wrong”", not told_error(n), [e["params"].get("text") for e in told_error(n)])
 

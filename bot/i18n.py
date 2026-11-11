@@ -493,6 +493,7 @@ T: dict[str, dict[str, str]] = {
                                   "Tap again to confirm, or go back"},
     "toast_publishing": {"zh": "发布中…", "en": "Publishing…"},
     "toast_purging": {"zh": "删除中…", "en": "Deleting…"},
+    "toast_banning": {"zh": "封禁中…", "en": "Banning…"},
     "toast_working": {"zh": "处理中…", "en": "Working on it…"},
     "toast_retrying": {"zh": "重试中…", "en": "Retrying…"},
     "toast_scheduled": {"zh": "已定时：{when}", "en": "Scheduled: {when}"},
@@ -518,10 +519,6 @@ T: dict[str, dict[str, str]] = {
     },
     "purge_nothing": {"zh": "TA 在审核群里没有可删除的稿件", "en": "They have nothing left to delete in the review group"},
     "toast_already_banned": {"zh": "这个投稿人已经被封禁了", "en": "This submitter is already banned"},
-    "toast_banned": {
-        "zh": "已封禁，并拒绝 {n} 条未处理来稿",
-        "en": "Banned; {n} open submission(s) rejected",
-    },
     "error_generic": {
         "zh": "出错了，这次操作没有完成，请稍后再试",
         "en": "Something went wrong and this action wasn't completed. Please try again shortly",

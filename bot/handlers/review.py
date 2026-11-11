@@ -218,10 +218,17 @@ def build_router(settings: Settings) -> Router:
             if not sub:
                 await answer(t(lang, "sub_not_found", sid=sid), show_alert=True)
                 return
+            user = await core.get_user(sub.user_id)
+            if user and user.banned:  # 确认期间被别人封禁了（/ban、卡片）：只收起确认面板
+                await answer(t(lang, "toast_already_banned"), show_alert=True)
+                await core.refresh_control(sid)
+                return
+            # 检查都通过了才回应：要拒绝 TA 全部未处理的稿件、逐条刷新控制按钮消息，可能很慢（被限流时更久），
+            # 等做完再回应会超时。结果不另发消息：控制按钮消息会显示已封禁
+            await answer(t(lang, "toast_banning"))
             rejected = await core.ban_user(sub.user_id, who)
             if sid not in rejected:  # 确认期间被别人处理了（发布、拒绝）：收起确认面板，显示“解除封禁”
                 await core.refresh_control(sid)
-            await answer(t(lang, "toast_banned", n=len(rejected)))
         elif action == "unban":
             sub = await core.get_submission(sid)
             ok = bool(sub) and await core.unban_user(sub.user_id)
@@ -257,9 +264,9 @@ def build_router(settings: Settings) -> Router:
             await cq.message.edit_reply_markup(reply_markup=user_confirm_kb(uid, a, lang))
             await answer(t(lang, _confirm_toast(a)))
             return
-        elif a == "ban_ok":
-            rejected = await core.ban_user(uid, cq.from_user)
-            toast, alert = t(lang, "toast_banned", n=len(rejected)), False
+        elif a == "ban_ok":  # 上面已经查过是否已被封禁；先回应再封禁（同控制按钮消息上的封禁），卡片会显示结果
+            await answer(t(lang, "toast_banning"))
+            await core.ban_user(uid, cq.from_user)
         elif a == "unban_ok":
             await core.unban_user(uid)
             toast, alert = t(lang, "toast_unbanned"), False

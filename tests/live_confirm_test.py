@@ -92,7 +92,19 @@ async def scenario():
           kb and any(v == "r:ban_ok:3:0" for v in buttons(kb).values()) and not banned, kb and buttons(kb))
     n = len(log); lt.cb("r:ban_ok:3:0", REVIEW, ADMIN)
     banned = await wait_for(lambda e: is_send(e, "sendMessage", USER, "禁止投稿"), since=n)
-    check("Confirm ban → submitter banned", banned)
+    first = next((e for e in log[n:] if e["method"] == "answerCallbackQuery"), None)
+    told_at = next((i for i, e in enumerate(log[n:]) if is_send(e, "sendMessage", USER, "禁止投稿")), None)
+    answered_at = log[n:].index(first) if first else None
+    check("Confirm ban → answered “banning…” before doing it, submitter banned",
+          banned and first and "封禁中" in first["params"].get("text", "") and answered_at < told_at,
+          first and first["params"])
+    # 已经被封禁了（别人刚封过）再点确认：弹窗说明，不重复封禁、不再通知投稿人
+    n = len(log); lt.cb("r:ban_ok:3:0", REVIEW, ADMIN)
+    t = await wait_for(lambda e: e["method"] == "answerCallbackQuery", since=n)
+    await asyncio.sleep(0.5)
+    check("Confirm ban again → alert “already banned”, submitter not told again",
+          t and t["params"].get("show_alert") in (True, "true") and "已经被封禁" in t["params"].get("text", "")
+          and not [e for e in log[n:] if is_send(e, "sendMessage", USER, "禁止投稿")], t and t["params"])
 
     # 6. 已经处理过的稿件再点“确认”：不会重复执行
     n = len(log); lt.cb("r:pub_ok:1:0", REVIEW, ADMIN)

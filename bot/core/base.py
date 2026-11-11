@@ -117,7 +117,8 @@ class CoreBase:
 
     def start_background(self) -> None:
         self._scheduler_task = asyncio.create_task(self._scheduler_loop(), name="scheduler")
-        self._tasks = [self._scheduler_task, asyncio.create_task(self._reminder_loop(), name="reminder")]
+        self._tasks = [self._scheduler_task, asyncio.create_task(self._reminder_loop(), name="reminder"),
+                       asyncio.create_task(self._backup_loop(), name="backup")]
 
     async def shutdown(self, handlers: set[asyncio.Task]) -> None:
         """停止（docker stop 发 SIGTERM）：已经开始的处理做完再退出，否则发到频道的稿件可能没记下状态，审核员会重复发布。

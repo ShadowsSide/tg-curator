@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+import os
+import sqlite3
 from dataclasses import dataclass
 from typing import Any, Iterable
 
@@ -280,6 +282,24 @@ class DB:
     async def close(self) -> None:
         if self.conn:
             await self.conn.close()
+
+    async def backup(self, path: str) -> None:
+        """用 SQLite 的 backup 接口复制一份到 path（运行中、WAL 模式下也是一致的副本）。
+        先写到临时文件，写完再改名：中途出错或停止，不会留下半个备份顶掉原来那份。"""
+        tmp = path + ".tmp"
+        if os.path.exists(tmp):  # 上次中途停止留下的
+            os.remove(tmp)
+        dst = sqlite3.connect(tmp, check_same_thread=False)  # backup 在 aiosqlite 的线程里执行
+        try:
+            await self.conn.backup(dst)
+        except BaseException:
+            dst.close()
+            os.remove(tmp)
+            raise
+        # 副本照搬了 WAL 模式：改回普通模式，备份就是单独一个文件，复制出去打开也不会多出 -wal / -shm
+        dst.execute("PRAGMA journal_mode=DELETE")
+        dst.close()
+        os.replace(tmp, path)
 
     async def _one(self, sql: str, params: Iterable[Any] = ()) -> aiosqlite.Row | None:
         async with self.conn.execute(sql, tuple(params)) as cur:

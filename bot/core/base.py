@@ -248,12 +248,21 @@ class CoreBase:
             return f"{self.channel_post_base}{sub.channel_msg_id}"
         return None
 
-    def review_link(self, sub: Submission) -> str | None:
-        """审核群里这条投稿控制按钮消息的链接（群成员可点开跳转），代替投稿编号来指认投稿。"""
-        if not sub.review_msg_id:
+    def review_msg_link(self, message_id: int | None) -> str | None:
+        """审核群里某条消息的链接（群成员可点开跳转）。"""
+        if not message_id:
             return None
         chat = str(self.s.review_chat_id).removeprefix("-100")
-        return f"https://t.me/c/{chat}/{sub.review_msg_id}"
+        return f"https://t.me/c/{chat}/{message_id}"
+
+    def review_link(self, sub: Submission) -> str | None:
+        """这条投稿控制按钮消息的链接，代替投稿编号来指认投稿。"""
+        return self.review_msg_link(sub.review_msg_id)
+
+    def edit_link(self, sub: Submission) -> str | None:
+        """最新一份修改后预览的链接。草稿时改的没有预览（进审核群时发的就是最新内容）；
+        预览被删除稿件清掉后 edit_preview 为空，不给链接。"""
+        return self.review_msg_link(sub.edit_preview[0]) if sub.edit_preview else None
 
     async def _signature(self, sub: Submission, *, link: bool):
         """link：审核群预览里名字带投稿人链接；发到频道的不带。"""
@@ -306,7 +315,7 @@ class CoreBase:
         user = await self.db.get_user(sub.user_id)
         try:
             await self.bot.edit_message_text(
-                text=control_text(sub, user, self.s.tz, self.post_url(sub), self.lang),
+                text=control_text(sub, user, self.s.tz, self.post_url(sub), self.lang, self.edit_link(sub)),
                 chat_id=self.s.review_chat_id,
                 message_id=sub.review_msg_id,
                 reply_markup=control_kb(sub, self.lang, banned=bool(user and user.banned)),

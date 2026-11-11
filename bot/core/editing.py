@@ -139,6 +139,8 @@ class EditingMixin(CoreBase):
         ok = await self.db.update_if(
             sub.id, allowed, version=sub.version, items=items, original_items=sub.original_items or sub.items,
             edited_by=editor, edited_at=now_ts(),
+            # 只数进审核群之后的修改（草稿时改的审核员没见过旧版）；有版本锁，不会两次都加在同一个旧值上
+            edit_count=sub.edit_count + (sub.status != "draft"),
             spam_flags=hits or None,
             **follow, **({"reviewer_edited": 1} if locking else {}),
         )

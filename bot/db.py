@@ -66,7 +66,8 @@ CREATE TABLE IF NOT EXISTS submissions (
     reviewer_edited INTEGER NOT NULL DEFAULT 0,  -- 审核员改过稿：之后投稿人不能再改，只能 /msg
     user_preview   TEXT,               -- 投稿人私聊里最新一份完整预览的消息（JSON 列表），发新的时删掉旧的
     edit_ack       TEXT,               -- 审核群里最近一次改稿的修改消息和“已修改”确认（JSON 列表），下次改稿时删掉
-    user_ack       TEXT                -- 投稿人私聊里最近一次改稿 / 查看的命令和回复（JSON 列表），下次时删掉
+    user_ack       TEXT,               -- 投稿人私聊里最近一次改稿 / 查看的命令和回复（JSON 列表），下次时删掉
+    edit_count     INTEGER NOT NULL DEFAULT 0  -- 进审核群后改稿保存成功的次数（控制按钮消息显示“已修改 N 次”）
 );
 
 CREATE INDEX IF NOT EXISTS idx_sub_status ON submissions(status, scheduled_at);
@@ -138,6 +139,7 @@ MIGRATIONS = [
     ("submissions", "user_preview", "ALTER TABLE submissions ADD COLUMN user_preview TEXT"),
     ("submissions", "edit_ack", "ALTER TABLE submissions ADD COLUMN edit_ack TEXT"),
     ("submissions", "user_ack", "ALTER TABLE submissions ADD COLUMN user_ack TEXT"),
+    ("submissions", "edit_count", "ALTER TABLE submissions ADD COLUMN edit_count INTEGER NOT NULL DEFAULT 0"),
 ]
 
 # 已移除功能留下的列：旧库里有就删掉 (表, 列)
@@ -206,6 +208,7 @@ class Submission:
     user_preview: list[int] | None = None  # 投稿人私聊里最新一份完整预览（改稿后、只发 /edit 时发出）
     edit_ack: list[int] | None = None  # 审核群里最近一次改稿留下的修改消息和“已修改”确认，下次改稿时删掉
     user_ack: list[int] | None = None  # 投稿人私聊里最近一次改稿 / 查看的命令和回复，下次改稿或查看时删掉
+    edit_count: int = 0  # 进审核群后改稿保存成功的次数（草稿时的不算）；升级前改过的稿件是 0（只显示“已修改”）
 
     @property
     def spoilerable(self) -> bool:

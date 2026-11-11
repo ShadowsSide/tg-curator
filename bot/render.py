@@ -218,8 +218,9 @@ async def _send(bot: Bot, chat_id: int | str, items: list[dict[str, Any]], sig: 
     return await bot.send_media_group(chat_id, media, **common)
 
 
-def control_text(sub: Submission, user: User | None, tz: ZoneInfo, post_url: str | None, lang: str) -> str:
-    """审核群里每条投稿下方的“控制按钮消息”。"""
+def control_text(sub: Submission, user: User | None, tz: ZoneInfo, post_url: str | None, lang: str,
+                 edit_url: str | None = None) -> str:
+    """审核群里每条投稿下方的“控制按钮消息”。edit_url：最新一份修改后预览的链接。"""
     lines = [
         t(lang, "ctrl_title", sid=sub.id),
         t(lang, "ctrl_from", link=user_link(user, sub.user_id), uid=sub.user_id)
@@ -228,7 +229,10 @@ def control_text(sub: Submission, user: User | None, tz: ZoneInfo, post_url: str
         t(lang, "ctrl_content", desc=describe(sub.items, lang)),
     ]
     if sub.edited_at:
-        lines.append(t(lang, "ctrl_edited", by=html.escape(sub.edited_by or ""), when=fmt_ts(sub.edited_at, tz, lang)))
+        key = "ctrl_edited_n" if sub.edit_count > 1 else "ctrl_edited"
+        link = f'  <a href="{edit_url}">{t(lang, "ctrl_edited_view")}</a>' if edit_url else ""
+        lines.append(t(lang, key, n=sub.edit_count, by=html.escape(sub.edited_by or ""),
+                       when=fmt_ts(sub.edited_at, tz, lang)) + link)
     if sub.spoilerable:
         lines.append(t(lang, "ctrl_spoiler", state=("🙈 " if sub.spoiler else "") + on_off(lang, sub.spoiler)))
     lines.append(t(lang, "ctrl_silent", state=("🔕 " if sub.silent else "") + on_off(lang, sub.silent)))

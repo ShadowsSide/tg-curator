@@ -37,6 +37,7 @@ jobs:
       - name: Lint
         run: python -m pyflakes bot tests
 
-      # 单元测试按顺序跑，端到端测试 4 个并行（公开仓库的 ubuntu-latest 是 4 核）；本地用同一个脚本，见 tests/run_all.py
+      # 单元测试按顺序跑，端到端测试 6 个并行：ubuntu-latest 是 4 核，但端到端测试大多在等待、不怎么占 CPU；
+      # 本地用同一个脚本，见 tests/run_all.py
       - name: Run tests
-        run: python tests/run_all.py -j 4
+        run: python tests/run_all.py -j 6

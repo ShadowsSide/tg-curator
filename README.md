@@ -273,10 +273,10 @@ set -a; source .env; set +a
 DB_PATH=./data/bot.db .venv/bin/python -m bot
 ```
 
-测试不需要 token，也不需要联网。`tests/test_*.py` 是单元测试；`tests/live_*.py` 是端到端测试，会启动模拟的 Bot API 服务器并运行真实的机器人进程。每个文件都能单独运行，开头写了它测什么。运行全部测试（约 10 分钟）和静态检查：
+测试不需要 token，也不需要联网。`tests/test_*.py` 是单元测试；`tests/live_*.py` 是端到端测试，会启动模拟的 Bot API 服务器并运行真实的机器人进程。每个文件都能单独运行，开头写了它测什么。运行全部测试和静态检查（端到端测试并行运行，并行数默认是 CPU 核数，可以用 `-j` 指定；8 路约 2.5 分钟）：
 
 ```bash
-for f in tests/test_*.py tests/live_*.py; do .venv/bin/python "$f" || echo "FAILED: $f"; done
+.venv/bin/python tests/run_all.py
 .venv/bin/python -m pyflakes bot tests
 ```
 

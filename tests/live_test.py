@@ -22,6 +22,8 @@ LINKED = -8000  # 发布频道的关联群组（评论区）
 BASIC_GROUP = -4001234  # 普通群（不是超级群），getChat 返回 type=group
 CTRL = "新投稿"  # 控制按钮消息标题（不再显示投稿编号；测试按顺序取紧接着的那一条）
 T0 = time.time()
+TMP = tempfile.mkdtemp()  # 本次测试自己的临时目录：并行跑时各用各的数据库、心跳文件、配置错误文件
+ISOLATED = {"HEARTBEAT_FILE": os.path.join(TMP, "heartbeat"), "CONFIG_ERROR_FILE": os.path.join(TMP, "config-error")}
 
 updates: list[dict] = []
 new_update = asyncio.Event()
@@ -685,7 +687,7 @@ async def main(scenario_fn=None, extra_env=None, allowed_errors=()):
     port = site._server.sockets[0].getsockname()[1]
 
     env = {**os.environ, "BOT_TOKEN": f"{BOT_ID}:TEST", "CHANNEL_ID": str(CHANNEL), "REVIEW_CHAT_ID": str(REVIEW),
-           "TELEGRAM_API_URL": f"http://127.0.0.1:{port}", "DB_PATH": os.path.join(tempfile.mkdtemp(), "bot.db"),
+           "TELEGRAM_API_URL": f"http://127.0.0.1:{port}", "DB_PATH": os.path.join(TMP, "bot.db"), **ISOLATED,
            "ALBUM_DELAY": "0.5", "REMINDER_INTERVAL_MINUTES": "1", "REMINDER_ONLY_WHEN_PENDING": "false",
            "REMINDER_QUIET_HOURS": "", "TZ": "Asia/Shanghai", "PYTHONUNBUFFERED": "1", **(extra_env or {})}
     proc = await asyncio.create_subprocess_exec(sys.executable, "-m", "bot", cwd=PROJECT, env=env,

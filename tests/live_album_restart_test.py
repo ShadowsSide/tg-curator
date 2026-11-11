@@ -46,7 +46,7 @@ def album(ids, group="g-restart"):
 async def start(port):
     env = {**os.environ, "BOT_TOKEN": f"{lt.BOT_ID}:TEST", "CHANNEL_ID": str(lt.CHANNEL), "REVIEW_CHAT_ID": str(lt.REVIEW),
            "TELEGRAM_API_URL": f"http://127.0.0.1:{port}", "DB_PATH": DB, "ALBUM_DELAY": str(DELAY),
-           "PYTHONUNBUFFERED": "1"}
+           "PYTHONUNBUFFERED": "1", **lt.ISOLATED}
     n = len(log)
     proc = await asyncio.create_subprocess_exec(sys.executable, "-m", "bot", cwd=PROJECT, env=env,
                                                 stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.STDOUT)

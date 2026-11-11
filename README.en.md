@@ -271,10 +271,10 @@ set -a; source .env; set +a
 DB_PATH=./data/bot.db .venv/bin/python -m bot
 ```
 
-Tests need no token and no network. `tests/test_*.py` are unit tests; `tests/live_*.py` are end-to-end tests that start a mock Bot API server and run the real bot process. Each file is a standalone script with a description at the top. Run all tests (about 10 minutes) and the static check:
+Tests need no token and no network. `tests/test_*.py` are unit tests; `tests/live_*.py` are end-to-end tests that start a mock Bot API server and run the real bot process. Each file is a standalone script with a description at the top. Run all tests and the static check (end-to-end tests run in parallel, as many at a time as there are CPU cores, or set it with `-j`; about 2.5 minutes with 8):
 
 ```bash
-for f in tests/test_*.py tests/live_*.py; do .venv/bin/python "$f" || echo "FAILED: $f"; done
+.venv/bin/python tests/run_all.py
 .venv/bin/python -m pyflakes bot tests
 ```
 

@@ -37,16 +37,6 @@ jobs:
       - name: Lint
         run: python -m pyflakes bot tests
 
-      # 每个测试文件单独运行（各自是独立脚本），全部跑完后再汇总失败的文件
+      # 单元测试按顺序跑，端到端测试 4 个并行（公开仓库的 ubuntu-latest 是 4 核）；本地用同一个脚本，见 tests/run_all.py
       - name: Run tests
-        run: |
-          failed=""
-          for f in tests/test_*.py tests/live_*.py; do
-            echo "::group::$f"
-            python "$f" || failed="$failed $f"
-            echo "::endgroup::"
-          done
-          if [ -n "$failed" ]; then
-            echo "::error::Failed:$failed"
-            exit 1
-          fi
+        run: python tests/run_all.py -j 4

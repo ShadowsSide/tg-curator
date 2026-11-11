@@ -525,6 +525,7 @@ T: dict[str, dict[str, str]] = {
         "zh": "出错了，这次操作没有完成，请稍后再试",
         "en": "Something went wrong and this action wasn't completed. Please try again shortly",
     },
+    "sched_published": {"zh": "⏰ 定时发布成功{link}", "en": "⏰ The scheduled post went out{link}"},
     "sched_publish_failed": {"zh": "⏰ 定时发布没有成功：{reason}", "en": "⏰ The scheduled post didn't go out: {reason}"},
     "publish_failed": {"zh": "发布失败：{error}", "en": "Failed to publish: {error}"},
     "publish_postponed": {

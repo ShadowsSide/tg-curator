@@ -14,7 +14,7 @@ from ..health import beat
 from ..i18n import t
 from ..timeutil import now_ts, start_of_today
 
-from .base import CoreBase, SCHEDULER_TICK, DRAFT_TTL, _reply_to
+from .base import CoreBase, SCHEDULER_TICK, DRAFT_TTL, NO_PREVIEW, _reply_to
 
 log = logging.getLogger(__name__)
 
@@ -35,6 +35,8 @@ class SchedulerMixin(CoreBase):
                         log.warning("定时发布 #%s：%s", sub.id, err.key)
                         if err.key != "status_changed":  # 已经被别人处理了（撤销定时、拒绝等），不用提醒
                             await self._report_scheduled(sub, err)
+                    else:
+                        await self._report_scheduled_ok(sub.id)
                 for sub in await self.db.expire_drafts(now_ts() - DRAFT_TTL):
                     if sub.user_msg_id:
                         try:
@@ -60,6 +62,23 @@ class SchedulerMixin(CoreBase):
             )
         except TelegramAPIError as e:
             log.warning("提醒定时发布 #%s 失败：%s", sub.id, e)
+
+    async def _report_scheduled_ok(self, sid: int) -> None:
+        """定时发布成功：同样没人点按钮，回复在控制按钮消息下面说一声，带上帖子链接。静音发送，定时稿件多时不会每条都响。
+        控制按钮消息已经没了（稿件被删除）就不发：单独一条没有上下文。"""
+        sub = await self.db.get(sid)
+        if not sub or not sub.review_msg_id:
+            return
+        url = self.post_url(sub)
+        link = f'  <a href="{url}">{t(self.lang, "view_post")}</a>' if url else ""
+        try:
+            await self.bot.send_message(
+                self.s.review_chat_id, t(self.lang, "sched_published", link=link),
+                reply_parameters=_reply_to(sub.review_msg_id), disable_notification=True,
+                link_preview_options=NO_PREVIEW,
+            )
+        except TelegramAPIError as e:
+            log.warning("告知定时发布 #%s 成功失败：%s", sid, e)
 
     async def _reminder_loop(self) -> None:
         interval = self.s.reminder_interval_min * 60

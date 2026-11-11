@@ -2,6 +2,7 @@
 
 - 处理函数（bot/handlers）只通过 Core 的方法访问业务和数据，不直接访问数据库（core.db）
 - Core 由 bot/core/ 下的几个模块组合而成，同一个方法不能在两个模块里各定义一份（后定义的会悄悄覆盖前一个）
+- 按钮只通过回应对象回应（bot/callbacks.py），不直接调用 cq.answer()：否则兜底不知道已经回应过，会再回应一次
 """
 import os
 import pathlib
@@ -15,6 +16,13 @@ sys.path.insert(0, str(ROOT))
 def test_handlers_do_not_touch_the_database():
     offenders = [f"{f.name}:{i}" for f in sorted((ROOT / "bot" / "handlers").glob("*.py"))
                  for i, line in enumerate(f.read_text().splitlines(), 1) if re.search(r"\bcore\.db\b", line)]
+    assert not offenders, offenders
+
+
+def test_buttons_answered_only_through_the_answer_object():
+    direct = re.compile(r"\b(cq|callback|callback_query|query|event)\.answer\(|AnswerCallbackQuery\(|answer_callback_query\(")
+    offenders = [f"{f.relative_to(ROOT)}:{i}" for f in sorted((ROOT / "bot").rglob("*.py")) if f.name != "callbacks.py"
+                 for i, line in enumerate(f.read_text().splitlines(), 1) if direct.search(line)]
     assert not offenders, offenders
 
 

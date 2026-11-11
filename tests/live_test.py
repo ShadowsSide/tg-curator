@@ -44,7 +44,11 @@ MOCK = {# 限流注入："方法名:chat_id" → 依次返回的 retry_after 秒
         # 失败注入："方法名:chat_id" → 依次返回的错误描述列表（HTTP 400），每次调用消耗一个
         "fail": {},  # 也可以是 (HTTP 状态码, 错误描述)
         # 审核群管理员（getChatMember 返回 creator），其他人返回普通成员
-        "admins": {7}}
+        "admins": {7},
+        # 按钮回应的时限（秒）：和 Telegram 一样，超时或回应第二次都返回 “query is too old”。测试可以调小
+        "callback_deadline": 15}
+callbacks: dict[str, float] = {}  # 按钮回调编号 → 推送时间；回应过的删掉（再回应一次也报错）
+QUERY_TOO_OLD = "Bad Request: query is too old and response timeout expired or query ID is invalid"
 BOT_ID = 1
 BOT_ADMIN = {"status": "administrator", "user": {"id": BOT_ID, "is_bot": True, "first_name": "TestBot"},
              "can_be_edited": False, "is_anonymous": False, "can_post_messages": True,
@@ -129,6 +133,12 @@ async def handle(request: web.Request):
                                       "markup are exactly the same as a current content and reply markup of the message"},
                                      status=400)
         markups[key] = params.get("reply_markup")
+
+    if m == "answercallbackquery":
+        pushed = callbacks.pop(str(params.get("callback_query_id")), None)
+        if pushed is None or time.time() - pushed > MOCK["callback_deadline"]:
+            log.append({"method": method, "params": params, "result": None, "error": True, "t": time.time()})
+            return web.json_response({"ok": False, "error_code": 400, "description": QUERY_TOO_OLD}, status=400)
 
     if m == "getme":
         result = {"id": BOT_ID, "is_bot": True, "first_name": "TestBot", "username": "test_bot"}
@@ -216,6 +226,7 @@ async def edit_cmd(text, ctrl):
 
 
 def cb(data, chat_id, from_id, message_id=999):
+    callbacks[str(uid[0])] = time.time()
     push(callback_query={"id": str(uid[0]), "chat_instance": "x", "data": data,
                          "from": {"id": from_id, "is_bot": False, "first_name": "Admin" if from_id == ADMIN else "Alice"},
                          "message": {"message_id": message_id, "date": now(), "chat": chat(chat_id)}})

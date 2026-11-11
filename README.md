@@ -163,6 +163,7 @@ docker compose pull && docker compose up -d && docker image prune -f   # 更新�
 | `MSG_WINDOW_DAYS` | `3` | `/msg` 沟通：审核结束（发布或拒绝）后还能继续沟通的天数；审核中始终可以 |
 | `LEAVE_UNKNOWN_CHATS` | `true` | 被拉进其他群组或频道时自动退出；设为 `false` 则留在群里但不响应。发布频道及其关联群组（启动时自动识别）始终保留 |
 | `ALBUM_DELAY` | `1.5` | 收集相册时等待的秒数 |
+| `CALLBACK_FALLBACK_SECONDS` | `3` | 点按钮后多少秒还没处理完，就先显示“处理中…”（Telegram 只给按钮几秒钟回应），结果稍后显示 |
 | `TELEGRAM_API_URL` | — | 自建 Bot API 服务器地址，可以突破官方 API 的 20MB/50MB 文件限制 |
 
 ## 使用

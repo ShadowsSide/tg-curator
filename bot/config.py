@@ -27,6 +27,13 @@ def _num(name: str, default: str = "", *, kind: type = int, required: bool = Fal
         raise ConfigError("cfg_number", name=name, value=value) from None
 
 
+def _seconds(name: str, default: str) -> float:
+    value = _num(name, default, kind=float)
+    if value < 0:
+        raise ConfigError("cfg_negative", name=name, value=value)
+    return value
+
+
 def _count(name: str, default: str) -> int:
     """次数、天数、分钟数这类不能是负数的整数；0 的含义各自定（不限 / 关闭）。"""
     value = _num(name, default)
@@ -92,6 +99,7 @@ class Settings:
     tz: ZoneInfo
     db_path: str
     album_delay: float
+    callback_fallback: float  # 按钮多少秒还没回应就先回应“处理中…”，见 bot/callbacks.py
     max_pending_per_user: int
     schedule_presets: tuple[str, ...]
     reminder_interval_min: int
@@ -142,6 +150,7 @@ def load_settings() -> Settings:
         tz=_tz(_env("TZ", "Asia/Shanghai")),
         db_path=_env("DB_PATH", "/app/data/bot.db"),
         album_delay=_num("ALBUM_DELAY", "1.5", kind=float),
+        callback_fallback=_seconds("CALLBACK_FALLBACK_SECONDS", "3"),
         max_pending_per_user=_count("MAX_PENDING_PER_USER", "5"),
         schedule_presets=_presets(_env("SCHEDULE_PRESETS", "09:00,12:00,18:00,21:00")),
         reminder_interval_min=_count("REMINDER_INTERVAL_MINUTES", "60"),

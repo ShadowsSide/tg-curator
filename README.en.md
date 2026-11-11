@@ -161,6 +161,7 @@ Spam checks, messaging window, stats scope and so on; the defaults are usually f
 | `MSG_WINDOW_DAYS` | `3` | `/msg`: days after a submission is published or rejected during which messaging stays open; always open during review |
 | `LEAVE_UNKNOWN_CHATS` | `true` | Leave any other group or channel the bot is added to; `false` stays but never responds. The publishing channel and its linked discussion group (detected at startup) are always kept |
 | `ALBUM_DELAY` | `1.5` | Seconds to wait while collecting the parts of an album |
+| `CALLBACK_FALLBACK_SECONDS` | `3` | If a button takes longer than this many seconds, it shows “Working on it…” first (Telegram only gives a button a few seconds to respond) and the result follows |
 | `TELEGRAM_API_URL` | — | Self-hosted Bot API server, which lifts the official 20 MB / 50 MB file limits |
 
 ## Usage

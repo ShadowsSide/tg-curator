@@ -107,12 +107,12 @@ async def scenario():
 
     # 9. 确认封禁：卡片显示已封禁和 🔓；通知投稿人；未处理的来稿被拒，控制按钮消息出现 🔓
     n = len(log); lt.cb(f"au:ban_ok:{USER}", REVIEW, ADMIN, message_id=card_id)
-    t = await toast(n, "已封禁")
+    t = await toast(n, "封禁中")  # 先回应再封禁，结果看卡片
     told = await wait_for(lambda e: is_send(e, "sendMessage", USER, "禁止投稿"), since=n)
     after = await ctrl_edit(card_id, n)
     ctrl3 = await ctrl_edit(c3["result"]["message_id"], n)
     check("card confirm Ban → banned, submitter told, card shows banned + 🔓, open submission rejected with 🔓",
-          t and "1" in t["params"]["text"] and told and after and "已封禁" in after["params"].get("text", "")
+          t and told and after and "已封禁" in after["params"].get("text", "")
           and buttons(after) == {"🔓 解除封禁": f"au:unban:{USER}", "🗑 删除 TA 在审核群的稿件（3 条）": f"au:purge:{USER}"}
           and ctrl3 and buttons(ctrl3) == {"🔓 解除封禁": "r:unban:3:0", "🗑 删除 TA 的稿件": "r:purge:3:0"}, after and buttons(after))
 

@@ -122,8 +122,9 @@ async def scenario():
 
     # 6. 卡片上删除：先确认；有一条消息暂时删不掉（整批失败，逐条删时也失败）→ 提示可重试，按钮还在，能删的先删掉
     #    （超过 48 小时、Telegram 不允许删的消息不重试，见 test_purge.py）
-    n = len(log); lt.cb(f"au:purge:{BOB}", REVIEW, ADMIN, message_id=cid)
+    n = len(log); click = lt.cb(f"au:purge:{BOB}", REVIEW, ADMIN, message_id=cid)
     panel = await edited(cid, n)
+    await wait_for(lt.answered(click), since=n)  # 回应在换面板之后：等它到了再点确认，免得算成确认那次的回应
     check("card 🗑 → confirm panel", panel and buttons(panel) == {CONFIRM: f"au:purge_ok:{BOB}", "« 返回": f"au:back:{BOB}"},
           panel and buttons(panel))
     lt.MOCK["fail"][f"deleteMessages:{REVIEW}"] = ["Bad Request: message can't be deleted"]

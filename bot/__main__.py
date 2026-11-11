@@ -14,6 +14,7 @@ from aiogram.enums import ParseMode
 from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.types import BotCommand, BotCommandScopeAllPrivateChats, BotCommandScopeChat
 
+from .callbacks import CallbackAnswerMiddleware, callback_lang
 from .config import Settings, load_settings
 from .core import Core
 from .db import DB
@@ -69,6 +70,8 @@ async def run() -> None:
         # 只处理私聊和审核群；必须在所有处理函数之前，放在 update 外层中间件
         keep = {c for c in (core.channel_chat_id, core.channel_linked_chat_id) if c}  # 发布频道 + 关联群组
         dp.update.outer_middleware(ChatGuard(settings.review_chat_id, keep, settings.leave_unknown_chats))
+        # 按钮的回应对象和超时兜底（见 bot/callbacks.py）；在错误处理中间件里面，错误处理也用得到
+        dp.update.outer_middleware(CallbackAnswerMiddleware(settings.callback_fallback, callback_lang(core)))
         dp.include_routers(review.build_router(settings), user.build_router(), errors.build_router())
 
         core.start_background()

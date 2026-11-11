@@ -12,7 +12,7 @@ import logging
 from aiogram import Bot
 from aiogram.client.session.middlewares.base import BaseRequestMiddleware, NextRequestMiddlewareType
 from aiogram.exceptions import TelegramRetryAfter
-from aiogram.methods import Response, TelegramMethod
+from aiogram.methods import AnswerCallbackQuery, Response, TelegramMethod
 from aiogram.methods.base import TelegramType
 
 log = logging.getLogger(__name__)
@@ -32,6 +32,8 @@ class RetryAfterMiddleware(BaseRequestMiddleware):
         bot: Bot,
         method: TelegramMethod[TelegramType],
     ) -> Response[TelegramType]:
+        if isinstance(method, AnswerCallbackQuery):  # 按钮几秒内不回应就失效，等完再回应也来不及：直接报错，不等
+            return await make_request(bot, method)
         for attempt in range(self.max_retries + 1):
             try:
                 return await make_request(bot, method)

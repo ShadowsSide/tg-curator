@@ -11,6 +11,7 @@ from aiogram.enums import ChatType
 from aiogram.exceptions import TelegramAPIError
 from aiogram.types import ErrorEvent
 
+from ..callbacks import Answer
 from ..core import Core
 from ..i18n import t
 
@@ -21,7 +22,7 @@ def build_router() -> Router:
     router = Router(name="errors")
 
     @router.errors()
-    async def on_error(event: ErrorEvent, core: Core) -> None:
+    async def on_error(event: ErrorEvent, core: Core, answer: Answer | None = None) -> None:
         log.error("处理更新出错（update %s）", event.update.update_id, exc_info=event.exception)
         cq = event.update.callback_query
         m = event.update.message or event.update.edited_message
@@ -31,13 +32,14 @@ def build_router() -> Router:
             return
         # 私聊用投稿人的语言，审核群用 LANGUAGE（和其他提示一样）
         text = t(core.lang_of(user) if user and chat.type == ChatType.PRIVATE else core.lang, "error_generic")
-        try:
-            if cq:
-                await cq.answer(text, show_alert=True)
-            else:
-                await m.reply(text)
+        if answer:  # 按钮：用同一个回应对象，兜底已经回应过时改成消息；回应失败只记日志，不再另发
+            await answer(text, show_alert=True)
             return
-        except TelegramAPIError as e:  # 按钮已经回应过（比如先显示了“发布中…”）、原消息已删除等
+        try:
+            if m:
+                await m.reply(text)
+                return
+        except TelegramAPIError as e:  # 原消息已删除等
             log.info("回复出错提示失败：%s", e)
         try:
             await core.bot.send_message(chat.id, text)

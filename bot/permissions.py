@@ -114,7 +114,7 @@ class ReviewerOnly(BaseMiddleware):
 
         denied = t(self.lang, "no_permission")
         if isinstance(event, CallbackQuery):
-            await event.answer(denied, show_alert=True)
+            await data["answer"](denied, show_alert=True)  # 按钮的回应对象，见 bot/callbacks.py
         elif isinstance(event, Message) and (event.text or "").startswith("/"):
             await event.reply(denied)  # 普通聊天消息直接忽略，只对命令给出提示
         return None

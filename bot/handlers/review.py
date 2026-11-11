@@ -14,6 +14,7 @@ from aiogram.types import CallbackQuery, Message, TelegramObject
 
 from .. import entities as ent
 from ..album import ALBUM_MERGE_WINDOW
+from ..callbacks import Answer
 from ..config import Settings
 from ..core import NO_PREVIEW, Core, explicit_reply
 from ..db import Prompt
@@ -143,7 +144,7 @@ def build_router(settings: Settings) -> Router:
     # ---------- 控制按钮 ----------
 
     @router.callback_query(ReviewCB.filter())
-    async def on_button(cq: CallbackQuery, callback_data: ReviewCB, core: Core) -> None:
+    async def on_button(cq: CallbackQuery, callback_data: ReviewCB, core: Core, answer: Answer) -> None:
         sid = callback_data.sid
         who = cq.from_user
         lang = core.lang
@@ -152,96 +153,96 @@ def build_router(settings: Settings) -> Router:
         step, action, v = route(callback_data.a, callback_data.v, bool(settings.reject_templates))
         if step == "reasons":
             await core.show_reject_reasons(sid)
-            await cq.answer(t(lang, "toast_pick_reason"))
+            await answer(t(lang, "toast_pick_reason"))
             return
         if step == "confirm" and action in ("unban", "purge") and not await _banned_submitter(core, sid):
             # 早就解封了（比如用了 /unban），控制按钮消息上的按钮是旧的：不出确认面板，直接收起
             await core.refresh_control(sid)
-            await cq.answer(t(lang, "toast_not_banned"), show_alert=True)
+            await answer(t(lang, "toast_not_banned"), show_alert=True)
             return
         if step == "confirm":
             await core.show_confirm(sid, action, v)
-            await cq.answer(t(lang, _confirm_toast(action)))
+            await answer(t(lang, _confirm_toast(action)))
             return
 
         if action == "spoiler":
-            await cq.answer((await core.toggle_spoiler(sid)).text(lang))
+            await answer((await core.toggle_spoiler(sid)).text(lang))
         elif action == "silent":
-            await cq.answer((await core.toggle_silent(sid)).text(lang))
+            await answer((await core.toggle_silent(sid)).text(lang))
         elif action == "pub":
-            await cq.answer(t(lang, "toast_publishing"))
+            await answer(t(lang, "toast_publishing"))
             err = await core.publish(sid, reviewer=who, version=v)
             if err:
                 await cq.message.reply(err.text(lang))  # 回复在这条投稿的控制按钮消息下面
         elif action == "retry":
-            await cq.answer(t(lang, "toast_retrying"))
+            await answer(t(lang, "toast_retrying"))
             err = await core.publish(sid, reviewer=who, from_states=("failed",), version=v)
             if err:
                 await cq.message.reply(err.text(lang))
         elif action == "sched":
             await core.show_schedule_picker(sid)
-            await cq.answer()
+            await answer()
         elif action == "back":
             await core.refresh_control(sid)
-            await cq.answer()
+            await answer()
         elif action == "preset":
             err = await core.schedule(sid, v, who)
-            await cq.answer(err.text(lang) if err else t(lang, "toast_scheduled", when=core.fmt(v)),
+            await answer(err.text(lang) if err else t(lang, "toast_scheduled", when=core.fmt(v)),
                             show_alert=bool(err))
         elif action in PROMPT_KIND:  # 发一条提示，审核员回复它（见 on_prompt_reply）
             if action in FOLD:
                 await core.refresh_control(sid)
             await core.ask(sid, PROMPT_KIND[action], who, cq.message.message_id, v)
-            await cq.answer()
+            await answer()
         elif action == "media":
             err = await core.show_media_panel(sid)
-            await cq.answer(err.text(lang) if err else None, show_alert=bool(err))
+            await answer(err.text(lang) if err else None, show_alert=bool(err))
         elif action == "mrm":
             index, version = parse_media_ref(v)
             err = await core.change_media(sid, "remove", index, [], who.full_name, REVIEWER_MEDIA, by_submitter=False,
                                           version=version)
             if err:
                 await core.refresh_control(sid)  # 收起确认面板
-            await cq.answer(err.text(lang) if err else t(lang, "toast_media_removed", n=index), show_alert=bool(err))
+            await answer(err.text(lang) if err else t(lang, "toast_media_removed", n=index), show_alert=bool(err))
         elif action == "unsched":
             err = await core.unschedule(sid)
-            await cq.answer(err.text(lang) if err else t(lang, "toast_unscheduled"))
+            await answer(err.text(lang) if err else t(lang, "toast_unscheduled"))
         elif action == "reject":
             reason = settings.reject_template(v)
             err = await core.reject(sid, who, reason)
             # 按钮提示最多 200 字符，理由是用户配置的，可能很长
             ok = t(lang, "toast_rejected_with", reason=reason[:150]) if reason else t(lang, "toast_rejected")
-            await cq.answer(err.text(lang) if err else ok, show_alert=bool(err))
+            await answer(err.text(lang) if err else ok, show_alert=bool(err))
         elif action == "ban":
             sub = await core.get_submission(sid)
             if not sub:
-                await cq.answer(t(lang, "sub_not_found", sid=sid), show_alert=True)
+                await answer(t(lang, "sub_not_found", sid=sid), show_alert=True)
                 return
             rejected = await core.ban_user(sub.user_id, who)
             if sid not in rejected:  # 确认期间被别人处理了（发布、拒绝）：收起确认面板，显示“解除封禁”
                 await core.refresh_control(sid)
-            await cq.answer(t(lang, "toast_banned", n=len(rejected)))
+            await answer(t(lang, "toast_banned", n=len(rejected)))
         elif action == "unban":
             sub = await core.get_submission(sid)
             ok = bool(sub) and await core.unban_user(sub.user_id)
             await core.refresh_control(sid)
-            await cq.answer(t(lang, "toast_unbanned" if ok else "toast_not_banned"), show_alert=not ok)
+            await answer(t(lang, "toast_unbanned" if ok else "toast_not_banned"), show_alert=not ok)
         elif action == "purge":
             sub = await core.get_submission(sid)
             if not sub:
-                await cq.answer(t(lang, "sub_not_found", sid=sid), show_alert=True)
+                await answer(t(lang, "sub_not_found", sid=sid), show_alert=True)
                 return
             # 先回应再删：逐条删很多消息可能超过 15 秒，按钮回应超时会被 Telegram 拒绝；结果另发一条消息
-            await cq.answer(t(lang, "toast_purging"))
+            await answer(t(lang, "toast_purging"))
             res = await core.purge_review_messages(sub.user_id)
             await core.refresh_control(sid)  # 删成功时这条控制按钮消息已经没了（不会再刷新）；没删掉就收起确认面板
             # 不用回复：控制按钮消息可能已经删掉了
             await core.bot.send_message(cq.message.chat.id, res.text(lang))
         else:
-            await cq.answer()
+            await answer()
 
     @router.callback_query(AdminUserCB.filter())
-    async def on_user_card(cq: CallbackQuery, callback_data: AdminUserCB, core: Core) -> None:
+    async def on_user_card(cq: CallbackQuery, callback_data: AdminUserCB, core: Core, answer: Answer) -> None:
         """/user 卡片上的封禁 / 解封 / 删除稿件：先确认；状态已经变了（别人刚封禁 / 解封过）就只刷新卡片。"""
         uid, a, lang = callback_data.uid, callback_data.a, core.lang
         action = a.removesuffix("_ok")
@@ -254,7 +255,7 @@ def build_router(settings: Settings) -> Router:
             toast, alert = t(lang, "toast_not_banned"), True
         elif a in ("ban", "unban", "purge"):
             await cq.message.edit_reply_markup(reply_markup=user_confirm_kb(uid, a, lang))
-            await cq.answer(t(lang, _confirm_toast(a)))
+            await answer(t(lang, _confirm_toast(a)))
             return
         elif a == "ban_ok":
             rejected = await core.ban_user(uid, cq.from_user)
@@ -264,7 +265,7 @@ def build_router(settings: Settings) -> Router:
             toast, alert = t(lang, "toast_unbanned"), False
         elif a == "purge_ok":
             # 先回应再删（同控制按钮消息上的 🗑）：结果在刷新卡片后回复在卡片下面
-            await cq.answer(t(lang, "toast_purging"))
+            await answer(t(lang, "toast_purging"))
             result = (await core.purge_review_messages(uid)).text(lang)
         text, kb = await core.user_card(uid)
         try:
@@ -275,7 +276,7 @@ def build_router(settings: Settings) -> Router:
         if result:
             await cq.message.reply(result)
         else:
-            await cq.answer(toast, show_alert=bool(toast) and alert)
+            await answer(toast, show_alert=bool(toast) and alert)
 
     # ---------- 回复提示 ----------
 

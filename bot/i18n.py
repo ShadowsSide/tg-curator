@@ -493,6 +493,7 @@ T: dict[str, dict[str, str]] = {
                                   "Tap again to confirm, or go back"},
     "toast_publishing": {"zh": "发布中…", "en": "Publishing…"},
     "toast_purging": {"zh": "删除中…", "en": "Deleting…"},
+    "toast_working": {"zh": "处理中…", "en": "Working on it…"},
     "toast_retrying": {"zh": "重试中…", "en": "Retrying…"},
     "toast_scheduled": {"zh": "已定时：{when}", "en": "Scheduled: {when}"},
     "toast_unscheduled": {"zh": "已取消定时，回到待审核", "en": "Unscheduled, back to pending review"},

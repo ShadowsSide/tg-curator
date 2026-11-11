@@ -7,6 +7,7 @@ from aiogram.filters import Command, CommandStart
 from aiogram.types import CallbackQuery, Message
 
 from .. import entities as ent
+from ..callbacks import Answer
 from ..core import Core, explicit_reply
 from ..db import SUBMITTER_EDITABLE
 from ..i18n import t
@@ -158,7 +159,7 @@ def build_router() -> Router:
         await core.receive([m])
 
     @router.callback_query(UserMediaCB.filter())
-    async def media_buttons(cq: CallbackQuery, callback_data: UserMediaCB, core: Core) -> None:
+    async def media_buttons(cq: CallbackQuery, callback_data: UserMediaCB, core: Core, answer: Answer) -> None:
         """投稿人自己改图片：把新发的图片加到旧投稿（merge）、删除面板（mdel / mrm / mback）。"""
         sid, a, v, uid = callback_data.sid, callback_data.a, callback_data.v, cq.from_user.id
         lang = core.lang_of(cq.from_user)
@@ -167,17 +168,17 @@ def build_router() -> Router:
             err = await core.merge_draft(sid, uid, editor)
             if not err:
                 await cq.message.edit_text(t(lang, "merged"))
-            await cq.answer(err.text(lang) if err else t(lang, "merged_toast"), show_alert=bool(err))
+            await answer(err.text(lang) if err else t(lang, "merged_toast"), show_alert=bool(err))
             return
         if a == "mrm":
             index, version = parse_media_ref(v)
             err = await core.remove_own_media(sid, uid, index, editor, version)  # 成功时按钮由 core 恢复
-            await cq.answer(err.text(lang) if err else t(lang, "toast_media_removed", n=index), show_alert=bool(err))
+            await answer(err.text(lang) if err else t(lang, "toast_media_removed", n=index), show_alert=bool(err))
             if not err:
                 return
         sub = await core.get_submission(sid)
         if not sub or sub.user_id != uid:
-            await cq.answer(t(lang, "u_edit_not_found"), show_alert=True)
+            await answer(t(lang, "u_edit_not_found"), show_alert=True)
             return
         # 打开删除面板；返回、删除失败、或者已经不能改了（审核开始后点旧按钮）：恢复成当前状态的按钮
         panel = a == "mdel" and sub.status in SUBMITTER_EDITABLE
@@ -188,30 +189,30 @@ def build_router() -> Router:
             if "not modified" not in str(e):
                 raise
         if a == "mdel" and not panel:
-            await cq.answer(t(lang, "media_locked"), show_alert=True)
+            await answer(t(lang, "media_locked"), show_alert=True)
         elif a != "mrm":
-            await cq.answer()
+            await answer()
 
     @router.callback_query(UserCB.filter())
-    async def choice(cq: CallbackQuery, callback_data: UserCB, core: Core) -> None:
+    async def choice(cq: CallbackQuery, callback_data: UserCB, core: Core, answer: Answer) -> None:
         sid = callback_data.sid
         lang = core.lang_of(cq.from_user)
         if callback_data.a == "cancel":
             err = await core.cancel_draft(sid, cq.from_user.id)
             if not err:
                 await cq.message.edit_text(t(lang, "cancelled"))
-            await cq.answer(err.text(lang) if err else t(lang, "cancelled"))
+            await answer(err.text(lang) if err else t(lang, "cancelled"))
             return
 
         anonymous = callback_data.a == "anon"
         err = await core.submit(sid, cq.from_user.id, anonymous)
         if err:
-            await cq.answer(err.text(lang), show_alert=True)
+            await answer(err.text(lang), show_alert=True)
             return
         mode = t(lang, "mode_anon" if anonymous else "mode_signed")
         await cq.message.edit_text(t(lang, "submitted", mode=mode, sid=sid),
                                    reply_markup=await core.user_keyboard(await core.get_submission(sid), lang))
-        await cq.answer(t(lang, "submitted_toast"))
+        await answer(t(lang, "submitted_toast"))
 
     return router
 

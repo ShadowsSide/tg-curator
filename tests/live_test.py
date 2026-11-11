@@ -228,10 +228,18 @@ async def edit_cmd(text, ctrl):
 
 
 def cb(data, chat_id, from_id, message_id=999):
-    callbacks[str(uid[0])] = time.time()
-    push(callback_query={"id": str(uid[0]), "chat_instance": "x", "data": data,
+    """推送一次按钮点击，返回这次点击的编号（answerCallbackQuery 的 callback_query_id）。"""
+    cid = str(uid[0])
+    callbacks[cid] = time.time()
+    push(callback_query={"id": cid, "chat_instance": "x", "data": data,
                          "from": {"id": from_id, "is_bot": False, "first_name": "Admin" if from_id == ADMIN else "Alice"},
                          "message": {"message_id": message_id, "date": now(), "chat": chat(chat_id)}})
+    return cid
+
+
+def answered(cid):
+    """等这次按钮点击的回应用的条件。"""
+    return lambda e: e["method"] == "answerCallbackQuery" and str(e["params"].get("callback_query_id")) == cid
 
 
 async def pub_ok(sid, quiet=0.3, timeout=5.0):
@@ -318,8 +326,11 @@ async def submit(text, sid, who=USER):
     其他测试文件共用；本文件的场景里另有一个带额外检查的同名局部函数。"""
     n = len(log); pm(text, who=who)
     await wait_for(lambda e: any(is_send(e, "sendMessage", who, p) for p in PROMPTS), since=n)
-    n = len(log); cb(f"u:sign:{sid}", who, who)
-    return await wait_for(lambda e: is_send(e, "sendMessage", REVIEW, CTRL), since=n)
+    n = len(log); cid = cb(f"u:sign:{sid}", who, who)
+    ctrl = await wait_for(lambda e: is_send(e, "sendMessage", REVIEW, CTRL), since=n)
+    # 按钮的回应在控制按钮消息之后才发：等它到了再返回，免得算进调用方接下来那次点击的回应里
+    await wait_for(answered(cid), since=n)
+    return ctrl
 
 
 async def scenario():

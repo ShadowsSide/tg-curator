@@ -7,6 +7,7 @@
 import asyncio
 import os
 import sys
+import time
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -34,6 +35,7 @@ def group_msg(text, who, reply_to=None, sender_chat=None):
 
 
 def group_cb(data, who, message_id):
+    lt.callbacks[str(lt.uid[0])] = time.time()  # 模拟服务器按推送时间算回应时限
     lt.push(callback_query={"id": str(lt.uid[0]), "chat_instance": "x", "data": data,
                             "from": {"id": who, "is_bot": who in (ADMIN_BOT, ANON_ADMIN), "first_name": f"U{who}"},
                             "message": {"message_id": message_id, "date": now(), "chat": lt.chat(REVIEW)}})

@@ -1,6 +1,6 @@
 """投稿防垃圾：关键词黑名单、链接数量上限（白名单域名不计）。纯函数，不访问数据库和网络。
 
-检查结果是命中项列表，每项是可存 JSON 的 dict，显示时再按语言翻译（render.spam_line）：
+检查结果是命中项列表，每项是可存 JSON 的 dict，显示时再按语言翻译（render.control_text）：
   {"k": "keyword", "word": "加微信"}
   {"k": "links", "n": 3, "max": 2}
 没有命中时返回空列表。新用户冷却是按投稿时间判断的，在 core/submissions.py 里。

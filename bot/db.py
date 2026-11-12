@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import asyncio
+import contextlib
 import json
 import os
 import sqlite3
@@ -260,6 +262,16 @@ def _version_cond(version: int | None) -> tuple[str, tuple]:
     return ("", ()) if version is None else (" AND version=?", (version,))
 
 
+def _copy_database(source: str, tmp: str) -> None:
+    """把数据库 source 复制到 tmp（在线程里执行，见 DB.backup）。"""
+    if os.path.exists(tmp):  # 上次中途停止留下的
+        os.remove(tmp)
+    with contextlib.closing(sqlite3.connect(source)) as src, contextlib.closing(sqlite3.connect(tmp)) as dst:
+        src.backup(dst)
+        # 副本照搬了 WAL 模式：改回普通模式，备份就是单独一个文件，复制出去打开也不会多出 -wal / -shm
+        dst.execute("PRAGMA journal_mode=DELETE")
+
+
 class DB:
     def __init__(self, path: str):
         self.path = path
@@ -285,20 +297,17 @@ class DB:
 
     async def backup(self, path: str) -> None:
         """用 SQLite 的 backup 接口复制一份到 path（运行中、WAL 模式下也是一致的副本）。
-        先写到临时文件，写完再改名：中途出错或停止，不会留下半个备份顶掉原来那份。"""
+        先写到临时文件，写完再改名：中途出错或停止，不会留下半个备份顶掉原来那份。
+        不用 self.conn 备份：写入是 execute、commit 两步，备份排在两步之间时 SQLite 因为这个连接有没提交的写入
+        而拒绝，backup 会一直重试，可那次 commit 排在它后面，整个数据库线程就卡死了。
+        另开一个连接、在别的线程里复制：只读到已经提交的内容，备份期间也不占用 self.conn。"""
         tmp = path + ".tmp"
-        if os.path.exists(tmp):  # 上次中途停止留下的
-            os.remove(tmp)
-        dst = sqlite3.connect(tmp, check_same_thread=False)  # backup 在 aiosqlite 的线程里执行
         try:
-            await self.conn.backup(dst)
+            await asyncio.to_thread(_copy_database, self.path, tmp)
         except BaseException:
-            dst.close()
-            os.remove(tmp)
+            with contextlib.suppress(FileNotFoundError):
+                os.remove(tmp)
             raise
-        # 副本照搬了 WAL 模式：改回普通模式，备份就是单独一个文件，复制出去打开也不会多出 -wal / -shm
-        dst.execute("PRAGMA journal_mode=DELETE")
-        dst.close()
         os.replace(tmp, path)
 
     async def _one(self, sql: str, params: Iterable[Any] = ()) -> aiosqlite.Row | None:

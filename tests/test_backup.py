@@ -13,6 +13,7 @@ from zoneinfo import ZoneInfo
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+import bot.db  # noqa: E402
 from bot.backup import backup_dir, human_size, make_backup, prune  # noqa: E402
 from bot.core.scheduler import SchedulerMixin  # noqa: E402
 from bot.db import DB  # noqa: E402
@@ -67,11 +68,13 @@ def test_failed_backup_keeps_the_old_file_and_leaves_no_temp_file():
         target = os.path.join(folder, "copy.db")
         with open(target, "wb") as f:
             f.write(b"old backup")
-        real = db.conn.backup
+        real = bot.db._copy_database
 
-        async def broken(*a, **kw):
+        def broken(source, tmp):  # 复制到一半出错：临时文件已经写了一部分
+            with open(tmp, "wb") as f:
+                f.write(b"half")
             raise sqlite3.OperationalError("disk I/O error")
-        db.conn.backup = broken
+        bot.db._copy_database = broken
         try:
             await db.backup(target)
         except sqlite3.OperationalError:
@@ -79,9 +82,35 @@ def test_failed_backup_keeps_the_old_file_and_leaves_no_temp_file():
         else:
             raise AssertionError("should raise")
         finally:
-            db.conn.backup = real
+            bot.db._copy_database = real
             await db.close()
         assert open(target, "rb").read() == b"old backup" and not os.path.exists(target + ".tmp")
+    run(go())
+
+
+def test_backup_does_not_hang_behind_an_uncommitted_write():
+    """写入是 execute、commit 两步；备份刚好排在两步之间也要能完成（用同一个连接备份的话，数据库线程会卡死），
+    而且只备份到已经提交的内容。"""
+    async def go():
+        folder = tempfile.mkdtemp()
+        db = await open_db(folder)
+        target = os.path.join(folder, "copy.db")
+        await db.conn.execute("INSERT INTO note VALUES ('Bob')")  # 还没提交
+        backup = asyncio.create_task(db.backup(target))
+        _, pending = await asyncio.wait({backup}, timeout=10)
+        if not pending:
+            backup.result()
+            commit = asyncio.create_task(db.conn.commit())
+            _, pending = await asyncio.wait({commit}, timeout=10)
+        if pending:
+            # 数据库线程卡住了，关不掉连接，进程也退不出：直接结束，不拖住整次测试
+            print("FAIL  backup or commit still not finished after 10 s: the database thread is stuck", flush=True)
+            os._exit(1)
+        with contextlib.closing(sqlite3.connect(target)) as conn:
+            assert [r[0] for r in conn.execute("SELECT text FROM note")] == ["Alice"]
+        rows = await db._all("SELECT text FROM note ORDER BY rowid")
+        assert [r[0] for r in rows] == ["Alice", "Bob"]  # 备份没有影响那次写入
+        await db.close()
     run(go())
 
 

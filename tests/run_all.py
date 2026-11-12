@@ -4,7 +4,7 @@
 
 用法（项目根目录下）：
   python tests/run_all.py          # live 测试的并行数默认是 CPU 核数
-  python tests/run_all.py -j 4     # 指定并行数（CI 用 4：公开仓库的 ubuntu-latest 是 4 核）
+  python tests/run_all.py -j 4     # 指定并行数（CI 用 6，见 .github/workflows/test.yml）
   python tests/run_all.py live_media_test.py test_db.py   # 只跑这几个
 """
 import argparse

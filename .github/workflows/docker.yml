@@ -65,6 +65,8 @@ jobs:
 
   build:
     needs: test
+    # 只有 DEV 和 v* 标签出镜像。在别的分支（比如 main）上手动运行只跑测试：那里一个标签都不会有，推送会失败
+    if: github.ref == 'refs/heads/DEV' || startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7

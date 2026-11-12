@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 import os
 import re
 from dataclasses import dataclass
@@ -22,9 +23,12 @@ def _env(name: str, default: str = "", *, required: bool = False) -> str:
 def _num(name: str, default: str = "", *, kind: type = int, required: bool = False) -> int | float:
     value = _env(name, default, required=required)
     try:
-        return kind(value)
+        number = kind(value)
     except ValueError:
         raise ConfigError("cfg_number", name=name, value=value) from None
+    if isinstance(number, float) and not math.isfinite(number):  # float 认 nan、inf，拿去等待会出错
+        raise ConfigError("cfg_number", name=name, value=value)
+    return number
 
 
 def _seconds(name: str, default: str) -> float:
@@ -57,8 +61,15 @@ def _tz(value: str) -> ZoneInfo:
         raise ConfigError("cfg_tz", value=value) from None
 
 
-def _bool(value: str) -> bool:
-    return value.lower() in ("1", "true", "yes", "on")
+def _bool(value: str, name: str) -> bool:
+    """开关：true / false（也认 1、yes、on 和 0、no、off；留空算 false）。
+    写错（比如 ture）启动时报错：以前一律当成 false，开关悄悄关掉了也看不出来。"""
+    value = value.lower()
+    if value in ("1", "true", "yes", "on"):
+        return True
+    if value in ("", "0", "false", "no", "off"):
+        return False
+    raise ConfigError("cfg_choice", name=name, allowed="true / false", value=value)
 
 
 def _chat_id(value: str) -> int | str:
@@ -160,20 +171,20 @@ def load_settings() -> Settings:
         review_chat_id=_num("REVIEW_CHAT_ID", required=True),
         tz=_tz(_env("TZ", "Asia/Shanghai")),
         db_path=_env("DB_PATH", "/app/data/bot.db"),
-        album_delay=_num("ALBUM_DELAY", "1.5", kind=float),
+        album_delay=_seconds("ALBUM_DELAY", "1.5"),
         callback_fallback=_seconds("CALLBACK_FALLBACK_SECONDS", "3"),
         max_pending_per_user=_count("MAX_PENDING_PER_USER", "5"),
         schedule_presets=_presets(_env("SCHEDULE_PRESETS", "09:00,12:00,18:00,21:00")),
         reminder_interval_min=_count("REMINDER_INTERVAL_MINUTES", "60"),
-        reminder_only_when_pending=_bool(_env("REMINDER_ONLY_WHEN_PENDING", "true")),
+        reminder_only_when_pending=_bool(_env("REMINDER_ONLY_WHEN_PENDING", "true"), "REMINDER_ONLY_WHEN_PENDING"),
         quiet_hours=_quiet_hours(_env("REMINDER_QUIET_HOURS", "")),
         stats_scope=_choice(_env("STATS_SCOPE", "today"), ("today", "all"), "STATS_SCOPE"),
-        default_silent=_bool(_env("DEFAULT_SILENT", "false")),
+        default_silent=_bool(_env("DEFAULT_SILENT", "false"), "DEFAULT_SILENT"),
         proxy=_env("PROXY"),
         api_url=_env("TELEGRAM_API_URL"),
         language=language,
         user_language=_choice(_env("USER_LANGUAGE", "auto"), ("auto", *LANGS), "USER_LANGUAGE"),
-        leave_unknown_chats=_bool(_env("LEAVE_UNKNOWN_CHATS", "true")),
+        leave_unknown_chats=_bool(_env("LEAVE_UNKNOWN_CHATS", "true"), "LEAVE_UNKNOWN_CHATS"),
         msg_window_days=_count("MSG_WINDOW_DAYS", "3"),
         reviewers=_env("REVIEWERS", "admins"),
         reject_templates=_templates(reasons if reasons is not None else t(language, "default_reject_templates")),

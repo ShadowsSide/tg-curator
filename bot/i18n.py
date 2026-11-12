@@ -278,11 +278,12 @@ T: dict[str, dict[str, str]] = {
               "<code>/edit new content</code>.",
     },
     "submitter_label": {"zh": "投稿人 {name}", "en": "submitter {name}"},
+    # 也会显示在按钮的弹窗里（点“加到这条投稿”“删除图片”时），弹窗不解析 HTML：不能带 <code> 这类标记
     "locked_by_reviewer": {
         "zh": "审核员已经修改过这条投稿，你不能再改了。如需调整，请回复审核员的消息或你的投稿，"
-              "发送 <code>/msg 内容</code> 告诉审核员。",
+              "发送“/msg 内容”告诉审核员。",
         "en": "A reviewer has already edited this submission, so you can't change it anymore. To ask for changes, "
-              "reply to the reviewer's message or your submission with <code>/msg your message</code>.",
+              "reply to the reviewer's message or your submission with “/msg your message”.",
     },
     "notify_reviewer_edited": {
         "zh": "✏️ 审核员修改了你的投稿，之后不能再改，请用 <code>/msg</code> 与审核员沟通。"
@@ -583,6 +584,9 @@ T: dict[str, dict[str, str]] = {
     },
     "prompt_cancelled": {"zh": "已取消。", "en": "Cancelled."},
     "prompt_none": {"zh": "没有等你回复的操作。", "en": "Nothing is waiting for your reply."},
+    # 以群身份匿名发言的管理员，记在稿件上的名字（已拒绝（…）、已修改（…）、封禁人）；title 是他的管理员头衔
+    "anonymous_admin": {"zh": "匿名管理员", "en": "Anonymous admin"},
+    "anonymous_admin_titled": {"zh": "匿名管理员 · {title}", "en": "Anonymous admin · {title}"},
     "prompt_cancel_anonymous": {
         "zh": "匿名发言时看不出是谁的提示：请回复要放弃的那条提示发送 <code>/cancel</code>。",
         "en": "When posting anonymously the bot can't tell which prompts are yours: reply to the prompt you want to "

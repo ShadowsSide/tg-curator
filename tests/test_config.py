@@ -55,11 +55,33 @@ def test_malformed_values():
         "SPAM_ACTION": ("delete", "cfg_choice"),
         "STATS_SCOPE": ("todya", "cfg_choice"),
         "BACKUP_TIME": ("25:00", "cfg_clock"),
+        "CALLBACK_FALLBACK_SECONDS": ("nan", "cfg_number"),
+        "DEFAULT_SILENT": ("ture", "cfg_choice"),
+        "REMINDER_ONLY_WHEN_PENDING": ("y", "cfg_choice"),
+        "LEAVE_UNKNOWN_CHATS": ("flase", "cfg_choice"),
     }
     for name, (value, key) in cases.items():
         got, zh, en = error(**{name: value})
         assert got == key, (name, got)
         assert name in zh and name in en, (zh, en)
+
+
+def test_switches():
+    """开关认 true / false 和几种常见写法（不分大小写）；留空算 false。"""
+    for value, want in (("true", True), ("TRUE", True), ("1", True), ("yes", True), ("on", True),
+                        ("false", False), ("False", False), ("0", False), ("no", False), ("off", False), ("", False)):
+        s = load(DEFAULT_SILENT=value, REMINDER_ONLY_WHEN_PENDING=value, LEAVE_UNKNOWN_CHATS=value)
+        assert (s.default_silent, s.reminder_only_when_pending, s.leave_unknown_chats) == (want,) * 3, value
+    s = load()
+    assert (s.default_silent, s.reminder_only_when_pending, s.leave_unknown_chats) == (False, True, True)
+
+
+def test_album_delay():
+    """等待秒数不能是负数，也不能是 nan / inf（float 认这些写法）；0 可以。"""
+    assert load(ALBUM_DELAY="0").album_delay == 0
+    assert error(ALBUM_DELAY="-1")[0] == "cfg_negative"
+    for value in ("nan", "inf", "-inf"):
+        assert error(ALBUM_DELAY=value)[0] == "cfg_number", value
 
 
 def test_quiet_hours():

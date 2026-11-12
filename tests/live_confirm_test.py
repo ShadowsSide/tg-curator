@@ -90,9 +90,9 @@ async def scenario():
     banned = await wait_for(lambda e: is_send(e, "sendMessage", USER, "禁止投稿"), timeout=1, since=n)
     check("Ban → confirm panel, nobody banned yet",
           kb and any(v == "r:ban_ok:3:0" for v in buttons(kb).values()) and not banned, kb and buttons(kb))
-    n = len(log); lt.cb("r:ban_ok:3:0", REVIEW, ADMIN)
+    n = len(log); click = lt.cb("r:ban_ok:3:0", REVIEW, ADMIN)
     banned = await wait_for(lambda e: is_send(e, "sendMessage", USER, "禁止投稿"), since=n)
-    first = next((e for e in log[n:] if e["method"] == "answerCallbackQuery"), None)
+    first = next((e for e in log[n:] if lt.answered(click)(e)), None)  # 只认这次点击的：封禁面板的回应可能晚到
     told_at = next((i for i, e in enumerate(log[n:]) if is_send(e, "sendMessage", USER, "禁止投稿")), None)
     answered_at = log[n:].index(first) if first else None
     check("Confirm ban → answered “banning…” before doing it, submitter banned",

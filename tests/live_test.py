@@ -169,6 +169,8 @@ async def handle(request: web.Request):
         result = [make_msg(params["chat_id"]) for _ in params["media"]]
     elif m.startswith("send"):
         result = make_msg(params["chat_id"])
+        # 记下发出时带的按钮：之后收起按钮（editMessageReplyMarkup 不带 reply_markup）才不会被当成“没有变化”
+        markups[(str(params["chat_id"]), str(result["message_id"]))] = params.get("reply_markup")
     else:
         result = True
     log.append({"method": method, "params": params, "result": result, "t": time.time()})

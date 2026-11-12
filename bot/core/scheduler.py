@@ -14,6 +14,7 @@ from ..db import Submission
 from ..errors import Notice
 from ..health import beat
 from ..i18n import t
+from ..keyboards import retry_kb
 from ..timeutil import next_occurrence, now_ts, start_of_today
 
 from .base import CoreBase, SCHEDULER_TICK, DRAFT_TTL, NO_PREVIEW, _reply_to
@@ -56,11 +57,14 @@ class SchedulerMixin(CoreBase):
                 await asyncio.wait_for(self._stopping.wait(), SCHEDULER_TICK)
 
     async def _report_scheduled(self, sub: Submission, err: Notice) -> None:
-        """定时发布没有成功（发布失败 / 被限流改了时间）：没人点按钮，控制按钮消息变了也没人注意，回复在它下面提醒审核员。"""
+        """定时发布没有成功（发布失败 / 被限流改了时间）：没人点按钮，控制按钮消息变了也没人注意，回复在它下面提醒审核员。
+        发布失败的带“重试发布”按钮，不用再去找控制按钮消息；被限流改到稍后自动发布的不带（不是失败，到点会再发）。"""
+        fresh = await self.db.get(sub.id)
+        kb = retry_kb(fresh, self.lang) if fresh and fresh.status == "failed" else None
         try:
             await self.bot.send_message(
                 self.s.review_chat_id, t(self.lang, "sched_publish_failed", reason=err.text(self.lang)),
-                reply_parameters=_reply_to(sub.review_msg_id),
+                reply_parameters=_reply_to(sub.review_msg_id), reply_markup=kb,
             )
         except TelegramAPIError as e:
             log.warning("提醒定时发布 #%s 失败：%s", sub.id, e)

@@ -121,6 +121,28 @@ def test_anonymous_admin_still_allowed():
     assert not _allowed("55", 1087968824, REVIEW, is_bot=True)
 
 
+def test_anonymous_admin_name():
+    """匿名管理员记在稿件上的名字：“匿名管理员”，有头衔的带上头衔；不是匿名的原样。"""
+    from datetime import datetime
+    from aiogram.types import Chat, Message, User
+    from bot.handlers.review import _actor
+
+    group = Chat(id=REVIEW, type="supergroup", title="Review")
+    bot = User(id=1087968824, is_bot=True, first_name="Group", username="GroupAnonymousBot")
+
+    def msg(**kw):
+        return Message(message_id=1, date=datetime.now(), chat=group, **kw)
+    assert _actor(msg(from_user=bot, sender_chat=group), "zh").full_name == "匿名管理员"
+    assert _actor(msg(from_user=bot, sender_chat=group), "en").full_name == "Anonymous admin"
+    titled = _actor(msg(from_user=bot, sender_chat=group, author_signature="值班"), "zh")
+    assert (titled.full_name, titled.id) == ("匿名管理员 · 值班", 1087968824)
+    alice = User(id=7, is_bot=False, first_name="Alice", last_name="L")
+    assert _actor(msg(from_user=alice), "zh") is alice
+    # 频道的帖子自动转到群里：sender_chat 是频道，不是匿名管理员
+    channel = Chat(id=-1002, type="channel", title="News")
+    assert _actor(msg(from_user=alice, sender_chat=channel), "zh") is alice
+
+
 def test_humans_unchanged():
     assert _allowed("all", 99)
     assert _allowed("admins,55", 55)

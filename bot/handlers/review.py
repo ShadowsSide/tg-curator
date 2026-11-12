@@ -10,7 +10,7 @@ from aiogram import BaseMiddleware, F, Router
 from aiogram.dispatcher.event.bases import SkipHandler
 from aiogram.exceptions import TelegramBadRequest
 from aiogram.filters import Command, CommandObject
-from aiogram.types import CallbackQuery, Message, TelegramObject
+from aiogram.types import CallbackQuery, Message, TelegramObject, User as TgUser
 
 from .. import entities as ent
 from ..album import ALBUM_MERGE_WINDOW
@@ -59,6 +59,17 @@ def _confirm_toast(action: str) -> str:
 def _anonymous_admin(m: Message) -> bool:
     """以群的身份匿名发言的管理员：from_user 是 Telegram 的匿名管理员机器人，看不出是谁。"""
     return m.sender_chat is not None and m.sender_chat.id == m.chat.id
+
+
+def _actor(m: Message, lang: str) -> TgUser:
+    """这条消息算在谁名下（记在稿件上的审核员、改稿人、封禁人）。
+    匿名管理员的 from_user 是 Telegram 的匿名管理员机器人，名字是 “Group”：改成“匿名管理员”，
+    设了头衔的带上头衔（author_signature），多个匿名管理员时还能分辨。"""
+    if not _anonymous_admin(m):
+        return m.from_user
+    name = (t(lang, "anonymous_admin_titled", title=m.author_signature) if m.author_signature
+            else t(lang, "anonymous_admin"))
+    return m.from_user.model_copy(update={"first_name": name, "last_name": None})
 
 
 def _is_owner(m: Message, prompt: Prompt) -> bool:
@@ -394,12 +405,12 @@ def build_router(settings: Settings) -> Router:
             return notice("media_only_photo_video")
         index, version = parse_media_ref(prompt.arg)
         # 添加不看序号；而且相册后到的部分要加在前面已经加过（版本已变）的内容后面，所以只有替换核对版本
-        return await core.change_media(prompt.sid, op, index, items, messages[0].from_user.full_name,
+        return await core.change_media(prompt.sid, op, index, items, _actor(messages[0], core.lang).full_name,
                                        REVIEWER_MEDIA, by_submitter=False, version=version if op == "replace" else None)
 
     async def _answer_prompt(prompt: Prompt, m: Message, core: Core) -> tuple[Notice | None, str]:
         """按提示的种类执行，返回 (错误, 成功时的回复)。"""
-        sid, lang, who = prompt.sid, core.lang, m.from_user
+        sid, lang, who = prompt.sid, core.lang, _actor(m, core.lang)
         body = m.text or m.caption or ""
         entities = ent.dump(m.entities or m.caption_entities)
         if prompt.kind not in PROMPT_KIND.values():
@@ -476,7 +487,7 @@ def build_router(settings: Settings) -> Router:
             return
         reason = _clean_reason(args)
 
-        err = await core.reject(sid, m.from_user, reason)
+        err = await core.reject(sid, _actor(m, core.lang), reason)
         if err:
             await _reply(m, core, sid, err.text(core.lang))
             return
@@ -497,7 +508,8 @@ def build_router(settings: Settings) -> Router:
             await m.reply(err.text(core.lang) if err else t(core.lang, "admin_echo_hint"))
             return
 
-        err = await core.edit(sid, m.from_user.full_name, body, entities, dump_link_preview(m.link_preview_options))
+        err = await core.edit(sid, _actor(m, core.lang).full_name, body, entities,
+                              dump_link_preview(m.link_preview_options))
         if err:  # 失败的留着：审核员要看原因、改了再发
             await m.reply(err.text(core.lang))
             return
@@ -524,7 +536,7 @@ def build_router(settings: Settings) -> Router:
         if any(it is None for it in items):
             await cmd.reply(t(core.lang, "msg_empty"))
             return
-        err = await core.relay_to_user(sid, cmd.from_user, items)
+        err = await core.relay_to_user(sid, _actor(cmd, core.lang), items)
         await cmd.reply(err.text(core.lang) if err else t(core.lang, "msg_sent_to_user"))
 
     @router.message(Command("ban"))
@@ -542,7 +554,7 @@ def build_router(settings: Settings) -> Router:
                 await m.reply(t(core.lang, "usage_ban"))
                 return
 
-        rejected = await core.ban_user(user_id, m.from_user, reason)
+        rejected = await core.ban_user(user_id, _actor(m, core.lang), reason)
         if sid is not None and sid not in rejected:  # 回复的那条（已发布 / 已拒绝）也显示“解除封禁”
             await core.refresh_control(sid)
         user = await core.get_user(user_id)

@@ -584,6 +584,9 @@ T: dict[str, dict[str, str]] = {
     },
     "prompt_cancelled": {"zh": "已取消。", "en": "Cancelled."},
     "prompt_none": {"zh": "没有等你回复的操作。", "en": "Nothing is waiting for your reply."},
+    # 以群身份匿名发言的管理员，记在稿件上的名字（已拒绝（…）、已修改（…）、封禁人）；title 是他的管理员头衔
+    "anonymous_admin": {"zh": "匿名管理员", "en": "Anonymous admin"},
+    "anonymous_admin_titled": {"zh": "匿名管理员 · {title}", "en": "Anonymous admin · {title}"},
     "prompt_cancel_anonymous": {
         "zh": "匿名发言时看不出是谁的提示：请回复要放弃的那条提示发送 <code>/cancel</code>。",
         "en": "When posting anonymously the bot can't tell which prompts are yours: reply to the prompt you want to "

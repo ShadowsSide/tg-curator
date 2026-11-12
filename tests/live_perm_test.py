@@ -89,6 +89,11 @@ async def scenario():
               sender_chat={"id": REVIEW, "type": "supergroup", "title": "Review"})
     e = await wait_for(lambda e: is_send(e, "sendMessage", USER, "匿名管理员"), since=n)
     check("anonymous admin (posting as the group) can review", e)
+    # from_user 是 Telegram 的匿名管理员机器人（名字 “Group”，这里是 U1087968824）：控制按钮消息上写“匿名管理员”
+    ctrl = await wait_for(lambda e: e["method"] == "editMessageText" and "已拒绝（" in e["params"].get("text", "")
+                          and str(e["params"].get("message_id")) == str(c3["result"]["message_id"]), since=n)
+    check("anonymous admin → control message says 匿名管理员, not the anonymous bot's name",
+          ctrl and "已拒绝（匿名管理员）" in ctrl["params"]["text"], ctrl and ctrl["params"]["text"])
 
     # 机器人不算审核员：即使它是审核群管理员，按钮和命令也都无权限
     lt.MOCK["admins"].add(ADMIN_BOT)

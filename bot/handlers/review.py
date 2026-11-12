@@ -39,6 +39,7 @@ MAX_ACTIVE_DAYS = 3650
 # 按钮 → 提示的种类；FOLD 里的按钮来自面板（理由面板、媒体面板），发提示时把控制按钮消息恢复原样
 PROMPT_KIND = {"custom": "time", "edit": "edit", "creason": "reason", "madd": "madd", "mrep": "mrep"}
 FOLD = ("creason", "madd", "mrep")
+ON_CONTROL = ("time", "reason")  # 回复这些提示成功后，确认回复在控制按钮消息下面（见 _finish）
 
 
 @dataclass
@@ -344,6 +345,11 @@ def build_router(settings: Settings) -> Router:
                 await core.finish_prompt(prompt)
             return
         await core.finish_prompt(prompt)
+        if prompt.kind in ON_CONTROL:
+            # 定时、拒绝理由：确认挂在控制按钮消息下面，看得出是哪条投稿；审核员回复的时间 / 理由和命令一样删掉
+            await core.reply_on_control(prompt.sid, done)
+            await core.delete_command(m.message_id)
+            return
         ack = await m.reply(done)
         # 改稿成功：审核员回复的内容（文字，或添加 / 替换用的图片）和确认只留最近一次的，下次改稿时删掉。
         # 相册后到的部分回复在它自己下面（见 _answer_late_media），删掉前面这几张不影响

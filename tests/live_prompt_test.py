@@ -191,11 +191,17 @@ async def scenario():
     restored = await wait_for(lambda e: e["method"] == "editMessageText"
                               and str(e["params"].get("message_id")) == str(ctrl2), since=n)
     check("Custom reason → reason panel folded back, prompt sent", p and restored)
-    n = len(log); lt.gm("图片和文字对不上", reply_to=p["result"]["message_id"])
+    n = len(log); answer = lt.gm("图片和文字对不上", reply_to=p["result"]["message_id"])
     told = await wait_for(lambda e: is_send(e, "sendMessage", USER, "图片和文字对不上"), since=n)
     ok = await wait_for(lambda e: is_send(e, "sendMessage", REVIEW, "已拒绝"), since=n)
     panel = [e for e in log[n:] if e["method"] == "editMessageReplyMarkup"]
     check("reply with the reason → rejected at once, submitter told the reason", told and ok and not panel)
+    check("“rejected” replies to the control msg, not to the reviewer's reason",
+          ok and (ok["params"].get("reply_parameters") or {}).get("message_id") == ctrl2,
+          ok and ok["params"].get("reply_parameters"))
+    gone = await wait_for(lambda e: is_send(e, "deleteMessage", REVIEW) and int(e["params"]["message_id"]) == answer,
+                          timeout=3, since=n)
+    check("reviewer's reason message deleted like a command", gone, lt.review_deleted(n))
 
 
 if __name__ == "__main__":

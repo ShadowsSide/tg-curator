@@ -418,9 +418,14 @@ async def scenario():
     n = len(log); gm("+999999999d", reply_to=prompt["result"]["message_id"])
     e = await wait_for(lambda e: is_send(e, "sendMessage", REVIEW, "时间太远了"), since=n)
     check("huge relative time → told it's too far (not 'can't read'), prompt kept", e)
-    n = len(log); gm("+1m", reply_to=prompt["result"]["message_id"])
+    n = len(log); answer = gm("+1m", reply_to=prompt["result"]["message_id"])
     e = await wait_for(lambda e: is_send(e, "sendMessage", REVIEW, "将于"), since=n)
-    check("schedule +1m accepted", e)
+    check("schedule +1m accepted, confirmation replies to the control msg",
+          e and (e["params"].get("reply_parameters") or {}).get("message_id") == ctrl1["result"]["message_id"],
+          e and e["params"].get("reply_parameters"))
+    gone = await wait_for(lambda e: is_send(e, "deleteMessage", REVIEW) and int(e["params"]["message_id"]) == answer,
+                          timeout=3, since=n)
+    check("reviewer's “+1m” deleted like a command", gone, review_deleted(n))
     scheduled_at = time.time()
 
     # 4. 再来两条投稿：一条 /no 带理由，一条用于 /ban 自动拒绝

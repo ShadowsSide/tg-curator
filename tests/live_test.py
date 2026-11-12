@@ -737,6 +737,12 @@ async def main(scenario_fn=None, extra_env=None, allowed_errors=()):
     numbered = [x for x in shown if re.search(r"#\d", x)]
     check("no submission numbers shown to submitters or reviewers", not numbered, numbered[:3])
 
+    # 按钮的回应（提示、弹窗）不解析 HTML，最多 200 个字符：带标记的会原样显示出来
+    answers = [e["params"]["text"] for e in log if e["method"] == "answerCallbackQuery"
+               and isinstance(e["params"].get("text"), str)]
+    raw = [x for x in answers if re.search(r"</?[a-z]+[^>]*>", x) or len(x) > 200]
+    check("button answers are plain text within 200 characters", not raw, raw[:3])
+
     bad = unexpected_errors(bot_log, allowed_errors)
     check("no errors in bot process log", not bad, "\n".join(bad[:10]))
     print("\n--- bot log (last 12 lines) ---")

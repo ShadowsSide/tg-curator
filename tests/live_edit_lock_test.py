@@ -1,4 +1,5 @@
 """审核员改过稿之后，投稿人不能再改（/edit、原生编辑、加到这条投稿、删除图片都不行），只能 /msg：
+- 审核员改稿之后回复这条投稿发图，不再给“加到这条投稿”；按钮弹窗里没有 HTML 标记（live_test 收尾时统一检查）
 - 审核员第一次改稿时通知投稿人一次（以后再改不通知），投稿人的“删除图片”按钮收起
 - 投稿人改稿被拒，回复说明原因、指引 /msg；审核群收不到新预览
 - 只发 /edit 查看当前内容不受影响；审核员只切换静音等开关不算改稿
@@ -57,6 +58,10 @@ async def scenario():
     r = await user_says("/edit 投稿人自己的说明", mids[0], (EDITED, LOCKED))
     check("before a reviewer edit → submitter can edit", r and EDITED in r["params"]["text"], r and r["params"]["text"])
 
+    # 审核员改稿之前回复投稿发的图：有“加到这条投稿”（留到审核员改稿之后再点）
+    m = len(log); user_photo("NEW", reply_to=mids[0])
+    draft = await wait_for(lambda e: is_send(e, "sendMessage", USER) and "um:merge" in str(e["params"]), since=m)
+
     # 审核员第一次改稿：投稿人收到一次通知，“删除图片”收起
     n = len(log); gm("/edit 审核员改过的说明", reply_to=ctrl)
     note = await wait_for(lambda e: is_send(e, "sendMessage", USER, NOTIFIED), since=n)
@@ -87,12 +92,16 @@ async def scenario():
     r = await wait_for(lambda e: is_send(e, "sendMessage", USER, LOCKED), since=m)
     check("native edit after a reviewer edit → refused", r)
 
-    m = len(log); user_photo("NEW", reply_to=mids[0])
-    draft = await wait_for(lambda e: is_send(e, "sendMessage", USER) and "um:merge" in str(e["params"]), since=m)
     m = len(log); lt.cb(buttons(draft)["➕ 加到这条投稿"] if draft else "", USER, USER,
                         message_id=draft and draft["result"]["message_id"])
     t = await wait_for(lambda e: e["method"] == "answerCallbackQuery" and LOCKED in e["params"].get("text", ""), since=m)
     check("Add to that submission after a reviewer edit → refused", t, draft and buttons(draft))
+
+    # 审核员改稿之后才回复投稿发的图：加不进去，不给“加到这条投稿”，只当成新投稿
+    m = len(log); user_photo("LATE", reply_to=mids[0])
+    late = await wait_for(lambda e: is_send(e, "sendMessage", USER, "请选择投稿方式"), since=m)
+    check("photo replying to a reviewer-edited submission → no Add to that submission button",
+          late and "um:merge" not in str(late["params"]) and "u:sign:3" in str(late["params"]), late and buttons(late))
 
     m = len(log); lt.cb(f"um:mrm:1:{media_ref(1, version(1))}", USER, USER, message_id=prompt)
     t = await wait_for(lambda e: e["method"] == "answerCallbackQuery" and LOCKED in e["params"].get("text", ""), since=m)
@@ -108,8 +117,8 @@ async def scenario():
           r and hint and not [e for e in log[n:] if is_send(e, "sendMessage", USER, "审核员又改了一次")])
 
     # 审核员只切换静音：不算改稿，投稿人照样能改
-    mids2, _, ctrl2 = await submit_album(3, "g2", ["C", "D"])
-    n = len(log); lt.cb("r:silent:3:0", REVIEW, ADMIN, message_id=ctrl2)
+    mids2, _, ctrl2 = await submit_album(4, "g2", ["C", "D"])
+    n = len(log); lt.cb("r:silent:4:0", REVIEW, ADMIN, message_id=ctrl2)
     await wait_for(lambda e: e["method"] == "answerCallbackQuery", since=n)
     r = await user_says("/edit 开关之后改", mids2[0], (EDITED, LOCKED))
     check("reviewer only toggled Silent → submitter can still edit",

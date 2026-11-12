@@ -278,11 +278,12 @@ T: dict[str, dict[str, str]] = {
               "<code>/edit new content</code>.",
     },
     "submitter_label": {"zh": "投稿人 {name}", "en": "submitter {name}"},
+    # 也会显示在按钮的弹窗里（点“加到这条投稿”“删除图片”时），弹窗不解析 HTML：不能带 <code> 这类标记
     "locked_by_reviewer": {
         "zh": "审核员已经修改过这条投稿，你不能再改了。如需调整，请回复审核员的消息或你的投稿，"
-              "发送 <code>/msg 内容</code> 告诉审核员。",
+              "发送“/msg 内容”告诉审核员。",
         "en": "A reviewer has already edited this submission, so you can't change it anymore. To ask for changes, "
-              "reply to the reviewer's message or your submission with <code>/msg your message</code>.",
+              "reply to the reviewer's message or your submission with “/msg your message”.",
     },
     "notify_reviewer_edited": {
         "zh": "✏️ 审核员修改了你的投稿，之后不能再改，请用 <code>/msg</code> 与审核员沟通。"

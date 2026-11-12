@@ -154,13 +154,15 @@ class SubmissionsMixin(CoreBase):
         return bool(limit) and await self.db.count_open_by_user(user_id, statuses) >= limit
 
     async def _merge_target(self, first: Message, items: list[dict]) -> int | None:
-        """回复自己的一条投稿（还能修改的）发来的图片视频：可以加到那条投稿里，返回它的编号。"""
+        """回复自己的一条投稿（还能修改的）发来的图片视频：可以加到那条投稿里，返回它的编号。
+        审核员改过的稿件投稿人不能再改（见 _save_edit），加不进去，不给这个选择。"""
         reply = explicit_reply(first)
         if not reply or not media_count(items):
             return None
         found = await self.db.find_by_user_message(first.from_user.id, reply.message_id)
         target = await self.db.get(found[0]) if found else None
-        if target and target.user_id == first.from_user.id and target.status in SUBMITTER_EDITABLE:
+        if (target and target.user_id == first.from_user.id and target.status in SUBMITTER_EDITABLE
+                and not target.reviewer_edited):
             return target.id
         return None
 

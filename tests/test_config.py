@@ -54,6 +54,7 @@ def test_malformed_values():
         "LANGUAGE": ("fr", "cfg_choice"),
         "SPAM_ACTION": ("delete", "cfg_choice"),
         "STATS_SCOPE": ("todya", "cfg_choice"),
+        "BACKUP_TIME": ("25:00", "cfg_clock"),
     }
     for name, (value, key) in cases.items():
         got, zh, en = error(**{name: value})
@@ -70,7 +71,18 @@ def test_quiet_hours():
         assert got == "cfg_quiet_hours_same" and value in zh and value in en, (value, got)
 
 
-COUNTS = ("MAX_PENDING_PER_USER", "MSG_WINDOW_DAYS", "REMINDER_INTERVAL_MINUTES", "MAX_LINKS", "NEW_USER_COOLDOWN_MINUTES")
+COUNTS = ("MAX_PENDING_PER_USER", "MSG_WINDOW_DAYS", "REMINDER_INTERVAL_MINUTES", "MAX_LINKS", "NEW_USER_COOLDOWN_MINUTES",
+          "BACKUP_KEEP")
+
+
+def test_backup_settings():
+    """备份时间默认 04:00，统一成两位数；中文冒号也认；写错（不是 HH:MM）启动时报错。"""
+    s = load()
+    assert (s.backup_time, s.backup_keep) == ("04:00", 7)
+    for value, want in (("4:05", "04:05"), ("23：30", "23:30"), ("00:00", "00:00")):
+        assert load(BACKUP_TIME=value).backup_time == want, value
+    for value in ("4", "04:60", "", "noon"):
+        assert error(BACKUP_TIME=value)[0] == "cfg_clock", value
 
 
 def test_counts_not_negative():

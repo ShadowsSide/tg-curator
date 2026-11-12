@@ -111,6 +111,13 @@ docker compose pull && docker compose up -d && docker image prune -f   # 更新�
 
 `docker image prune -f` 只删除没有被任何容器使用的旧镜像，正在运行的那个不会删。每次更新都会留下一份一两百 MB 的旧镜像，磁盘小的 VPS、树莓派最好加上；想保留上一个版本、断网时也能快速回滚的话，可以不加。用 `docker system df` 可以查看镜像占了多少空间。
 
+机器人每天还会自动备份一次数据库（默认 04:00，保留最近 7 份，见 `BACKUP_TIME`、`BACKUP_KEEP`），放在同一个卷的 `/app/data/backups/` 里，成功或失败都会在审核群静音提醒。它能防误操作、防升级删列，但和数据库在同一个卷里，不防卷或磁盘损坏，重要的话定期复制到别处。复制出来和恢复：
+
+```bash
+docker compose cp bot:/app/data/backups ./backups   # 把自动备份复制到当前目录
+docker compose stop bot && docker compose cp ./backups/bot-2026-11-12.db bot:/app/data/bot.db && docker compose start bot   # 用某一份恢复
+```
+
 数据库保存在 Docker 卷 `bot-data` 中。停止或更新时，机器人会先做完正在进行的发布（最多 45 秒）再退出，所以 `docker-compose.yml` 里的 `stop_grace_period: 60s` 不要删；新版本改了 `docker-compose.yml` 时，更新前也要重新下载它。
 
 ## 配置
@@ -141,6 +148,8 @@ docker compose pull && docker compose up -d && docker image prune -f   # 更新�
 | `MAX_PENDING_PER_USER` | `5` | 每人同时最多保留几条未处理投稿，`0` 不限；回复自己的投稿加图不受限制 |
 | `REMINDER_INTERVAL_MINUTES` | `60` | 审核统计提醒的间隔（分钟），按整点对齐；`0` 表示关闭 |
 | `REMINDER_QUIET_HOURS` | — | 免打扰时段，例如 `0-8` |
+| `BACKUP_TIME` | `04:00` | 每天几点（`TZ` 时区）自动备份数据库，成功或失败都会在审核群静音提醒 |
+| `BACKUP_KEEP` | `7` | 保留最近几份自动备份；`0` 表示关闭自动备份 |
 | `PROXY` | — | 代理，例如 `socks5://host:port` |
 | `IMAGE` | `ghcr.io/shadowsside/tg-curator:latest` | 换成其他镜像时填写，例如固定版本、自己 fork 的镜像或 Docker Hub 上的镜像 |
 
@@ -273,10 +282,10 @@ set -a; source .env; set +a
 DB_PATH=./data/bot.db .venv/bin/python -m bot
 ```
 
-测试不需要 token，也不需要联网。`tests/test_*.py` 是单元测试；`tests/live_*.py` 是端到端测试，会启动模拟的 Bot API 服务器并运行真实的机器人进程。每个文件都能单独运行，开头写了它测什么。运行全部测试（约 10 分钟）和静态检查：
+测试不需要 token，也不需要联网。`tests/test_*.py` 是单元测试；`tests/live_*.py` 是端到端测试，会启动模拟的 Bot API 服务器并运行真实的机器人进程。每个文件都能单独运行，开头写了它测什么。运行全部测试和静态检查（端到端测试并行运行，并行数默认是 CPU 核数，可以用 `-j` 指定；8 路约 2.5 分钟）：
 
 ```bash
-for f in tests/test_*.py tests/live_*.py; do .venv/bin/python "$f" || echo "FAILED: $f"; done
+.venv/bin/python tests/run_all.py
 .venv/bin/python -m pyflakes bot tests
 ```
 

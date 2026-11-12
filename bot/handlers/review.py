@@ -176,6 +176,13 @@ def build_router(settings: Settings) -> Router:
                 await cq.message.reply(err.text(lang))  # 回复在这条投稿的控制按钮消息下面
         elif action == "retry":
             await answer(t(lang, "toast_retrying"))
+            sub = await core.get_submission(sid)
+            if sub and cq.message and cq.message.message_id != sub.review_msg_id:
+                # 定时发布失败提醒上的按钮：先收起，免得留着一个过时的按钮（重试结果照样回复在这条提醒下面）
+                try:
+                    await cq.message.edit_reply_markup(reply_markup=None)
+                except TelegramBadRequest:  # 已经收起了（连点两次）、消息已删除
+                    pass
             err = await core.publish(sid, reviewer=who, from_states=("failed",), version=v)
             if err:
                 await cq.message.reply(err.text(lang))

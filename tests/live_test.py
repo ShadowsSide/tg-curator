@@ -22,6 +22,8 @@ LINKED = -8000  # 发布频道的关联群组（评论区）
 BASIC_GROUP = -4001234  # 普通群（不是超级群），getChat 返回 type=group
 CTRL = "新投稿"  # 控制按钮消息标题（不再显示投稿编号；测试按顺序取紧接着的那一条）
 T0 = time.time()
+TMP = tempfile.mkdtemp()  # 本次测试自己的临时目录：并行跑时各用各的数据库、心跳文件、配置错误文件
+ISOLATED = {"HEARTBEAT_FILE": os.path.join(TMP, "heartbeat"), "CONFIG_ERROR_FILE": os.path.join(TMP, "config-error")}
 
 updates: list[dict] = []
 new_update = asyncio.Event()
@@ -167,6 +169,8 @@ async def handle(request: web.Request):
         result = [make_msg(params["chat_id"]) for _ in params["media"]]
     elif m.startswith("send"):
         result = make_msg(params["chat_id"])
+        # 记下发出时带的按钮：之后收起按钮（editMessageReplyMarkup 不带 reply_markup）才不会被当成“没有变化”
+        markups[(str(params["chat_id"]), str(result["message_id"]))] = params.get("reply_markup")
     else:
         result = True
     log.append({"method": method, "params": params, "result": result, "t": time.time()})
@@ -226,10 +230,18 @@ async def edit_cmd(text, ctrl):
 
 
 def cb(data, chat_id, from_id, message_id=999):
-    callbacks[str(uid[0])] = time.time()
-    push(callback_query={"id": str(uid[0]), "chat_instance": "x", "data": data,
+    """推送一次按钮点击，返回这次点击的编号（answerCallbackQuery 的 callback_query_id）。"""
+    cid = str(uid[0])
+    callbacks[cid] = time.time()
+    push(callback_query={"id": cid, "chat_instance": "x", "data": data,
                          "from": {"id": from_id, "is_bot": False, "first_name": "Admin" if from_id == ADMIN else "Alice"},
                          "message": {"message_id": message_id, "date": now(), "chat": chat(chat_id)}})
+    return cid
+
+
+def answered(cid):
+    """等这次按钮点击的回应用的条件。"""
+    return lambda e: e["method"] == "answerCallbackQuery" and str(e["params"].get("callback_query_id")) == cid
 
 
 async def pub_ok(sid, quiet=0.3, timeout=5.0):
@@ -316,8 +328,11 @@ async def submit(text, sid, who=USER):
     其他测试文件共用；本文件的场景里另有一个带额外检查的同名局部函数。"""
     n = len(log); pm(text, who=who)
     await wait_for(lambda e: any(is_send(e, "sendMessage", who, p) for p in PROMPTS), since=n)
-    n = len(log); cb(f"u:sign:{sid}", who, who)
-    return await wait_for(lambda e: is_send(e, "sendMessage", REVIEW, CTRL), since=n)
+    n = len(log); cid = cb(f"u:sign:{sid}", who, who)
+    ctrl = await wait_for(lambda e: is_send(e, "sendMessage", REVIEW, CTRL), since=n)
+    # 按钮的回应在控制按钮消息之后才发：等它到了再返回，免得算进调用方接下来那次点击的回应里
+    await wait_for(answered(cid), since=n)
+    return ctrl
 
 
 async def scenario():
@@ -685,7 +700,7 @@ async def main(scenario_fn=None, extra_env=None, allowed_errors=()):
     port = site._server.sockets[0].getsockname()[1]
 
     env = {**os.environ, "BOT_TOKEN": f"{BOT_ID}:TEST", "CHANNEL_ID": str(CHANNEL), "REVIEW_CHAT_ID": str(REVIEW),
-           "TELEGRAM_API_URL": f"http://127.0.0.1:{port}", "DB_PATH": os.path.join(tempfile.mkdtemp(), "bot.db"),
+           "TELEGRAM_API_URL": f"http://127.0.0.1:{port}", "DB_PATH": os.path.join(TMP, "bot.db"), **ISOLATED,
            "ALBUM_DELAY": "0.5", "REMINDER_INTERVAL_MINUTES": "1", "REMINDER_ONLY_WHEN_PENDING": "false",
            "REMINDER_QUIET_HOURS": "", "TZ": "Asia/Shanghai", "PYTHONUNBUFFERED": "1", **(extra_env or {})}
     proc = await asyncio.create_subprocess_exec(sys.executable, "-m", "bot", cwd=PROJECT, env=env,

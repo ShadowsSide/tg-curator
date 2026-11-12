@@ -61,6 +61,9 @@ async def scenario():
     n = len(log); lt.cb("r:pub_ok:2:0", REVIEW, ADMIN, message_id=c2["result"]["message_id"])
     await wait_for(lambda e: is_send(e, "sendMessage", lt.CHANNEL, "解封后可以再投稿"), since=n)
     ctrl2 = c2["result"]["message_id"]
+    # 发布最后才刷新控制按钮消息（显示已发布）：等它到了再 /ban，免得把它当成 /ban 之后的刷新
+    await wait_for(lambda e: e["method"] == "editMessageText" and str(e["params"].get("message_id")) == str(ctrl2)
+                   and "已发布" in e["params"].get("text", ""), since=n)
     n = len(log); gm("/ban 广告", reply_to=ctrl2)
     await wait_for(lambda e: is_send(e, "sendMessage", REVIEW, "已封禁"), since=n)
     shown = await ctrl_edit(ctrl2, n)

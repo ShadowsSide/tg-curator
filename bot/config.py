@@ -78,6 +78,15 @@ def _presets(value: str) -> tuple[str, ...]:
     return presets
 
 
+def _clock(name: str, default: str) -> str:
+    """一天中的某个时间 HH:MM（例如每天几点备份），统一成两位数的写法。"""
+    value = _env(name, default).replace("：", ":")
+    if not re.fullmatch(r"([01]?[0-9]|2[0-3]):[0-5][0-9]", value):
+        raise ConfigError("cfg_clock", name=name, value=value)
+    hour, minute = value.split(":")
+    return f"{int(hour):02d}:{minute}"
+
+
 def _quiet_hours(value: str) -> tuple[int, int] | None:
     if not value:
         return None
@@ -118,6 +127,8 @@ class Settings:
     spam_rules: SpamRules  # 关键词黑名单、链接上限，见 spam.py
     spam_action: str  # 命中时：flag = 照常提交但在控制按钮消息上标记；block = 拦下不让提交
     new_user_cooldown_min: int  # 还没有稿件发布过的投稿人，两次投稿之间至少间隔几分钟；0 = 不限
+    backup_time: str  # 每天几点（本地时间 HH:MM）自动备份数据库
+    backup_keep: int  # 保留最近几份备份；0 = 不自动备份
 
     def reject_template(self, index: int) -> str | None:
         """理由面板上的第 index 个理由（从 1 开始）；0 或超出范围 = 不附理由。"""
@@ -169,4 +180,6 @@ def load_settings() -> Settings:
         spam_rules=SpamRules.parse(_env("SPAM_KEYWORDS"), _count("MAX_LINKS", "0"), _env("LINK_WHITELIST")),
         spam_action=_choice(_env("SPAM_ACTION", "flag"), ("flag", "block"), "SPAM_ACTION"),
         new_user_cooldown_min=_count("NEW_USER_COOLDOWN_MINUTES", "0"),
+        backup_time=_clock("BACKUP_TIME", "04:00"),
+        backup_keep=_count("BACKUP_KEEP", "7"),
     )

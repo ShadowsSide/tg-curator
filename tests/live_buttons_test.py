@@ -48,14 +48,14 @@ async def scenario():
           failed and buttons(failed))
 
     # 2. 重试发布：不需要确认，直接发布成功
-    n = len(log); lt.cb("r:retry:1:0", REVIEW, ADMIN)
+    n = len(log); lt.cb("r:retry:1:0", REVIEW, ADMIN, message_id=c1["result"]["message_id"])  # 控制按钮消息上的按钮
     post = await wait_for(lambda e: is_send(e, "sendMessage", CHANNEL, "按钮测试 1"), since=n)
     done = await control_edit(c1, n, "已发布")
     panel = [e for e in log[n:] if e["method"] == "editMessageReplyMarkup"]
     check("Retry → published right away (no confirm panel), control shows published", post and done and not panel)
 
     # 3. 已发布的再点“重试发布”（旧按钮）：提示状态已变化，不会重复发布
-    n = len(log); lt.cb("r:retry:1:0", REVIEW, ADMIN)
+    n = len(log); lt.cb("r:retry:1:0", REVIEW, ADMIN, message_id=c1["result"]["message_id"])  # 控制按钮消息上的按钮
     told = await wait_for(lambda e: is_send(e, "sendMessage", REVIEW, "状态已变化"), since=n)
     check("Retry on an already-published submission → 'status changed', nothing posted twice",
           told and not posts(n, "按钮测试 1"))

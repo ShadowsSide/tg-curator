@@ -109,6 +109,11 @@ def _rb(text: str, a: str, sid: int, v: int = 0, style: ButtonStyle | None = Non
     return InlineKeyboardButton(text=text, callback_data=ReviewCB(a=a, sid=sid, v=v).pack(), style=style)
 
 
+def retry_kb(sub: Submission, lang: str) -> InlineKeyboardMarkup:
+    """定时发布失败的提醒上的“重试发布”：和控制按钮消息上的是同一个按钮（带内容版本），点过就收起（见 handlers/review.py）。"""
+    return InlineKeyboardMarkup(inline_keyboard=[[_rb(t(lang, "btn_retry"), "retry", sub.id, sub.version, style=GREEN)]])
+
+
 def _toggle(on: bool) -> ButtonStyle | None:
     return BLUE if on else None
 

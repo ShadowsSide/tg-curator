@@ -67,6 +67,8 @@ T: dict[str, dict[str, str]] = {
                "en": "TZ is not a valid time zone: {value!r} (e.g. Asia/Shanghai, UTC)"},
     "cfg_schedule_presets": {"zh": "SCHEDULE_PRESETS 里的 {value!r} 不是有效的时间（格式 HH:MM，例如 09:00,21:30）",
                              "en": "{value!r} in SCHEDULE_PRESETS is not a valid time (use HH:MM, e.g. 09:00,21:30)"},
+    "cfg_clock": {"zh": "{name} 不是有效的时间：{value!r}（格式 HH:MM，例如 04:00）",
+                  "en": "{name} is not a valid time: {value!r} (use HH:MM, e.g. 04:00)"},
     "cfg_quiet_hours": {"zh": "REMINDER_QUIET_HOURS 格式不对：{value!r}（例如 0-8）",
                         "en": "REMINDER_QUIET_HOURS is malformed: {value!r} (e.g. 0-8)"},
     "cfg_quiet_hours_same": {
@@ -525,6 +527,9 @@ T: dict[str, dict[str, str]] = {
         "zh": "出错了，这次操作没有完成，请稍后再试",
         "en": "Something went wrong and this action wasn't completed. Please try again shortly",
     },
+    "backup_done": {"zh": "💾 数据库已自动备份：<code>{name}</code>（{size}），保留最近 {keep} 份",
+                    "en": "💾 Database backed up: <code>{name}</code> ({size}), keeping the last {keep}"},
+    "backup_failed": {"zh": "💾 数据库自动备份失败：{error}", "en": "💾 Automatic database backup failed: {error}"},
     "sched_published": {"zh": "⏰ 定时发布成功{link}", "en": "⏰ The scheduled post went out{link}"},
     "sched_publish_failed": {"zh": "⏰ 定时发布没有成功：{reason}", "en": "⏰ The scheduled post didn't go out: {reason}"},
     "publish_failed": {"zh": "发布失败：{error}", "en": "Failed to publish: {error}"},

@@ -1,4 +1,5 @@
 """定时发布没有成功时提醒审核员：回复在这条稿件的控制按钮消息下面。
+发布失败的提醒带“重试发布”按钮，点过就收起；被限流改到稍后发布的不带。
 定时发布成功时也静音回复一条，带帖子链接；立即发布、控制按钮消息已经没了的不发。
 
 用法（项目根目录下）：python tests/live_sched_fail_test.py
@@ -12,7 +13,7 @@ import tempfile
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import live_test as lt  # noqa: E402
-from live_test import CHANNEL, REVIEW, check, is_send, log, submit, wait_for  # noqa: E402
+from live_test import CHANNEL, REVIEW, buttons, check, is_send, log, submit, wait_for  # noqa: E402
 
 DB = os.path.join(tempfile.mkdtemp(), "bot.db")
 TICK = 20  # 秒：比调度间隔（15 秒）多一点
@@ -51,14 +52,38 @@ async def scenario():
     check("scheduled publish fails → reviewers told under the control panel message, with the reason",
           alert and "&lt;chat&gt; not found" in alert["params"]["text"] and status(1) == "failed",
           alert and alert["params"]["text"])
+    retry = buttons(alert).get("🔁 重试发布")
+    check("… with a 🔁 Retry button (same callback as on the control panel message, carrying the version)",
+          retry and retry.startswith("r:retry:1:"), alert and buttons(alert))
+
+    # 1b. 点提醒上的“重试”：收起这条提醒的按钮，重新发布成功
+    aid = alert["result"]["message_id"]
+    lt.MOCK["fail"].pop(f"sendMessage:{CHANNEL}", None)
+    n = len(log); lt.cb(retry, REVIEW, lt.ADMIN, message_id=aid)
+    post = await wait_for(lambda e: is_send(e, "sendMessage", CHANNEL, "定时失败测试"), since=n)
+    folded = await wait_for(lambda e: e["method"] == "editMessageReplyMarkup" and not e.get("error")
+                            and str(e["params"].get("message_id")) == str(aid)
+                            and not (e["params"].get("reply_markup") or {}).get("inline_keyboard"), since=n)
+    await asyncio.sleep(0.5)  # 发到频道之后才记成已发布
+    check("Retry on the alert → button folded away, published", post and folded and status(1) == "published",
+          (bool(post), bool(folded), status(1)))
+
+    # 1c. 再点一次（比如两个审核员都点了）：不重复发布，回复在提醒下面说状态已变化
+    n = len(log); lt.cb(retry, REVIEW, lt.ADMIN, message_id=aid)
+    told = await wait_for(lambda e: is_send(e, "sendMessage", REVIEW, "状态已变化")
+                          and str((e["params"].get("reply_parameters") or {}).get("message_id")) == str(aid), since=n)
+    await asyncio.sleep(0.5)
+    check("Retry again → not published twice, told under the alert that the status changed",
+          told and not [e for e in log[n:] if is_send(e, "sendMessage", CHANNEL, "定时失败测试")])
 
     # 2. 被限流太久、改到稍后发布：同样提醒，告诉新的时间
     c2 = await submit("定时限流测试", 2)
     lt.MOCK["flood"][f"sendMessage:{CHANNEL}"] = [120]
     n = len(log); due_now(2)
     alert = await wait_for(alert_for(c2), timeout=TICK, since=n)
-    check("scheduled publish postponed by a long 429 → reviewers told the new time",
-          alert and "限流" in alert["params"]["text"] and status(2) == "scheduled", alert and alert["params"]["text"])
+    check("scheduled publish postponed by a long 429 → reviewers told the new time, no Retry button (it isn't failed)",
+          alert and "限流" in alert["params"]["text"] and status(2) == "scheduled" and not buttons(alert),
+          alert and alert["params"])
 
     # 3. 发布成功：不提醒失败，静音回复控制按钮消息说成功了，带帖子链接
     c3 = await submit("定时成功测试", 3)

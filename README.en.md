@@ -109,6 +109,13 @@ docker compose pull && docker compose up -d && docker image prune -f   # update 
 
 `docker image prune -f` only removes old images no container is using; the running one is never deleted. Every update leaves an old image of one or two hundred MB behind, so keep it on small VPSes and Raspberry Pis; leave it out if you want to keep the previous version around for a quick offline rollback. `docker system df` shows how much space images take.
 
+The bot also backs up the database automatically once a day (04:00 by default, keeping the last 7; see `BACKUP_TIME` and `BACKUP_KEEP`) into `/app/data/backups/` on the same volume, and posts a silent message to the review group whether it worked or not. This protects against mistakes and columns dropped by upgrades, but it lives on the same volume as the database, so it doesn't survive a lost volume or disk; copy it elsewhere now and then if it matters. To copy the backups out and restore one:
+
+```bash
+docker compose cp bot:/app/data/backups ./backups   # copy the automatic backups to the current directory
+docker compose stop bot && docker compose cp ./backups/bot-2026-11-12.db bot:/app/data/bot.db && docker compose start bot   # restore one of them
+```
+
 The database lives in the Docker volume `bot-data`. When stopping or updating, the bot finishes publishing in progress (up to 45 seconds) before exiting, so keep `stop_grace_period: 60s` in `docker-compose.yml`. When a new version changes `docker-compose.yml`, download it again before updating.
 
 ## Configuration
@@ -139,6 +146,8 @@ Options most deployments adjust as needed.
 | `MAX_PENDING_PER_USER` | `5` | Maximum open submissions per user at a time, `0` for no limit; adding photos to your own submission by replying isn't limited |
 | `REMINDER_INTERVAL_MINUTES` | `60` | Interval of the review summary, aligned to the clock; `0` turns it off |
 | `REMINDER_QUIET_HOURS` | — | Quiet hours with no summaries, e.g. `0-8` |
+| `BACKUP_TIME` | `04:00` | Time of day (in `TZ`) for the automatic database backup; the review group gets a silent message whether it worked or not |
+| `BACKUP_KEEP` | `7` | How many automatic backups to keep; `0` turns automatic backups off |
 | `PROXY` | — | Proxy, e.g. `socks5://host:port` |
 | `IMAGE` | `ghcr.io/shadowsside/tg-curator:latest` | Set this to use another image, e.g. a pinned version, your fork's image or one on Docker Hub |
 
@@ -271,10 +280,10 @@ set -a; source .env; set +a
 DB_PATH=./data/bot.db .venv/bin/python -m bot
 ```
 
-Tests need no token and no network. `tests/test_*.py` are unit tests; `tests/live_*.py` are end-to-end tests that start a mock Bot API server and run the real bot process. Each file is a standalone script with a description at the top. Run all tests (about 10 minutes) and the static check:
+Tests need no token and no network. `tests/test_*.py` are unit tests; `tests/live_*.py` are end-to-end tests that start a mock Bot API server and run the real bot process. Each file is a standalone script with a description at the top. Run all tests and the static check (end-to-end tests run in parallel, as many at a time as there are CPU cores, or set it with `-j`; about 2.5 minutes with 8):
 
 ```bash
-for f in tests/test_*.py tests/live_*.py; do .venv/bin/python "$f" || echo "FAILED: $f"; done
+.venv/bin/python tests/run_all.py
 .venv/bin/python -m pyflakes bot tests
 ```
 

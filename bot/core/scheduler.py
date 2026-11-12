@@ -1,18 +1,21 @@
-"""后台任务：到点发布定时投稿、清理过期草稿、定时发送审核统计。"""
+"""后台任务：到点发布定时投稿、清理过期草稿、定时发送审核统计、每天备份数据库。"""
 from __future__ import annotations
 
 import asyncio
 import contextlib
+import html
 import logging
 from datetime import datetime
 
 from aiogram.exceptions import TelegramAPIError
 
+from ..backup import human_size, make_backup
 from ..db import Submission
 from ..errors import Notice
 from ..health import beat
 from ..i18n import t
-from ..timeutil import now_ts, start_of_today
+from ..keyboards import retry_kb
+from ..timeutil import next_occurrence, now_ts, start_of_today
 
 from .base import CoreBase, SCHEDULER_TICK, DRAFT_TTL, NO_PREVIEW, _reply_to
 
@@ -54,11 +57,14 @@ class SchedulerMixin(CoreBase):
                 await asyncio.wait_for(self._stopping.wait(), SCHEDULER_TICK)
 
     async def _report_scheduled(self, sub: Submission, err: Notice) -> None:
-        """定时发布没有成功（发布失败 / 被限流改了时间）：没人点按钮，控制按钮消息变了也没人注意，回复在它下面提醒审核员。"""
+        """定时发布没有成功（发布失败 / 被限流改了时间）：没人点按钮，控制按钮消息变了也没人注意，回复在它下面提醒审核员。
+        发布失败的带“重试发布”按钮，不用再去找控制按钮消息；被限流改到稍后自动发布的不带（不是失败，到点会再发）。"""
+        fresh = await self.db.get(sub.id)
+        kb = retry_kb(fresh, self.lang) if fresh and fresh.status == "failed" else None
         try:
             await self.bot.send_message(
                 self.s.review_chat_id, t(self.lang, "sched_publish_failed", reason=err.text(self.lang)),
-                reply_parameters=_reply_to(sub.review_msg_id),
+                reply_parameters=_reply_to(sub.review_msg_id), reply_markup=kb,
             )
         except TelegramAPIError as e:
             log.warning("提醒定时发布 #%s 失败：%s", sub.id, e)
@@ -97,3 +103,29 @@ class SchedulerMixin(CoreBase):
                 await self.post_stats()
             except Exception:
                 log.exception("审核提醒出错")
+
+    async def _backup_loop(self) -> None:
+        if self.s.backup_keep <= 0:
+            return
+        tz = self.s.tz
+        target = next_occurrence(self.s.backup_time, tz)
+        while True:
+            await asyncio.sleep(max(0.0, (target - datetime.now(tz)).total_seconds()))
+            await self.backup_now()
+            # 从这次的时间点往后算：sleep 提前一点醒来也不会同一天备份两次
+            target = next_occurrence(self.s.backup_time, tz, max(datetime.now(tz), target))
+
+    async def backup_now(self) -> None:
+        """备份一次，成功、失败都静音告诉审核群（失败了一直没人知道，等要用时才发现没有备份）。"""
+        try:
+            name, size = await make_backup(self.db, self.s.db_path, self.s.backup_keep,
+                                           datetime.now(self.s.tz).strftime("%Y-%m-%d"))
+            log.info("已备份数据库：%s（%s 字节）", name, size)
+            text = t(self.lang, "backup_done", name=name, size=human_size(size), keep=self.s.backup_keep)
+        except Exception as e:
+            log.exception("自动备份数据库失败")
+            text = t(self.lang, "backup_failed", error=html.escape(str(e)))
+        try:
+            await self.bot.send_message(self.s.review_chat_id, text, disable_notification=True)
+        except TelegramAPIError as e:
+            log.warning("告知备份结果失败：%s", e)

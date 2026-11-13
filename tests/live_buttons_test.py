@@ -99,8 +99,12 @@ async def scenario():
           changed and not first, changed and changed["params"]["text"])
     await wait_for(lt.answered(click), since=n)  # 回应在通知之后：等它到了再点第二下，免得被当成第二下的回应
     n = len(log); click = lt.cb(presets[1], REVIEW, ADMIN)
-    await wait_for(lt.answered(click), since=n)  # 定时（含通知投稿人）做完才回应：回应到了，该发的通知就都发了
-    check("Reschedule to the same time → no notification", not [e for e in log[n:] if is_send(e, "sendMessage", USER)])
+    # 等控制按钮消息刷新：定时里通知投稿人在刷新之前，刷新到了，该发的通知就都发了。
+    # 不拿按钮的回应当“做完了”：处理得慢时兜底会先回应“处理中…”，那时通知可能还没发
+    done = await control_edit(c2, n, "定时")
+    await wait_for(lt.answered(click), since=n)
+    check("Reschedule to the same time → no notification",
+          done and not [e for e in log[n:] if is_send(e, "sendMessage", USER)])
 
 
 if __name__ == "__main__":

@@ -26,9 +26,8 @@ async def draft(**kw):
     return mid
 
 
-async def press(data):
-    n = len(log); lt.cb(data, USER, USER)
-    return n, await wait_for(lambda e: e["method"] == "answerCallbackQuery", since=n)
+def press(data):
+    return lt.press(data, USER, USER)
 
 
 async def scenario():

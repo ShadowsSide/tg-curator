@@ -46,8 +46,7 @@ async def scenario():
 
     # 取消的草稿（数据库里默认记为“署名”）不算一次选择：仍然标“匿名”
     await draft("第四次")
-    n = len(log); lt.cb("u:cancel:4", USER, USER)
-    await wait_for(lambda e: e["method"] == "answerCallbackQuery", since=n)
+    await lt.press("u:cancel:4", USER, USER)
     e = await draft("第五次")
     check("a cancelled draft doesn't count as a choice",
           e and first_row(e) == ["🕶 匿名投稿（上次）", "👤 署名投稿"], e and first_row(e))

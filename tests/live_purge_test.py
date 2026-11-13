@@ -31,10 +31,14 @@ def review_ids(marker):
             if not e.get("error") and is_send(e, "sendMessage", REVIEW, marker) and e.get("result")}
 
 
+def is_delete(e):
+    """在审核群的删除请求：整批（deleteMessages）和逐条（deleteMessage）。"""
+    return e["method"] in ("deleteMessages", "deleteMessage") and str(e["params"].get("chat_id")) == str(REVIEW)
+
+
 def deletes(since):
-    """since 之后在审核群的删除请求：整批（deleteMessages）和逐条（deleteMessage）。"""
-    return [e for e in log[since:] if e["method"] in ("deleteMessages", "deleteMessage")
-            and str(e["params"].get("chat_id")) == str(REVIEW)]
+    """since 之后在审核群的删除请求。"""
+    return [e for e in log[since:] if is_delete(e)]
 
 
 def result(since, contains):
@@ -45,10 +49,10 @@ def result(since, contains):
 def answered_first(since, click):
     """这次点击（lt.cb 返回的编号）的回应（删除中…）在任何删除请求之前：等删完再回应，删得久了 Telegram 会拒绝（query is too old）。
     只认这次点击的回应：上一步晚到的回应不算。"""
-    first_delete = next((i for i, e in enumerate(log[since:]) if e in deletes(since)), None)
-    first_answer = next((i for i, e in enumerate(log[since:]) if lt.answered(click)(e)), None)
-    return first_answer is not None and (first_delete is None or first_answer < first_delete) \
-        and "删除中" in log[since + first_answer]["params"].get("text", "")
+    first_delete = next((i for i in range(since, len(log)) if is_delete(log[i])), None)
+    answered_at, first = next(iter(lt.answers_of(click)), (None, None))  # 下标都是在 log 里的位置
+    return first is not None and (first_delete is None or answered_at < first_delete) \
+        and "删除中" in first["params"].get("text", "")
 
 
 def deleted_ids(since):

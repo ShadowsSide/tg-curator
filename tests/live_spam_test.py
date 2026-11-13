@@ -27,8 +27,7 @@ async def draft(text, who=USER, **extra):
 
 async def choose(sid, who=USER):
     """选“署名”。返回 (控制按钮消息, 按钮提示)。"""
-    n = len(log); lt.cb(f"u:sign:{sid}", who, who)
-    toast = await wait_for(lambda e: e["method"] == "answerCallbackQuery", since=n)
+    n, toast = await lt.press(f"u:sign:{sid}", who, who)
     ctrl = await wait_for(lambda e: is_send(e, "sendMessage", REVIEW, CTRL), timeout=1.5, since=n)
     return ctrl, toast
 

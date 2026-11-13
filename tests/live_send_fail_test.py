@@ -19,10 +19,8 @@ async def draft(**kw):
     await wait_for(lambda e: any(is_send(e, "sendMessage", USER, p) for p in lt.PROMPTS), since=n)
 
 
-async def press_submit(sid):
-    n = len(log); lt.cb(f"u:sign:{sid}", USER, USER)
-    answer = await wait_for(lambda e: e["method"] == "answerCallbackQuery", since=n)
-    return n, answer
+def press_submit(sid):
+    return lt.press(f"u:sign:{sid}", USER, USER)
 
 
 def told_draft(answer):

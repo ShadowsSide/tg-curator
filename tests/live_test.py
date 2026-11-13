@@ -244,6 +244,20 @@ def answered(cid):
     return lambda e: e["method"] == "answerCallbackQuery" and str(e["params"].get("callback_query_id")) == cid
 
 
+def answers_of(cid):
+    """这次按钮点击的全部回应，按先后：[(在 log 里的下标, 记录)]。点击编号在一次测试里不重复，不用再限定从哪里找起。"""
+    pred = answered(cid)
+    return [(i, e) for i, e in enumerate(log) if pred(e)]
+
+
+async def press(data, chat_id, from_id, message_id=999, timeout=10.0):
+    """推送一次按钮点击，并等它自己的回应。返回 (点击前的日志长度, 回应)；没等到回应时后者为 None。
+    只等“第一个 answerCallbackQuery”的话，上一次点击晚到的回应会被当成这一次的（test_structure 不允许那样写）。
+    回应不一定是处理完的信号：处理得慢时兜底会先回应“处理中…”；先回应再做的操作（发布、封禁、删稿）也一样。"""
+    n = len(log); cid = cb(data, chat_id, from_id, message_id)
+    return n, await wait_for(answered(cid), timeout, since=n)
+
+
 async def pub_ok(sid, quiet=0.3, timeout=5.0):
     """“确认发布”的按钮数据。发布按钮带着内容版本（改一次稿加 1），这里取控制按钮消息上最新的那个。
     改稿后机器人先发新预览、再刷新控制按钮消息：等它这一轮请求都发完（quiet 秒内没有新请求）再取，免得取到旧版本。"""

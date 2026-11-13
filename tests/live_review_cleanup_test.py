@@ -31,8 +31,7 @@ async def scenario():
 
     # 2. 封禁后删除稿件：最近一次改稿的消息也删掉
     latest = await edit_cmd("/edit 第三次", ctrl)
-    n = len(log); lt.cb("r:ban_ok:1:0", REVIEW, ADMIN, message_id=ctrl)
-    await wait_for(lambda e: e["method"] == "answerCallbackQuery", since=n)
+    await lt.press("r:ban_ok:1:0", REVIEW, ADMIN, message_id=ctrl)
     n = len(log); lt.cb("r:purge_ok:1:0", REVIEW, ADMIN, message_id=ctrl)
     await wait_for(lambda e: is_send(e, "sendMessage", REVIEW, "已删除"), since=n)  # 按钮先回应，删完才发结果
     check("purge → the latest edit's messages (reviewer's /edit and the confirmation) deleted too",

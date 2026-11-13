@@ -92,14 +92,14 @@ async def scenario():
     n = len(log); lt.cb("r:sched:2:0", REVIEW, ADMIN)
     picker = await wait_for(lambda e: e["method"] == "editMessageReplyMarkup", since=n)
     presets = [v for v in buttons(picker).values() if v.startswith("r:preset:")]
-    n = len(log); lt.cb(presets[1], REVIEW, ADMIN)  # 第一个快捷时间刚才已经用过，换第二个
+    n = len(log); click = lt.cb(presets[1], REVIEW, ADMIN)  # 第一个快捷时间刚才已经用过，换第二个
     changed = await wait_for(lambda e: is_send(e, "sendMessage", USER, "发布时间已改为"), since=n)
     first = [e for e in log[n:] if is_send(e, "sendMessage", USER, "已通过审核")]
     check("Reschedule to a different time → submitter told the new time (not the first-approval text)",
           changed and not first, changed and changed["params"]["text"])
-    n = len(log); lt.cb(presets[1], REVIEW, ADMIN)
-    await wait_for(lambda e: e["method"] == "answerCallbackQuery", since=n)
-    await asyncio.sleep(0.5)
+    await wait_for(lt.answered(click), since=n)  # 回应在通知之后：等它到了再点第二下，免得被当成第二下的回应
+    n = len(log); click = lt.cb(presets[1], REVIEW, ADMIN)
+    await wait_for(lt.answered(click), since=n)  # 定时（含通知投稿人）做完才回应：回应到了，该发的通知就都发了
     check("Reschedule to the same time → no notification", not [e for e in log[n:] if is_send(e, "sendMessage", USER)])
 
 

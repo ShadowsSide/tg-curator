@@ -25,8 +25,9 @@ WORKING = "处理中"
 BANNING = "封禁中"  # 封禁是已知的慢操作：检查通过后自己先回应，不靠兜底
 
 
-def answers(since):
-    return [e for e in log[since:] if e["method"] == "answerCallbackQuery"]
+def answers(click):
+    """这次点击（lt.cb 返回的编号）的回应：只认自己的，上一步晚到的回应不算进来。"""
+    return [e for _, e in lt.answers_of(click)]
 
 
 def told_error(since):
@@ -44,33 +45,33 @@ async def scenario():
 
     # 1. 很快处理完：照常显示自己的提示
     ctrl = (await submit("封禁时被限流", 1))["result"]["message_id"]
-    n = len(log); lt.cb("r:spoiler:1:0", REVIEW, ADMIN, message_id=ctrl)
-    a = await wait_for(lambda e: e["method"] == "answerCallbackQuery", since=n)
+    n = len(log); click = lt.cb("r:spoiler:1:0", REVIEW, ADMIN, message_id=ctrl)
+    a = await wait_for(lt.answered(click), since=n)
     await asyncio.sleep(FALLBACK + 0.5)
     check("fast button → its own toast, answered once, no “working on it”",
-          a and not a.get("error") and "剧透" in a["params"].get("text", "") and len(answers(n)) == 1,
-          [e["params"] for e in answers(n)])
+          a and not a.get("error") and "剧透" in a["params"].get("text", "") and len(answers(click)) == 1,
+          [e["params"] for e in answers(click)])
 
     # 2. 兜底的回应自己被限流：不等不重试，处理照常完成
     lt.MOCK["flood"][f"editMessageText:{REVIEW}"] = [FLOOD]
     lt.MOCK["flood"]["answerCallbackQuery:None"] = [30]
-    n = len(log); lt.cb("r:silent:1:0", REVIEW, ADMIN, message_id=ctrl)
+    n = len(log); click = lt.cb("r:silent:1:0", REVIEW, ADMIN, message_id=ctrl)
     done = await control_edited(ctrl, n)
     await asyncio.sleep(0.5)
     check("fallback answer rate limited → no waiting or retrying, the action still completes",
-          done and len(answers(n)) == 1 and answers(n)[0].get("flood") and not told_error(n),
-          [(e["params"].get("text"), e.get("flood")) for e in answers(n)])
+          done and len(answers(click)) == 1 and answers(click)[0].get("flood") and not told_error(n),
+          [(e["params"].get("text"), e.get("flood")) for e in answers(click)])
 
 
     # 3. 控制按钮消息上确认封禁：刷新控制按钮消息时被限流
     lt.MOCK["flood"][f"editMessageText:{REVIEW}"] = [FLOOD]
-    n = len(log); lt.cb("r:ban_ok:1:0", REVIEW, ADMIN, message_id=ctrl)
+    n = len(log); click = lt.cb("r:ban_ok:1:0", REVIEW, ADMIN, message_id=ctrl)
     await control_edited(ctrl, n)
     await asyncio.sleep(0.5)
-    ok = [e for e in answers(n) if not e.get("error")]
+    ok = [e for e in answers(click) if not e.get("error")]
     check("ban on the control panel while rate limited → answered in time with “banning…” (before the slow part), once",
-          len(answers(n)) == 1 and ok and BANNING in ok[0]["params"].get("text", ""),
-          [(e["params"].get("text"), e.get("error")) for e in answers(n)])
+          len(answers(click)) == 1 and ok and BANNING in ok[0]["params"].get("text", ""),
+          [(e["params"].get("text"), e.get("error")) for e in answers(click)])
     check("… no “something went wrong”, no extra result message",
           not told_error(n) and not [e for e in log[n:] if is_send(e, "sendMessage", REVIEW, "已封禁")],
           [e["params"].get("text") for e in told_error(n)])
@@ -78,11 +79,11 @@ async def scenario():
     # 4. 解封一个没被封禁的人（Bob 的稿件，按钮是旧的）：慢，最后是弹窗 → 改成回复控制按钮消息
     ctrl3 = (await submit("旧的解封按钮", 2, who=BOB))["result"]["message_id"]
     lt.MOCK["flood"][f"editMessageText:{REVIEW}"] = [FLOOD]
-    n = len(log); lt.cb("r:unban_ok:2:0", REVIEW, ADMIN, message_id=ctrl3)
+    n = len(log); click = lt.cb("r:unban_ok:2:0", REVIEW, ADMIN, message_id=ctrl3)
     told = await wait_for(lambda e: is_send(e, "sendMessage", REVIEW, "没有被封禁"), FLOOD + 4, since=n)
     check("slow button ending in an alert → answered with “working on it”, the alert becomes a reply",
           told and str((told["params"].get("reply_parameters") or {}).get("message_id")) == str(ctrl3)
-          and len(answers(n)) == 1 and WORKING in answers(n)[0]["params"].get("text", ""),
+          and len(answers(click)) == 1 and WORKING in answers(click)[0]["params"].get("text", ""),
           told and told["params"])
 
     # 5. /user 卡片上确认封禁：同样被限流
@@ -90,13 +91,13 @@ async def scenario():
     card = await wait_for(lambda e: is_send(e, "sendMessage", REVIEW, f"<code>{BOB}</code>"), since=n)
     cid = card and card["result"]["message_id"]
     lt.MOCK["flood"][f"editMessageText:{REVIEW}"] = [FLOOD]
-    n = len(log); lt.cb(f"au:ban_ok:{BOB}", REVIEW, ADMIN, message_id=cid)
+    n = len(log); click = lt.cb(f"au:ban_ok:{BOB}", REVIEW, ADMIN, message_id=cid)
     await control_edited(cid, n)  # 刷新卡片在最后
     await asyncio.sleep(0.5)
-    ok = [e for e in answers(n) if not e.get("error")]
+    ok = [e for e in answers(click) if not e.get("error")]
     check("ban on the /user card while rate limited → answered in time with “banning…”, once",
-          len(answers(n)) == 1 and ok and BANNING in ok[0]["params"].get("text", ""),
-          [(e["params"].get("text"), e.get("error")) for e in answers(n)])
+          len(answers(click)) == 1 and ok and BANNING in ok[0]["params"].get("text", ""),
+          [(e["params"].get("text"), e.get("error")) for e in answers(click)])
     check("… no “something went wrong”", not told_error(n), [e["params"].get("text") for e in told_error(n)])
 
 

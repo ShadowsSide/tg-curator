@@ -118,8 +118,7 @@ async def scenario():
 
     # 审核员只切换静音：不算改稿，投稿人照样能改
     mids2, _, ctrl2 = await submit_album(4, "g2", ["C", "D"])
-    n = len(log); lt.cb("r:silent:4:0", REVIEW, ADMIN, message_id=ctrl2)
-    await wait_for(lambda e: e["method"] == "answerCallbackQuery", since=n)
+    await lt.press("r:silent:4:0", REVIEW, ADMIN, message_id=ctrl2)
     r = await user_says("/edit 开关之后改", mids2[0], (EDITED, LOCKED))
     check("reviewer only toggled Silent → submitter can still edit",
           r and EDITED in r["params"]["text"], r and r["params"]["text"])

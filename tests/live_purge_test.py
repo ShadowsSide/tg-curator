@@ -31,10 +31,14 @@ def review_ids(marker):
             if not e.get("error") and is_send(e, "sendMessage", REVIEW, marker) and e.get("result")}
 
 
+def is_delete(e):
+    """在审核群的删除请求：整批（deleteMessages）和逐条（deleteMessage）。"""
+    return e["method"] in ("deleteMessages", "deleteMessage") and str(e["params"].get("chat_id")) == str(REVIEW)
+
+
 def deletes(since):
-    """since 之后在审核群的删除请求：整批（deleteMessages）和逐条（deleteMessage）。"""
-    return [e for e in log[since:] if e["method"] in ("deleteMessages", "deleteMessage")
-            and str(e["params"].get("chat_id")) == str(REVIEW)]
+    """since 之后在审核群的删除请求。"""
+    return [e for e in log[since:] if is_delete(e)]
 
 
 def result(since, contains):
@@ -42,12 +46,13 @@ def result(since, contains):
     return wait_for(lambda e: is_send(e, "sendMessage", REVIEW, contains), since=since)
 
 
-def answered_first(since):
-    """按钮回应（删除中…）在任何删除请求之前：等删完再回应，删得久了 Telegram 会拒绝（query is too old）。"""
-    first_delete = next((i for i, e in enumerate(log[since:]) if e in deletes(since)), None)
-    first_answer = next((i for i, e in enumerate(log[since:]) if e["method"] == "answerCallbackQuery"), None)
-    return first_answer is not None and (first_delete is None or first_answer < first_delete) \
-        and "删除中" in log[since + first_answer]["params"].get("text", "")
+def answered_first(since, click):
+    """这次点击（lt.cb 返回的编号）的回应（删除中…）在任何删除请求之前：等删完再回应，删得久了 Telegram 会拒绝（query is too old）。
+    只认这次点击的回应：上一步晚到的回应不算。"""
+    first_delete = next((i for i in range(since, len(log)) if is_delete(log[i])), None)
+    answered_at, first = next(iter(lt.answers_of(click)), (None, None))  # 下标都是在 log 里的位置
+    return first is not None and (first_delete is None or answered_at < first_delete) \
+        and "删除中" in first["params"].get("text", "")
 
 
 def deleted_ids(since):
@@ -89,12 +94,12 @@ async def scenario():
     check("Back → nothing deleted", back and PURGE_BTN in buttons(back) and not deletes(n))
 
     # 3. 确认：删除 Alice 全部投稿（含已发布）在审核群的消息，Bob 的不动
-    n = len(log); lt.cb("r:purge_ok:2:0", REVIEW, ADMIN, message_id=ctrl2)
+    n = len(log); click = lt.cb("r:purge_ok:2:0", REVIEW, ADMIN, message_id=ctrl2)
     t = await result(n, "已删除 TA 在审核群的 2 条稿件")
     gone = deleted_ids(n)
     check("confirm → all of Alice's review messages deleted (published one too), Bob's kept",
           t and alice_ids <= gone and not gone & bob_ids, (gone, alice_ids, bob_ids))
-    check("confirm → button answered (Deleting…) before deleting, result sent as a message", answered_first(n))
+    check("confirm → button answered (Deleting…) before deleting, result sent as a message", answered_first(n, click))
     c = await card(USER)
     check("/user after deleting → no 🗑 left (only 🔓)", c and buttons(c) == {"🔓 解除封禁": f"au:unban:{USER}"},
           c and buttons(c))
@@ -129,10 +134,10 @@ async def scenario():
           panel and buttons(panel))
     lt.MOCK["fail"][f"deleteMessages:{REVIEW}"] = ["Bad Request: message can't be deleted"]
     lt.MOCK["fail"][f"deleteMessage:{REVIEW}"] = ["Bad Request: not enough rights to delete a message"]
-    n = n6 = len(log); lt.cb(f"au:purge_ok:{BOB}", REVIEW, ADMIN, message_id=cid)
+    n = n6 = len(log); click = lt.cb(f"au:purge_ok:{BOB}", REVIEW, ADMIN, message_id=cid)
     t = await result(n, "删除失败")
     after = await edited(cid, n)
-    check("card: button answered (Deleting…) before deleting", answered_first(n))
+    check("card: button answered (Deleting…) before deleting", answered_first(n, click))
     check("delete fails → result says retry (replying to the card), card keeps 🗑, the deletable messages are removed",
           t and str((t["params"].get("reply_parameters") or {}).get("message_id")) == str(cid) and after and buttons(after).get(purge_n) == f"au:purge:{BOB}"
           and len(bob_ids - deleted_ids(n)) == 1, after and buttons(after))

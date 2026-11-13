@@ -33,9 +33,8 @@ async def scenario():
           kb and buttons(kb))
 
     # 1b. 连点两下：第二下按钮没变（Telegram 报 not modified），不报错，按钮也不会一直转圈
-    n = len(log); lt.cb("r:pub:1:0", REVIEW, ADMIN)
+    n, answered = await lt.press("r:pub:1:0", REVIEW, ADMIN)
     dup = await wait_for(lambda e: e["method"] == "editMessageReplyMarkup" and e.get("error"), since=n)
-    answered = await wait_for(lambda e: e["method"] == "answerCallbackQuery", since=n)
     check("double tap on Publish → 'not modified' swallowed, tap still answered", dup and answered)
 
     # 2. 点“返回”：恢复原来的按钮，仍然没有发布
@@ -90,17 +89,16 @@ async def scenario():
     banned = await wait_for(lambda e: is_send(e, "sendMessage", USER, "禁止投稿"), timeout=1, since=n)
     check("Ban → confirm panel, nobody banned yet",
           kb and any(v == "r:ban_ok:3:0" for v in buttons(kb).values()) and not banned, kb and buttons(kb))
-    n = len(log); lt.cb("r:ban_ok:3:0", REVIEW, ADMIN)
+    n = len(log); click = lt.cb("r:ban_ok:3:0", REVIEW, ADMIN)
     banned = await wait_for(lambda e: is_send(e, "sendMessage", USER, "禁止投稿"), since=n)
-    first = next((e for e in log[n:] if e["method"] == "answerCallbackQuery"), None)
-    told_at = next((i for i, e in enumerate(log[n:]) if is_send(e, "sendMessage", USER, "禁止投稿")), None)
-    answered_at = log[n:].index(first) if first else None
+    # 只认这次点击的回应：封禁面板的回应可能晚到。下标都是在 log 里的位置
+    answered_at, first = next(iter(lt.answers_of(click)), (None, None))
+    told_at = next((i for i in range(n, len(log)) if is_send(log[i], "sendMessage", USER, "禁止投稿")), None)
     check("Confirm ban → answered “banning…” before doing it, submitter banned",
           banned and first and "封禁中" in first["params"].get("text", "") and answered_at < told_at,
           first and first["params"])
     # 已经被封禁了（别人刚封过）再点确认：弹窗说明，不重复封禁、不再通知投稿人
-    n = len(log); lt.cb("r:ban_ok:3:0", REVIEW, ADMIN)
-    t = await wait_for(lambda e: e["method"] == "answerCallbackQuery", since=n)
+    n, t = await lt.press("r:ban_ok:3:0", REVIEW, ADMIN)
     await asyncio.sleep(0.5)
     check("Confirm ban again → alert “already banned”, submitter not told again",
           t and t["params"].get("show_alert") in (True, "true") and "已经被封禁" in t["params"].get("text", "")
@@ -108,9 +106,10 @@ async def scenario():
 
     # 6. 已经处理过的稿件再点“确认”：不会重复执行
     n = len(log); lt.cb("r:pub_ok:1:0", REVIEW, ADMIN)
-    await asyncio.sleep(1)
+    # 等审核群里的“状态已变化”：这是处理完的最后一步，要是会再发一次，这时已经发到频道了（不靠固定等待）
+    told = await wait_for(lambda e: is_send(e, "sendMessage", REVIEW, "状态已变化"), since=n)
     again = [e for e in log[n:] if is_send(e, "sendMessage", CHANNEL)]
-    check("Confirm on an already-published submission → nothing published twice", not again)
+    check("Confirm on an already-published submission → 'status changed', nothing published twice", told and not again)
 
     # 7. 定时发布不需要确认：点“定时发布”直接出时间面板，选了时间直接定时
     n = len(log); lt.pm("确认测试 5", who=lt.BOB)

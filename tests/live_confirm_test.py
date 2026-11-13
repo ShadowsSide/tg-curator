@@ -108,9 +108,10 @@ async def scenario():
 
     # 6. 已经处理过的稿件再点“确认”：不会重复执行
     n = len(log); lt.cb("r:pub_ok:1:0", REVIEW, ADMIN)
-    await asyncio.sleep(1)
+    # 等审核群里的“状态已变化”：这是处理完的最后一步，要是会再发一次，这时已经发到频道了（不靠固定等待）
+    told = await wait_for(lambda e: is_send(e, "sendMessage", REVIEW, "状态已变化"), since=n)
     again = [e for e in log[n:] if is_send(e, "sendMessage", CHANNEL)]
-    check("Confirm on an already-published submission → nothing published twice", not again)
+    check("Confirm on an already-published submission → 'status changed', nothing published twice", told and not again)
 
     # 7. 定时发布不需要确认：点“定时发布”直接出时间面板，选了时间直接定时
     n = len(log); lt.pm("确认测试 5", who=lt.BOB)

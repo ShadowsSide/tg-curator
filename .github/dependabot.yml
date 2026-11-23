@@ -1,8 +1,10 @@
 # Dependabot：每周检查依赖更新并自动提 PR
+# PR 都提到 DEV（target-branch），和其他改动一样走 DEV → main；直接提到 main 会一直等不到必需的检查 “test / test”
 version: 2
 updates:
   - package-ecosystem: pip
     directory: /
+    target-branch: DEV
     schedule:
       interval: weekly
     open-pull-requests-limit: 5
@@ -12,11 +14,13 @@ updates:
 
   - package-ecosystem: docker
     directory: /
+    target-branch: DEV
     schedule:
       interval: weekly
 
   - package-ecosystem: github-actions
     directory: /
+    target-branch: DEV
     schedule:
       interval: weekly
     groups:

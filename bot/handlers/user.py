@@ -21,7 +21,8 @@ USER_CONTENT = frozenset({
     ContentType.TEXT, ContentType.PHOTO, ContentType.VIDEO, ContentType.ANIMATION, ContentType.DOCUMENT,
     ContentType.AUDIO, ContentType.VOICE, ContentType.VIDEO_NOTE, ContentType.STICKER, ContentType.LIVE_PHOTO,
     ContentType.PAID_MEDIA, ContentType.STORY, ContentType.CHECKLIST, ContentType.CONTACT, ContentType.DICE,
-    ContentType.GAME, ContentType.POLL, ContentType.VENUE, ContentType.LOCATION, ContentType.UNKNOWN,
+    ContentType.GAME, ContentType.POLL, ContentType.VENUE, ContentType.LOCATION, ContentType.RICH_MESSAGE,
+    ContentType.WIDGET, ContentType.UNKNOWN,
 })
 
 

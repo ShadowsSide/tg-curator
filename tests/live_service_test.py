@@ -31,6 +31,17 @@ async def scenario():
     check("sticker → still told it's unsupported",
           await wait_for(lambda e: is_send(e, "sendMessage", USER, UNSUPPORTED), since=n))
 
+    # 机器人发的富文本消息、HTML 小组件被用户转发过来：是内容，不能被当成服务消息不吭声
+    n = len(log)
+    lt.pm(rich_message={"blocks": []})
+    check("forwarded rich message → told it's unsupported",
+          await wait_for(lambda e: is_send(e, "sendMessage", USER, UNSUPPORTED), since=n))
+
+    n = len(log)
+    lt.pm(widget={"html": "<b>widget</b>"})
+    check("forwarded widget → told it's unsupported",
+          await wait_for(lambda e: is_send(e, "sendMessage", USER, UNSUPPORTED), since=n))
+
 
 if __name__ == "__main__":
     asyncio.run(lt.main(scenario, {"REMINDER_INTERVAL_MINUTES": "0"}))

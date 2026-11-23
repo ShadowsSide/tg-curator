@@ -143,7 +143,13 @@ async def handle(request: web.Request):
             return web.json_response({"ok": False, "error_code": 400, "description": QUERY_TOO_OLD}, status=400)
 
     if m == "getme":
-        result = {"id": BOT_ID, "is_bot": True, "first_name": "TestBot", "username": "test_bot"}
+        # Bot API 10.5 起 getMe 返回 BotFullInfo，这些开关是必填的
+        result = {"id": BOT_ID, "is_bot": True, "first_name": "TestBot", "username": "test_bot",
+                  **{k: False for k in ("can_join_groups", "can_read_all_group_messages", "supports_guest_queries",
+                                        "supports_inline_queries", "needs_inline_query_location",
+                                        "can_connect_to_business", "has_main_web_app", "has_topics_enabled",
+                                        "allows_users_to_create_topics", "has_topic_sidebar", "can_manage_bots",
+                                        "supports_join_request_queries")}}
     elif m == "getchat":
         info = {"accent_color_id": 0, "max_reaction_count": 11,
                 "accepted_gift_types": {k: False for k in ("unlimited_gifts", "limited_gifts", "unique_gifts",

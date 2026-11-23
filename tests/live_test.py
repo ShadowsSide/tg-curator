@@ -727,7 +727,10 @@ async def main(scenario_fn=None, extra_env=None, allowed_errors=()):
     env = {**os.environ, "BOT_TOKEN": f"{BOT_ID}:TEST", "CHANNEL_ID": str(CHANNEL), "REVIEW_CHAT_ID": str(REVIEW),
            "TELEGRAM_API_URL": f"http://127.0.0.1:{port}", "DB_PATH": os.path.join(TMP, "bot.db"), **ISOLATED,
            "ALBUM_DELAY": "0.5", "REMINDER_INTERVAL_MINUTES": "1", "REMINDER_ONLY_WHEN_PENDING": "false",
-           "REMINDER_QUIET_HOURS": "", "TZ": "Asia/Shanghai", "PYTHONUNBUFFERED": "1", **(extra_env or {})}
+           "REMINDER_QUIET_HOURS": "", "TZ": "Asia/Shanghai", "PYTHONUNBUFFERED": "1",
+           # 每天的自动备份默认关掉：测试正好跨过 BACKUP_TIME（默认上海 04:00）时，审核群会多一条备份提醒，
+           # 打乱“审核群最后几条回复”的检查。要测备份的（live_backup_test）自己设 BACKUP_KEEP
+           "BACKUP_KEEP": "0", **(extra_env or {})}
     proc = await asyncio.create_subprocess_exec(sys.executable, "-m", "bot", cwd=PROJECT, env=env,
                                                 stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.STDOUT)
     bot_log = []
